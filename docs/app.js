@@ -130,6 +130,11 @@ function toast(msg) {
   document.body.append(t);
   setTimeout(() => t.remove(), 2600);
 }
+// replaceChildren boş değerleri "null" yazısı olarak basar; bu yardımcı onları atlar.
+function fill(el, ...nodes) {
+  el.replaceChildren(...nodes.flat().filter((n) => n !== null && n !== undefined && n !== false));
+}
+
 function render(...nodes) {
   // Soru çözerken dikkat dağılmasın diye üst çubuk ve menü gizlenir.
   const bar = state.profile && !state.session
@@ -687,7 +692,7 @@ function showQuestion() {
       : correct && confidence <= 50 ? 'Doğru, ama tahmine yakındı. Bu konuyu farklı sorularla biraz daha göreceğiz.'
       : correct && overTime ? `Doğru, ama ${fmtDuration(duration)} sürdü. LGS'de ${SUBJECTS[subject].name} sorusuna en fazla ${fmtDuration(target)} ayırabilirsin; bu konuyu biraz daha hızlandıracağız.`
       : null;
-    feedback.replaceChildren(
+    fill(feedback,
       h('p', { class: 'verdict ' + (correct ? 'ok' : 'no') }, correct ? 'Doğru' : `Yanlış. Doğru cevap ${question.answer}.`),
       coachNote ? h('p', { class: 'small' }, coachNote) : null,
       question.solution ? h('div', { class: 'note teacher' }, question.solution) : null,
@@ -887,7 +892,7 @@ async function viewReasons() {
       } catch (e) { saveBtn.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       saveBtn.remove();
       const same = REASON_GROUP[reason] === CAUSE_GROUP[r.diagnosis_cause];
-      reveal.replaceChildren(
+      fill(reveal,
         h('p', { class: 'label' }, 'Benim yorumum'),
         h('div', { class: 'note teacher' },
           h('p', {}, h('b', {}, CAUSE_LABEL[r.diagnosis_cause] || r.diagnosis_cause), same ? ' · Senin seçiminle aynı.' : ' · Senin seçiminden farklı.'),
