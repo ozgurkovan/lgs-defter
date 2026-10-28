@@ -48,7 +48,11 @@ Standard LGS order (a branş or school exam may differ; follow the booklet):
 Sözel: Türkçe 1–20, İnkılap Tarihi 1–10, Din Kültürü 1–10, İngilizce 1–10.
 Sayısal: Matematik 1–20, Fen Bilimleri 1–20. Choices are A–D.
 
-1. Read the answer key (`cevap_anahtari` photos).
+1. Read the answer key (`cevap_anahtari` photos). The key is optional in the app. If there is no
+   key photo, look for it on the last booklet pages first. If there is none, solve every question
+   yourself, twice by independent routes; where the two disagree or you are not sure, do not mark
+   the student wrong (record `outcome` from your best answer only when confident, otherwise skip
+   the question) and say in `result_note` that the deneme was graded without an answer key.
 2. Read the student's answers from the optik form if present, otherwise from the marks in the
    booklet. If the booklet shows a different, correct choice than the optik form, set
    `coding_error = true`.

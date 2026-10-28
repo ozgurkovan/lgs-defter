@@ -964,13 +964,27 @@ async function viewUpload(kind) {
 
   const status = h('p', { class: 'small muted', hidden: true });
   const sendBtn = h('button', { class: 'primary block', disabled: true, onclick: send }, 'Gönder');
+  // Gönder neden kapalı ya da neye dikkat edilmeli: düğmenin hemen altında söylenir.
+  const missingNote = h('p', { class: 'small muted' });
 
   function refresh() {
-    if (kind === 'kitap') { sendBtn.disabled = !photos.length; return; }
+    if (kind === 'kitap') {
+      sendBtn.disabled = !photos.length;
+      missingNote.textContent = photos.length ? '' : 'Göndermek için en az bir sayfa ekle.';
+      return;
+    }
     const examOk = examSel.value && (examSel.value !== '__new' || newName.value.trim());
     const hasBook = photos.some((p) => p.role === 'kitapcik');
     const hasKey = photos.some((p) => p.role === 'cevap_anahtari');
-    sendBtn.disabled = !(examOk && hasBook && hasKey);
+    const missing = [];
+    if (!examSel.value) missing.push('hangi deneme olduğunu seç');
+    else if (examSel.value === '__new' && !newName.value.trim()) missing.push('denemenin adını yaz');
+    if (!hasBook) missing.push('kitapçık sayfalarını ekle');
+    sendBtn.disabled = !(examOk && hasBook);
+    missingNote.className = missing.length ? 'small muted' : 'small';
+    missingNote.textContent = missing.length
+      ? 'Göndermek için: ' + missing.join(', ') + '.'
+      : hasKey ? '' : 'Cevap anahtarı eklemedin. Yine de gönderebilirsin: anahtar kitapçığın içindeyse onu bulurum, yoksa soruları kendim çözerim. Anahtar olursa sonuç daha güvenilir olur.';
   }
 
   async function send() {
@@ -1028,7 +1042,8 @@ async function viewUpload(kind) {
         h('p', { class: 'muted' }, 'Soru bankasından sayfa fotoğrafları. Cevap anahtarı ayrı sayfadaysa onu da çek.')),
       photoPicker('Sayfalar', 'Her sayfa düz ve net olsun, gölge düşmesin.', 'kitap_sayfa', photos, refresh),
       h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
-      sendBtn, status);
+      sendBtn, missingNote, status);
+    refresh();
     return;
   }
 
@@ -1039,10 +1054,11 @@ async function viewUpload(kind) {
       h('p', { class: 'muted' }, 'Kitapçığın tamamı, cevap anahtarı ve varsa optik formun.')),
     h('section', { class: 'card' }, h('label', { class: 'field' }, 'Hangi deneme?', examSel), newBox),
     photoPicker('1. Kitapçık sayfaları', 'Tüm sayfalar, sırayla. Karalamaların görünsün; T ve yuvarlak işaretlerin de.', 'kitapcik', photos, refresh),
-    photoPicker('2. Cevap anahtarı', null, 'cevap_anahtari', photos, refresh),
+    photoPicker('2. Cevap anahtarı', 'Kitapçığın sonundaysa ya da yoksa boş bırakabilirsin.', 'cevap_anahtari', photos, refresh),
     photoPicker('3. Optik form (varsa)', null, 'optik', photos, refresh),
     h('section', { class: 'card' }, h('h3', {}, 'Süre yetti mi?'), h('div', { class: 'chips' }, timeChips)),
-    sendBtn, status);
+    sendBtn, missingNote, status);
+  refresh();
 }
 
 // ---------------------------------------------------------------- öğrenci: konular
