@@ -149,8 +149,8 @@ const sid = () => state.student?.id;
 
 function studentSwitcher() {
   const me = state.profile;
-  if (me.role !== 'parent' || (state.students || []).length < 2) {
-    return h('span', { class: 'small muted' }, me.role === 'parent' && state.student
+  if (me.role === 'student' || (state.students || []).length < 2) {
+    return h('span', { class: 'small muted' }, me.role !== 'student' && state.student
       ? `${me.display_name || ''} · ${state.student.display_name}` : me.display_name || '');
   }
   return h('select', { id: 'student-switch', class: 'switch', 'aria-label': 'Hangi çocuk', onchange: (e) => {
@@ -217,9 +217,14 @@ function icon(name) {
 function renderTabs() {
   document.querySelector('nav.tabs')?.remove();
   if (!state.profile || state.session) return;
-  const tabs = state.profile.role === 'parent'
-    ? [['report', 'Rapor', 'report'], ['topics', 'Konular', 'topics'], ['upload', 'Deneme', 'upload'], ['book', 'Kitap', 'upload'], ['settings', 'Ayarlar', 'settings']]
-    : [['home', 'Bugün', 'home'], ['upload', 'Deneme yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']];
+  const role = state.profile.role;
+  const tabs = role === 'parent'
+    ? (state.student
+      ? [['report', 'Rapor', 'report'], ['topics', 'Konular', 'topics'], ['upload', 'Deneme', 'upload'], ['book', 'Kitap', 'upload'], ['settings', 'Ayarlar', 'settings']]
+      : [['settings', 'Ayarlar', 'settings']])
+    : role === 'teacher'
+      ? [['report', 'Rapor', 'report'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
+      : [['home', 'Bugün', 'home'], ['upload', 'Deneme yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']];
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
       h('button', { 'aria-current': state.tab === id ? 'page' : null, onclick: () => go(id) }, icon(ic), label))));
@@ -253,23 +258,34 @@ async function start() {
   }
   state.profile = profile;
   // Öğrenci kendi verisiyle çalışır; veli bağlı olduğu bütün çocukları görür ve aralarında geçiş yapar.
+  // Öğretmen, sadece velilerin kendisine açtığı çocukları görür (salt okunur).
+  await loadStudents();
+  if (!state.student) {
+    if (profile.role === 'parent') return go('settings'); // ilk çocuğu Aile bölümünden ekler
+    return render(h('div', { class: 'card' },
+      h('h2', {}, 'Henüz bağlı öğrenci yok'),
+      h('p', { class: 'muted' }, profile.role === 'teacher'
+        ? 'Bir veli size çocuğunu açtığında burada görünecek.'
+        : 'Hesabınız henüz bir öğrenciye bağlanmamış.'),
+      h('button', { onclick: signOut }, 'Çıkış yap')));
+  }
+  go(profile.role === 'student' ? 'home' : 'report');
+}
+
+async function loadStudents() {
+  const profile = state.profile;
   if (profile.role === 'student') {
     state.students = [profile];
   } else {
-    const links = await q(sb.from('family_links').select('student_id').eq('parent_id', profile.id));
+    const links = await q(sb.from('family_links').select('student_id')
+      .eq('parent_id', profile.id).eq('relation', profile.role === 'teacher' ? 'teacher' : 'parent'));
     state.students = links.length
       ? await q(sb.from('profiles').select('*').in('id', links.map((l) => l.student_id)).order('display_name'))
       : [];
   }
   let remembered = null;
   try { remembered = localStorage.getItem('defter.student'); } catch (e) { /* tarayıcı izin vermiyor */ }
-  state.student = state.students.find((s) => s.id === remembered) || state.students[0] || null;
-  if (!state.student) {
-    return render(h('div', { class: 'card' },
-      h('h2', {}, 'Bağlı öğrenci yok'),
-      h('p', { class: 'muted' }, 'Bu veli hesabına henüz bir öğrenci bağlanmamış. Bunu Claude ile tamamlayın.')));
-  }
-  go(profile.role === 'parent' ? 'report' : 'home');
+  state.student = state.students.find((s) => s.id === (state.student?.id || remembered)) || state.students[0] || null;
 }
 
 function viewLogin() {
@@ -1175,7 +1191,7 @@ async function viewTopics() {
         h('div', { class: 'row' }, subjTag(byId[g.topic_id].subject), h('b', {}, byId[g.topic_id].name)),
         g.lesson ? h('div', { class: 'note teacher' }, g.lesson) : h('p', { class: 'small muted' }, 'Kısa konu anlatımı hazırlanıyor.'),
         g.youtube_query ? h('a', { class: 'btn block', href: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(g.youtube_query), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı izle') : null))) : null,
-    maybe.length ? h('section', { class: 'stack' },
+    maybe.length && !isTeacherView() ? h('section', { class: 'stack' },
       h('h2', {}, 'Bu konuları okulda işlediniz mi?'),
       h('p', { class: 'small muted' }, 'Denemede çıktı ama hepsi boş ya da yanlış. Henüz işlenmediyse zayıflık saymıyorum.'),
       maybe.map((m) => h('div', { class: 'card' },
@@ -1185,7 +1201,9 @@ async function viewTopics() {
           h('button', { style: 'flex: 1', onclick: () => setStatus(m.topic_id, 'active') }, 'İşledik'))))) : null,
     h('section', { class: 'stack', style: 'gap: 4px' },
       h('h2', {}, 'Okulda işlenen konular'),
-      h('p', { class: 'small muted' }, isParentView()
+      h('p', { class: 'small muted' }, isTeacherView()
+        ? 'İşaretli konular okulda işlenmiş ve tekrar takviminde. Konu işaretlerini öğrenci ve veli değiştirir.'
+        : isParentView()
         ? 'İşlenen konuları işaretleyin; işaretli konular tekrar takvimine girer. İşaretsizler, yıllık plandaki haftası gelince kendiliğinden açılır.'
         : 'İşlediğin konuları işaretle; işaretli konular tekrar takvimine girer. İşlemediğin bir konunun işaretini kaldırırsan o konudan soru gelmez.')),
     SUBJECT_ORDER.map((s) => {
@@ -1209,7 +1227,7 @@ async function viewTopics() {
             tag.textContent = label;
           };
           paint();
-          const box = h('input', { type: 'checkbox', id: 'topic-' + t.id, checked: covered(t) || null, onchange: async () => {
+          const box = h('input', { type: 'checkbox', id: 'topic-' + t.id, checked: covered(t) || null, disabled: isTeacherView() || null, onchange: async () => {
             box.disabled = true;
             try {
               await setCovered(t.id, box.checked);
@@ -1229,7 +1247,8 @@ async function viewTopics() {
     !topics.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'Bu sınıfın konu listesi henüz yüklenmedi.')) : null);
 }
 
-function isParentView() { return state.profile?.role === 'parent'; }
+function isParentView() { return state.profile?.role !== 'student'; }
+function isTeacherView() { return state.profile?.role === 'teacher'; }
 
 /* Konuyu "okulda işlendi" (takibe al) ya da "işlenmedi" (beklet) yapar.
    İlk kez işaretlenen konunun ilk tekrarı yarın gelir. */
@@ -1252,17 +1271,20 @@ async function setCovered(topicId, covered) {
 // ---------------------------------------------------------------- ayarlar
 
 function viewSettings() {
-  // Çalışma ayarları öğrencinindir; veli seçili çocuğun ayarlarını değiştirir.
+  // Çalışma ayarları öğrencinindir; veli seçili çocuğun ayarlarını değiştirir. Öğretmen sadece kendi şifresini.
   const p = state.student;
-  const isParent = state.profile.role === 'parent';
-  const mm = h('input', { id: 'mistake-min', type: 'number', min: 5, max: 120, step: 5, value: p.mistake_minutes, inputmode: 'numeric' });
-  const tm = h('input', { id: 'topic-min', type: 'number', min: 5, max: 180, step: 5, value: p.topic_minutes, inputmode: 'numeric' });
-  const lgs = h('input', { id: 'lgs-date', type: 'date', value: p.lgs_date });
-  const daily = h('input', { id: 'daily-questions', type: 'number', min: 5, max: 200, step: 5, value: p.daily_questions || 40, inputmode: 'numeric' });
-  const grade = h('select', { id: 'grade' }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === p.grade }, `${g}. sınıf`)));
+  const role = state.profile.role;
+  const isParent = role === 'parent';
+  const showStudent = p && role !== 'teacher';
+  const mm = p && h('input', { id: 'mistake-min', type: 'number', min: 5, max: 120, step: 5, value: p.mistake_minutes, inputmode: 'numeric' });
+  const tm = p && h('input', { id: 'topic-min', type: 'number', min: 5, max: 180, step: 5, value: p.topic_minutes, inputmode: 'numeric' });
+  const lgs = p && h('input', { id: 'lgs-date', type: 'date', value: p.lgs_date });
+  const daily = p && h('input', { id: 'daily-questions', type: 'number', min: 5, max: 200, step: 5, value: p.daily_questions || 40, inputmode: 'numeric' });
+  const grade = p && h('select', { id: 'grade' }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === p.grade }, `${g}. sınıf`)));
   render(
-    h('header', {}, h('h1', {}, isParent ? `Ayarlar · ${p.display_name}` : 'Ayarlar')),
-    h('section', { class: 'card' },
+    h('header', {}, h('h1', {}, isParent && p ? `Ayarlar · ${p.display_name}` : 'Ayarlar')),
+    isParent ? familySection() : null,
+    showStudent && h('section', { class: 'card' },
       isParent ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
       h('label', { class: 'field' }, 'Günlük hedef soru sayısı', daily),
       h('p', { class: 'small muted' }, 'Tekrarlar bu sayıya ulaşmazsa açık, en zayıf konulardan ek çalışmayla tamamlanır.'),
@@ -1287,6 +1309,128 @@ function viewSettings() {
     h('section', { class: 'card' },
       h('p', { class: 'small muted' }, 'Ana ekrana eklemek için: Safari’de paylaş düğmesi → “Ana Ekrana Ekle”.'),
       h('button', { class: 'block', onclick: signOut }, 'Çıkış yap')));
+}
+
+// ---------------------------------------------------------------- aile yönetimi (veli)
+
+async function familyCall(body) {
+  const { data, error } = await sb.functions.invoke('family', { body });
+  if (error) {
+    let message = 'İşlem yapılamadı.';
+    try { message = (await error.context.json()).error || message; } catch (e) { /* yanıt okunamadı */ }
+    throw new Error(message);
+  }
+  return data;
+}
+
+/* Veli: çocuk ekler/siler, ikinci veliyi (eşini) ve öğretmenleri ekler; öğretmenin hangi
+   çocukları göreceğini seçer. Hesap açma/silme sunucudaki "family" fonksiyonunda yapılır. */
+function familySection() {
+  const box = h('section', { class: 'stack' }, h('h2', {}, 'Aile'), h('p', { class: 'small muted' }, 'Yükleniyor…'));
+  const reload = async () => {
+    await loadStudents();
+    if (state.tab === 'settings') viewSettings();
+  };
+  familyCall({ action: 'list' }).then(({ members, me }) => {
+    const kids = members.filter((m) => m.role === 'student').sort((a, b) => a.display_name.localeCompare(b.display_name, 'tr'));
+    const parents = members.filter((m) => m.role === 'parent');
+    const teachers = members.filter((m) => m.role === 'teacher');
+    const kidName = (id) => kids.find((k) => k.id === id)?.display_name || '';
+
+    const person = (m, extra) => h('div', { class: 'member' },
+      h('div', { class: 'stack', style: 'gap: 0; min-width: 0' },
+        h('b', {}, m.display_name + (m.id === me ? ' (sen)' : '') + (m.grade ? ` · ${m.grade}. sınıf` : '')),
+        h('span', { class: 'small muted', style: 'overflow-wrap: anywhere' }, m.email)),
+      extra || null);
+
+    // Çocuk silme: adını yazarak onaylanır.
+    const deleteControl = (kid) => {
+      const confirmBox = h('div', { class: 'stack', hidden: true },
+        h('p', { class: 'small error' }, `${kid.display_name} ve bütün verisi (denemeler, cevaplar, fotoğraflar) kalıcı olarak silinecek. Geri alınamaz.`));
+      const input = h('input', { id: 'confirm-' + kid.id, placeholder: `Onay için “${kid.display_name}” yaz` });
+      const go = h('button', { class: 'danger', disabled: true, onclick: async () => {
+        go.disabled = true;
+        try {
+          await familyCall({ action: 'delete_child', student_id: kid.id });
+          toast(`${kid.display_name} silindi.`);
+          if (state.student?.id === kid.id) state.student = null;
+          await reload();
+        } catch (e) { toast(e.message); go.disabled = false; }
+      } }, 'Kalıcı olarak sil');
+      input.addEventListener('input', () => { go.disabled = input.value.trim() !== kid.display_name; });
+      confirmBox.append(input, go);
+      return [h('button', { class: 'ghost small danger', onclick: () => { confirmBox.hidden = !confirmBox.hidden; } }, 'Sil'), confirmBox];
+    };
+
+    // Öğretmenin gördüğü çocuklar: onay kutularıyla.
+    const teacherControl = (t) => {
+      const boxes = kids.map((k) => h('label', { class: 'row small' },
+        h('input', { type: 'checkbox', value: k.id, checked: t.student_ids?.includes(k.id) || null }), k.display_name));
+      const save = h('button', { class: 'small', onclick: async () => {
+        save.disabled = true;
+        const ids = boxes.map((b) => b.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
+        try {
+          await familyCall({ action: 'set_teacher_students', teacher_id: t.id, student_ids: ids });
+          toast(ids.length ? 'Öğretmenin gördüğü çocuklar güncellendi.' : 'Öğretmenin erişimi kaldırıldı.');
+          viewSettings();
+        } catch (e) { toast(e.message); save.disabled = false; }
+      } }, 'Kaydet');
+      return h('div', { class: 'stack', style: 'gap: 6px' },
+        h('span', { class: 'small muted' }, 'Görebildiği çocuklar:'), h('div', { class: 'row' }, boxes), save);
+    };
+
+    const addForm = (kind) => {
+      const name = h('input', { id: `${kind}-name`, placeholder: 'Adı' });
+      const email = h('input', { id: `${kind}-email`, type: 'email', inputmode: 'email', placeholder: 'Giriş e-postası' });
+      const password = h('input', { id: `${kind}-password`, type: 'text', autocomplete: 'off', placeholder: 'Şifre (en az 6 karakter)' });
+      const grade = h('select', { id: `${kind}-grade` }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === 8 }, `${g}. sınıf`)));
+      const kidBoxes = kids.map((k) => h('label', { class: 'row small' }, h('input', { type: 'checkbox', value: k.id }), k.display_name));
+      const msg = h('p', { class: 'small', hidden: true });
+      const submit = h('button', { class: 'primary block', onclick: async () => {
+        submit.disabled = true;
+        msg.hidden = true;
+        const body = { action: { child: 'add_child', parent: 'add_parent', teacher: 'add_teacher' }[kind],
+          name: name.value, email: email.value, password: password.value };
+        if (kind === 'child') body.grade = +grade.value;
+        if (kind === 'teacher') body.student_ids = kidBoxes.map((b) => b.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
+        try {
+          const res = await familyCall(body);
+          toast(kind === 'teacher' && res.existing ? 'Öğretmenin mevcut hesabı bağlandı.' : 'Eklendi. Giriş bilgilerini kendisine iletin.');
+          await reload();
+        } catch (e) {
+          msg.className = 'small error'; msg.textContent = e.message; msg.hidden = false; submit.disabled = false;
+        }
+      } }, { child: 'Çocuğu ekle', parent: 'Veliyi ekle', teacher: 'Öğretmeni ekle' }[kind]);
+      return h('details', { class: 'card' },
+        h('summary', {}, h('b', {}, { child: '+ Çocuk ekle', parent: '+ Veli ekle (eş)', teacher: '+ Öğretmen ekle' }[kind])),
+        h('div', { class: 'stack', style: 'margin-top: 12px' },
+          kind === 'child' ? h('p', { class: 'small muted' }, 'Çocuğun e-postası yoksa kendi adresinize + ekleyerek bir giriş adresi yazabilirsiniz, örneğin ad+cocuk@hotmail.com. E-postalar size gelir.') : null,
+          kind === 'teacher' ? h('p', { class: 'small muted' }, 'Öğretmen sadece seçtiğiniz çocukları görür ve hiçbir şeyi değiştiremez. Öğretmenin bu uygulamada hesabı varsa şifre boş kalabilir.') : null,
+          h('label', { class: 'field' }, 'Ad', name),
+          h('label', { class: 'field' }, 'E-posta', email),
+          h('label', { class: 'field' }, 'Şifre', password),
+          kind === 'child' ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
+          kind === 'teacher' ? h('div', { class: 'stack', style: 'gap: 6px' }, h('span', { class: 'small' }, 'Görebileceği çocuklar'), h('div', { class: 'row' }, kidBoxes)) : null,
+          msg, submit));
+    };
+
+    fill(box,
+      h('h2', {}, 'Aile'),
+      h('div', { class: 'card' },
+        h('p', { class: 'label' }, 'Çocuklar'),
+        kids.length ? kids.map((k) => {
+          const [delBtn, delBox] = deleteControl(k);
+          return h('div', { class: 'stack', style: 'gap: 6px' }, person(k, delBtn), delBox);
+        }) : h('p', { class: 'small muted' }, 'Henüz çocuk eklenmedi.'),
+        h('p', { class: 'label', style: 'margin-top: 8px' }, 'Veliler'),
+        parents.map((m) => person(m)),
+        teachers.length ? [h('p', { class: 'label', style: 'margin-top: 8px' }, 'Öğretmenler'),
+          teachers.map((t) => h('div', { class: 'stack', style: 'gap: 6px' }, person(t), teacherControl(t)))] : null),
+      addForm('child'),
+      kids.length ? addForm('parent') : null,
+      kids.length ? addForm('teacher') : null);
+  }).catch((e) => fill(box, h('h2', {}, 'Aile'), h('p', { class: 'error small' }, e.message)));
+  return box;
 }
 
 // ---------------------------------------------------------------- veli raporu
@@ -1488,7 +1632,7 @@ async function viewReport() {
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
-      h('p', { class: 'label' }, 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
+      h('p', { class: 'label' }, isTeacherView() ? 'Öğretmen görünümü' : 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
       h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)),
     tiles, h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);

@@ -180,6 +180,12 @@ input, select, textarea {
 .topic-row .name { min-width: 0; }
 .topic-row .tag { white-space: nowrap; }
 
+.member { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-block: 6px; border-bottom: 1px solid var(--rule); }
+.member:last-child { border-bottom: 0; }
+details.card > summary { cursor: pointer; list-style: none; }
+details.card > summary::-webkit-details-marker { display: none; }
+.row.small input[type="checkbox"] { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+
 /* Alt menü */
 nav.tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
