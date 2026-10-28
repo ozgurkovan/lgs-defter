@@ -165,6 +165,9 @@ input, select, textarea {
   width: 100%;
 }
 
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: -8px; }
+.topbar button { min-height: 40px; color: var(--ink-soft); }
+
 /* Alt menü */
 nav.tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;

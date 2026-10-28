@@ -111,7 +111,13 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2600);
 }
 function render(...nodes) {
-  app.replaceChildren(...nodes);
+  // Soru çözerken dikkat dağılmasın diye üst çubuk ve menü gizlenir.
+  const bar = state.profile && !state.session
+    ? h('div', { class: 'topbar' },
+        h('span', { class: 'small muted' }, state.profile.display_name || ''),
+        h('button', { class: 'ghost small', onclick: signOut }, 'Çıkış yap'))
+    : null;
+  app.replaceChildren(...[bar, ...nodes].filter(Boolean));
   renderTabs();
 }
 function loading(msg = 'Yükleniyor…') {
