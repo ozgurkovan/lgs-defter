@@ -894,19 +894,49 @@ function photoPicker(title, hint, role, list, onChange) {
   };
   const cam = h('input', { type: 'file', accept: 'image/*', capture: 'environment', onchange: (e) => { add(e.target.files); e.target.value = ''; } });
   const lib = h('input', { type: 'file', accept: 'image/*', multiple: true, onchange: (e) => { add(e.target.files); e.target.value = ''; } });
+  // Panodan yapıştırma: düğmeyle (iPhone'da Safari "Yapıştır" onayı ister) ya da bilgisayarda Ctrl+V ile.
+  const paste = async () => {
+    activePicker = add;
+    try {
+      const files = [];
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith('image/'));
+        if (type) files.push(new File([await item.getType(type)], `pano-${Date.now()}.${type.split('/')[1]}`, { type }));
+      }
+      if (files.length) { add(files); toast(`${files.length} resim yapıştırıldı.`); }
+      else toast('Panoda resim yok. Önce bir resmi kopyala.');
+    } catch (e) {
+      toast('Tarayıcı panoya izin vermedi. Bilgisayarda Ctrl+V ile yapıştırabilirsin.');
+    }
+  };
   draw();
-  return h('section', { class: 'card' },
+  const card = h('section', { class: 'card', onfocusin: () => { activePicker = add; }, onclick: () => { activePicker = add; } },
     h('h3', {}, title),
     hint ? h('p', { class: 'small muted' }, hint) : null,
     grid,
     h('div', { class: 'row' },
       h('button', { style: 'flex: 1', onclick: () => cam.click() }, 'Fotoğraf çek'),
-      h('button', { style: 'flex: 1', onclick: () => lib.click() }, 'Galeriden seç')),
+      h('button', { style: 'flex: 1', onclick: () => lib.click() }, 'Galeriden seç'),
+      h('button', { style: 'flex: 1', onclick: paste }, 'Yapıştır')),
     cam, lib);
+  if (!activePicker) activePicker = add;
+  return card;
 }
+
+// Ctrl+V ile yapıştırılan resimler en son dokunulan fotoğraf bölümüne eklenir.
+let activePicker = null;
+document.addEventListener('paste', (e) => {
+  if (!activePicker || !document.querySelector('.thumbs')) return;
+  const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  activePicker(files);
+  toast(`${files.length} resim yapıştırıldı.`);
+});
 
 async function viewUpload(kind) {
   loading();
+  activePicker = null;
   const exams = kind === 'deneme' ? await q(sb.from('exams').select('*').eq('student_id', sid()).order('exam_date', { ascending: false })) : [];
   const photos = [];
   let timeNote = null;
