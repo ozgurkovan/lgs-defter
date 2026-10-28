@@ -3,6 +3,9 @@
    Tekrar takvimi bu dosyada hesaplanır (gradeItem). */
 'use strict';
 
+// Şifre sıfırlama bağlantısıyla mı gelindi? (İstemci adresteki bilgiyi okuyup sildiği için önce bakılır.)
+let cameForRecovery = /type=recovery/.test(location.hash) || /type=recovery/.test(location.search);
+
 const sb = window.supabase.createClient(window.CONFIG.url, window.CONFIG.anonKey, {
   auth: { persistSession: true, autoRefreshToken: true },
 });
@@ -215,6 +218,7 @@ async function start() {
   const { data } = await sb.auth.getSession();
   if (!data.session) return viewLogin();
   state.user = data.session.user;
+  if (cameForRecovery || state.recovery) return viewNewPassword();
   const profile = await q(sb.from('profiles').select('*').eq('id', state.user.id).maybeSingle());
   if (!profile) {
     return render(h('div', { class: 'card' },
@@ -244,12 +248,57 @@ function viewLogin() {
     h('label', { class: 'field' }, 'Şifre', pass),
     msg,
     h('button', { class: 'primary block', type: 'submit' }, 'Giriş yap'));
+  const forgot = h('button', { class: 'ghost small', type: 'button', onclick: async () => {
+    const mail = email.value.trim();
+    if (!mail) { msg.textContent = 'Önce e-posta adresini yaz.'; msg.hidden = false; return; }
+    forgot.disabled = true;
+    const { error } = await sb.auth.resetPasswordForEmail(mail, { redirectTo: location.origin + location.pathname });
+    msg.hidden = false;
+    msg.className = error ? 'error' : 'small';
+    msg.textContent = error
+      ? 'Gönderilemedi, birkaç dakika sonra tekrar dene.'
+      : 'Bu adres kayıtlıysa şifre sıfırlama bağlantısı gönderildi. E-postadaki bağlantıya dokun.';
+    forgot.disabled = false;
+  } }, 'Şifremi unuttum');
   render(
     h('div', { class: 'stack', style: 'padding-top: 12vh' },
       h('p', { class: 'label' }, 'LGS 2027'),
       h('h1', {}, 'Defter'),
       h('p', { class: 'muted' }, 'Yanlışların nereden geldiğini bul, öğrendiğini unutma.')),
-    form);
+    form, forgot);
+}
+
+function newPasswordForm(onDone) {
+  const p1 = h('input', { id: 'new-password', type: 'password', autocomplete: 'new-password', minlength: 6, required: true });
+  const p2 = h('input', { id: 'new-password-2', type: 'password', autocomplete: 'new-password', minlength: 6, required: true });
+  const msg = h('p', { class: 'error', hidden: true });
+  return h('form', { class: 'card', onsubmit: async (e) => {
+    e.preventDefault();
+    msg.hidden = true;
+    if (p1.value.length < 6) { msg.textContent = 'Şifre en az 6 karakter olmalı.'; msg.hidden = false; return; }
+    if (p1.value !== p2.value) { msg.textContent = 'İki şifre aynı değil.'; msg.hidden = false; return; }
+    const { error } = await sb.auth.updateUser({ password: p1.value });
+    if (error) { msg.textContent = 'Şifre değiştirilemedi: ' + error.message; msg.hidden = false; return; }
+    p1.value = ''; p2.value = '';
+    toast('Şifren değişti.');
+    onDone();
+  } },
+    h('label', { class: 'field' }, 'Yeni şifre', p1),
+    h('label', { class: 'field' }, 'Yeni şifre (tekrar)', p2),
+    msg,
+    h('button', { class: 'primary block', type: 'submit' }, 'Şifreyi kaydet'));
+}
+
+function viewNewPassword() {
+  state.recovery = false;
+  cameForRecovery = false;
+  history.replaceState(null, '', location.pathname);
+  render(
+    h('div', { class: 'stack', style: 'padding-top: 10vh' },
+      h('p', { class: 'label' }, 'Şifre sıfırlama'),
+      h('h1', {}, 'Yeni şifreni belirle'),
+      h('p', { class: 'muted' }, state.user?.email || '')),
+    newPasswordForm(() => start().catch((err) => render(failBox(err)))));
 }
 
 async function signOut() {
@@ -1018,6 +1067,10 @@ function viewSettings() {
         Object.assign(p, upd);
         toast('Kaydedildi.');
       } }, 'Kaydet')),
+    h('section', { class: 'stack' },
+      h('h2', {}, 'Şifreyi değiştir'),
+      h('p', { class: 'small muted' }, `${state.user?.email || ''} hesabının şifresi`),
+      newPasswordForm(() => {})),
     h('section', { class: 'card' },
       h('p', { class: 'small muted' }, 'Ana ekrana eklemek için: Safari’de paylaş düğmesi → “Ana Ekrana Ekle”.'),
       h('button', { class: 'block', onclick: signOut }, 'Çıkış yap')));
@@ -1203,5 +1256,12 @@ function splitBar(label, counts) {
 
 // ---------------------------------------------------------------- başlat
 
-sb.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') viewLogin(); });
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') viewLogin();
+  if (event === 'PASSWORD_RECOVERY') {
+    state.recovery = true;
+    state.user = session?.user || state.user;
+    viewNewPassword();
+  }
+});
 start().catch((e) => render(failBox(e)));
