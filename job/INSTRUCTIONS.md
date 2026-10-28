@@ -134,7 +134,31 @@ node tools/sb.mjs get "gap_progress?select=*"
 If `last3` has three `true` values, patch that topic's `topic_status` to `active` (keep the lesson
 and tutor note).
 
-## 4. Finish
+## 4. Question feedback (every run)
+
+The student can report a question ("Soruda sorun var"). Reports of kind `cevap_yanlis`,
+`soru_hatali`, `anlasilmiyor` and `konu_disi` already removed the question from the pool
+(`active=false`) and cancelled her result for it (`reviews.voided=true`).
+
+```
+node tools/sb.mjs get "question_feedback?status=eq.new&select=*,questions(*),reviews(answer)&order=created_at"
+```
+For each report, check the question carefully (solve it again from scratch):
+- The question really is wrong, ambiguous, or off-topic → `verdict=soru_hatali`. Keep it inactive.
+  Look at the other active questions you generated for the same topic and fix or deactivate any
+  with the same flaw.
+- The question is correct → `verdict=soru_dogru`. Set it `active=true` again only if she reported
+  it without answering (it is already seen by her, so it will not come back to her anyway).
+- Taste only (`cok_kolay`, `cok_zor`, `diger` without a real error) → `verdict=not_alindi`; adjust
+  the difficulty of new questions for that topic accordingly.
+Patch `status=checked, checked_at=now, verdict, response`. `response` is 1–3 Turkish sentences to
+her: thank her, say plainly whether she was right, and if the question was correct, explain the
+correct answer briefly and kindly. Learn from every report when generating new questions.
+
+Future (many students): a question with several independent negative reports should be retired
+for everyone; with one student, a disputed question is retired immediately.
+
+## 5. Finish
 
 Patch the `job_runs` row with `finished_at` and a one-line Turkish summary, for example
 "1 deneme işlendi (17 yanlış/boş), 24 yeni soru eklendi, 1 konu eksiği notu yazıldı." If nothing

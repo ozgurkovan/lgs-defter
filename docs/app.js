@@ -49,7 +49,18 @@ const STYLE_LABEL = {
   grafik: 'Grafik', tablo: 'Tablo', oncullu: 'Öncüllü (I-II-III)', degildir: 'Olumsuz soru kökü',
   paragraf: 'Paragraf', islem: 'İşlem', deney: 'Deney', gorsel: 'Şekil / görsel', kavram: 'Kavram',
 };
-const EXAM_KINDS = [['tam', 'Tam deneme'], ['brans', 'Branş denemesi'], ['okul', 'Okul sınavı']];
+const FEEDBACK_KINDS = [
+  ['cevap_yanlis', 'Cevap anahtarı yanlış'],
+  ['soru_hatali', 'Soruda hata var'],
+  ['anlasilmiyor', 'Soru anlaşılmıyor'],
+  ['konu_disi', 'Bu konuyla ilgili değil'],
+  ['cok_kolay', 'Çok kolay'],
+  ['cok_zor', 'Çok zor'],
+  ['diger', 'Başka bir şey'],
+];
+// Bu bildirimlerde soru sayılmaz ve havuzdan çekilir.
+const DISPUTE_KINDS = new Set(['cevap_yanlis', 'soru_hatali', 'anlasilmiyor', 'konu_disi']);
+const EXAM_KINDS =[['tam', 'Tam deneme'], ['brans', 'Branş denemesi'], ['okul', 'Okul sınavı']];
 const TIME_NOTES = ['Süre yetti', 'Sözelde sıkıştım', 'Sayısalda sıkıştım', 'İkisinde de sıkıştım'];
 
 // ---------------------------------------------------------------- yardımcılar
@@ -354,7 +365,11 @@ async function viewHome() {
     q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name)')
       .neq('status', 'draft').order('created_at', { ascending: false }).limit(4)),
   ]);
-  const todayCount = await q(sb.from('reviews').select('id, track, correct').gte('answered_at', localDate() + 'T00:00:00'));
+  const [todayCount, replies] = await Promise.all([
+    q(sb.from('reviews').select('id, track, correct').eq('voided', false).gte('answered_at', localDate() + 'T00:00:00')),
+    q(sb.from('question_feedback').select('id, kind, verdict, response, questions(stem, subject)')
+      .not('response', 'is', null).eq('response_seen', false).order('checked_at')),
+  ]);
   state.cache = { mistake, topic };
 
   const hour = new Date().getHours();
@@ -388,6 +403,21 @@ async function viewHome() {
       : null,
     sessionCard('mistake', 'Hata tekrarı', mistake),
     sessionCard('topic', 'Konu tekrarı', topic),
+    replies.length ? h('section', { class: 'stack' },
+      h('p', { class: 'label' }, 'Bildirdiğin sorular'),
+      replies.map((r) => {
+        const card = h('div', { class: 'card' },
+          h('div', { class: 'row' },
+            r.questions?.subject ? subjTag(r.questions.subject) : null,
+            h('span', { class: 'tag ' + (r.verdict === 'soru_hatali' ? 'green' : '') }, r.verdict === 'soru_hatali' ? 'Haklıydın' : 'Kontrol ettim')),
+          r.questions?.stem ? h('p', { class: 'small muted' }, r.questions.stem.slice(0, 120) + (r.questions.stem.length > 120 ? '…' : '')) : null,
+          h('div', { class: 'note teacher' }, r.response),
+          h('button', { class: 'ghost small', onclick: async () => {
+            await sb.from('question_feedback').update({ response_seen: true }).eq('id', r.id);
+            card.remove();
+          } }, 'Okudum'));
+        return card;
+      })) : null,
     subs.length ? h('section', { class: 'stack' },
       h('p', { class: 'label' }, 'Son yüklemeler'),
       subs.map((s) => h('div', { class: 'card flat', style: 'padding: 12px' },
@@ -461,7 +491,16 @@ function showQuestion() {
     hintUsed = true; hintBox.hidden = false; hintBtn.remove();
   } }, 'İpucu göster') : null;
 
+  // Geri bildirim için: bu sorunun kaydı ve takvim değişmeden önceki hali.
+  let answered = false, reviewId = null, gradePromise = null, prevItem = null, myResult = null;
+  const itemSnapshot = () => ({
+    step: item.step, ease: item.ease, consecutive_wrong: item.consecutive_wrong, interval_days: item.interval_days,
+    due_date: item.due_date, state: item.state, last_reviewed_at: item.last_reviewed_at, note: item.note,
+  });
+
   const submit = async (confident) => {
+    if (answered) return;
+    answered = true;
     clearInterval(timerId);
     const duration = Math.round((Date.now() - startedAt) / 1000);
     const correct = selected === question.answer;
@@ -474,7 +513,8 @@ function showQuestion() {
     });
     ss.stats.total++; if (correct) ss.stats.correct++;
     const list = ss.results.get(item.id) || [];
-    list.push({ correct, strong });
+    myResult = { correct, strong };
+    list.push(myResult);
     ss.results.set(item.id, list);
 
     feedback.replaceChildren(
@@ -486,16 +526,81 @@ function showQuestion() {
     feedback.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     try {
-      await q(sb.from('reviews').insert({
+      const rv = await q(sb.from('reviews').insert({
         item_id: item.id, question_id: question.id, track: item.track, answer: selected,
         correct, duration_sec: duration, confident, hint_used: hintUsed,
-      }));
-      if (entry.last) await saveItemGrade(item, list);
+      }).select('id').single());
+      reviewId = rv.id;
+      if (entry.last) {
+        prevItem = itemSnapshot();
+        gradePromise = saveItemGrade(item, list);
+        await gradePromise;
+      }
     } catch (e) {
       console.error(e);
       toast('Kaydedilemedi, internet bağlantını kontrol et.');
     }
   };
+
+  // "Soruda sorun var": soru hatalıysa sonuç sayılmaz, takvim eski haline döner, soru havuzdan çekilir.
+  const report = h('div', { class: 'card', hidden: true });
+  const reportLink = h('button', { class: 'ghost small muted', onclick: () => { report.hidden = !report.hidden; if (!report.hidden) report.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 'Soruda sorun var');
+  let reportKind = null;
+  const reportNote = h('textarea', { id: 'report-note', rows: 2, placeholder: 'İstersen kısaca açıkla (isteğe bağlı)' });
+  const reportSend = h('button', { class: 'primary', disabled: true, onclick: () => sendReport() }, 'Gönder');
+  const reportChips = FEEDBACK_KINDS.map(([k, label]) => h('button', { class: 'chip', 'aria-pressed': 'false', onclick: (e) => {
+    reportKind = k;
+    reportChips.forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget)));
+    reportSend.disabled = false;
+  } }, label));
+  report.append(
+    h('h3', {}, 'Bu soruda ne sorun var?'),
+    h('div', { class: 'chips' }, reportChips),
+    reportNote,
+    h('div', { class: 'row' }, reportSend, h('button', { class: 'ghost', onclick: () => { report.hidden = true; } }, 'Vazgeç')));
+
+  async function sendReport() {
+    reportSend.disabled = true;
+    const dispute = DISPUTE_KINDS.has(reportKind);
+    const skipped = !answered;
+    const list = ss.results.get(item.id) || [];
+    try {
+      if (skipped) {
+        // Cevaplamadan bildirdi: soru görüldü sayılır ama sonucu yok.
+        answered = true;
+        clearInterval(timerId);
+        const rv = await q(sb.from('reviews').insert({
+          item_id: item.id, question_id: question.id, track: item.track, answer: null, correct: false,
+          duration_sec: Math.round((Date.now() - startedAt) / 1000), hint_used: hintUsed, voided: true,
+        }).select('id').single());
+        reviewId = rv.id;
+      } else if (dispute && reviewId) {
+        await q(sb.from('reviews').update({ voided: true }).eq('id', reviewId));
+        const i = list.indexOf(myResult);
+        if (i >= 0) list.splice(i, 1);
+        ss.stats.total--; if (myResult?.correct) ss.stats.correct--;
+        if (gradePromise) {
+          await gradePromise.catch(() => {});
+          const madeGap = item.consecutive_wrong >= 3 && prevItem.consecutive_wrong < 3;
+          await q(sb.from('items').update(prevItem).eq('id', item.id));
+          Object.assign(item, prevItem);
+          if (madeGap) await q(sb.from('topic_status').update({ status: 'active', gap_since: null }).eq('topic_id', item.topic_id).eq('gap_since', localDate()));
+          if (list.length) await saveItemGrade(item, list);
+        }
+      }
+      if (dispute) await q(sb.from('questions').update({ active: false }).eq('id', question.id));
+      await q(sb.from('question_feedback').insert({ question_id: question.id, review_id: reviewId, kind: reportKind, note: reportNote.value.trim() || null }));
+      if (skipped && entry.last && list.length) await saveItemGrade(item, list);
+    } catch (e) {
+      console.error(e);
+      reportSend.disabled = false;
+      return toast('Gönderilemedi, tekrar dene.');
+    }
+    toast(dispute ? 'Teşekkürler. Kontrol edip cevap yazacağım; bu soru sana sayılmadı.' : 'Teşekkürler, not aldım.');
+    report.hidden = true;
+    reportLink.remove();
+    if (skipped) { ss.index++; showQuestion(); }
+  }
 
   const confirmRow = h('div', { class: 'stack', hidden: true },
     h('p', { class: 'small muted' }, 'Bu cevaptan emin misin?'),
@@ -521,7 +626,10 @@ function showQuestion() {
     h('div', { class: 'choices' }, choiceBtns),
     confirmRow,
     feedback,
-    entry.item.track === 'topic' ? notTaughtBtn : null);
+    h('div', { class: 'row', style: 'justify-content: space-between' },
+      reportLink,
+      entry.item.track === 'topic' ? notTaughtBtn : null),
+    report);
 }
 
 async function saveItemGrade(item, results) {
@@ -880,10 +988,11 @@ async function viewReport() {
     q(sb.from('topics').select('*')),
     q(sb.from('topic_status').select('*')),
     q(sb.from('items').select('*')),
-    q(sb.from('reviews').select('track, correct, duration_sec, confident, hint_used, answered_at, questions(subject, target_seconds)').gte('answered_at', addDays(localDate(), -14))),
+    q(sb.from('reviews').select('track, correct, duration_sec, confident, hint_used, answered_at, questions(subject, target_seconds)').eq('voided', false).gte('answered_at', addDays(localDate(), -14))),
     q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name)').neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
     q(sb.from('job_runs').select('*').order('started_at', { ascending: false }).limit(1)),
   ]);
+  const feedbackRows = await q(sb.from('question_feedback').select('kind, verdict, status'));
   const topicName = Object.fromEntries(topics.map((t) => [t.id, t]));
   const missed = eqs.filter((e) => e.outcome !== 'dogru');
   const studentName = state.student?.display_name || '';
@@ -1009,6 +1118,9 @@ async function viewReport() {
     subs.length ? subs.map((s) => h('div', { class: 'stack', style: 'gap: 4px' },
       h('div', { class: 'spread' }, h('span', {}, s.exams?.name || (s.kind === 'kitap' ? 'Kitap sayfaları' : 'Yükleme')), statusTag(s.status)),
       s.result_note ? h('p', { class: 'small muted' }, s.result_note) : null)) : h('p', { class: 'muted' }, 'Henüz yükleme yok.'),
+    feedbackRows.length ? h('p', { class: 'small muted' },
+      `Soru bildirimi: ${feedbackRows.length}. Kontrol edilen ${feedbackRows.filter((f) => f.status === 'checked').length}, ` +
+      `hatalı bulunan ${feedbackRows.filter((f) => f.verdict === 'soru_hatali').length}.`) : null,
     runs[0] ? h('p', { class: 'small muted' }, `Saatlik görev en son ${new Date(runs[0].started_at).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })} çalıştı.`) : null);
 
   render(
