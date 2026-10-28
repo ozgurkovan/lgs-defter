@@ -213,6 +213,15 @@ nav.tabs svg { width: 22px; height: 22px; }
 .choice.wrong { border-color: var(--red); background: var(--red-soft); }
 .choice.wrong b { background: var(--red); border-color: var(--red); color: var(--card); }
 
+/* Emin olma ölçeği: soldan sağa artan dört basamak */
+.scale { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.conf {
+  flex-direction: column; gap: 2px; padding: 8px 4px; min-height: 64px;
+  font-size: 0.75rem; font-weight: 500; line-height: 1.2; text-align: center;
+}
+.conf b { font-family: var(--font-display); font-size: 1rem; }
+.conf[aria-checked="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
 .verdict { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; }
 .verdict.ok { color: var(--green); }
 .verdict.no { color: var(--red); }

@@ -104,6 +104,8 @@ Rules:
 - The student must never see the same question twice, and never one of her own exam questions. Do
   not copy an `exam_questions` item into the pool. Each new question must differ in numbers,
   context and wording, and should test the same kazanım.
+- Items she was unsure about get extra "support" questions in styles she has not seen yet, so
+  keep every topic's pool spread across several styles, not just one.
 - Mix styles; favour the styles she missed for that topic (`exam_questions?topic_id=eq.<id>&outcome=neq.dogru&select=styles`).
 - Real LGS format: one stem, four choices A–D, exactly one correct answer, plausible distractors
   built on typical misconceptions. Keep difficulty at LGS level, not easier.
@@ -124,7 +126,8 @@ For each, using everything known about her mistakes in that topic (`exam_questio
 - `lesson`: a short Turkish lesson for her: the core idea, one worked example, the trap she keeps
   falling into.
 - `tutor_note`: for the private tutor: what exactly she gets wrong (with evidence), which
-  sub-skills to rebuild, two or three concrete exercise types.
+  sub-skills to rebuild, two or three concrete exercise types. Reviews where she was wrong with
+  `confidence` 75 or 100 are the strongest evidence of a misconception; name them first.
 - `youtube_query`: a search phrase like `LGS 8. sınıf <konu adı> konu anlatımı`.
 
 Then clear gaps that have recovered:

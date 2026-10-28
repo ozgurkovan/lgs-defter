@@ -53,6 +53,17 @@ it = { track: 'topic', step: 5, ease: 1, consecutive_wrong: 0 };
 it = { ...it, ...gradeItem(it, [{ correct: true, strong: true }, { correct: false, strong: false }], '2030-06-01') };
 check('konu tekrarında yanlış', it.step === 3, `step ${it.step}, ${it.interval_days} gün`);
 
+// Emin olma ölçeği
+it = { track: 'topic', step: 4, ease: 1, consecutive_wrong: 0 };
+let g = gradeItem(it, [{ correct: true, strong: true, confidence: 100 }], '2030-06-01');
+check('tam emin doğru: aralık uzar, destek yok', g.step === 5 && g.support === 0, `step ${g.step}, ${g.interval_days} gün`);
+g = gradeItem(it, [{ correct: true, strong: false, confidence: 75 }], '2030-06-01');
+check('%75 emin doğru: aralık aynı, 1 destek', g.step === 4 && g.support === 1, `step ${g.step}, ${g.interval_days} gün`);
+g = gradeItem(it, [{ correct: true, strong: false, confidence: 50 }], '2030-06-01');
+check('tahmine yakın doğru: bir basamak geri, 2 destek', g.step === 3 && g.support === 2, `step ${g.step}, ${g.interval_days} gün`);
+g = gradeItem(it, [{ correct: false, strong: false, confidence: 100 }], '2030-06-01');
+check('emin ama yanlış: kavram yanılgısı notu', g.step === 2 && g.support === 2 && g.note.includes('kavram'), g.note);
+
 // Sınav yakınken uzun aralık son tekrara çekilir
 const nearLgs = addDays(today, 40);
 it = { track: 'topic', step: 6, ease: 1, consecutive_wrong: 0 };

@@ -49,6 +49,7 @@ const STYLE_LABEL = {
   grafik: 'Grafik', tablo: 'Tablo', oncullu: 'Öncüllü (I-II-III)', degildir: 'Olumsuz soru kökü',
   paragraf: 'Paragraf', islem: 'İşlem', deney: 'Deney', gorsel: 'Şekil / görsel', kavram: 'Kavram',
 };
+const CONFIDENCE_LEVELS = [[25, 'Tahmin ettim'], [50, 'Kararsızım'], [75, 'Büyük ölçüde eminim'], [100, 'Tamamen eminim']];
 const FEEDBACK_KINDS = [
   ['cevap_yanlis', 'Cevap anahtarı yanlış'],
   ['soru_hatali', 'Soruda hata var'],
@@ -260,14 +261,18 @@ async function signOut() {
 // ---------------------------------------------------------------- tekrar takvimi
 
 /* Bir maddenin (yanlış soru ya da konu) bir sonraki tekrar gününü hesaplar.
-   results: o madde için bu oturumda çözülen soruların sonuçları. */
+   results: o madde için bu oturumda çözülen soruların sonuçları {correct, strong, confidence}.
+   confidence: öğrencinin emin olma ölçeği (25, 50, 75, 100).
+   support: bir sonraki tekrarda eklenecek, farklı tarzda destek sorusu sayısı. */
 function gradeItem(item, results, lgsDate) {
   const today = localDate();
   const ladder = item.track === 'mistake' ? MISTAKE_LADDER : TOPIC_LADDER;
   const allCorrect = results.every((r) => r.correct);
   const allStrong = results.every((r) => r.strong);
+  const minConfidence = Math.min(...results.map((r) => r.confidence ?? (r.strong ? 100 : 75)));
+  const confidentlyWrong = results.some((r) => !r.correct && (r.confidence ?? 0) >= 75);
   let { step, ease, consecutive_wrong } = item;
-  let note;
+  let note, support;
   let st = 'active';
 
   if (allCorrect && allStrong) {
@@ -275,15 +280,26 @@ function gradeItem(item, results, lgsDate) {
     if (step >= 3) ease = Math.min(1.3, ease * 1.03);
     step += 1;
     consecutive_wrong = 0;
-    note = 'Rahat bildi, aralık uzadı.';
-  } else if (allCorrect) {
+    support = 0;
+    note = 'Rahat ve emin bildi, aralık uzadı.';
+  } else if (allCorrect && minConfidence >= 75) {
     consecutive_wrong = 0;
-    note = 'Doğru ama yavaş, emin değil ya da ipucuyla çözdü; aralık aynı kaldı.';
+    support = 1;
+    note = 'Doğru ama tam emin değil, yavaş ya da ipucuyla; aralık aynı, sonraki tekrarda 1 destek sorusu.';
+  } else if (allCorrect) {
+    // Doğru ama tahmine yakın: bilgi oturmamış sayılır.
+    consecutive_wrong = 0;
+    step = Math.max(0, step - 1);
+    support = 2;
+    note = 'Doğru ama tahmine yakın; aralık kısaldı, sonraki tekrarda 2 destek sorusu.';
   } else {
     consecutive_wrong += 1;
     if (step >= 2) ease = Math.max(0.6, ease * 0.85);
     step = item.track === 'mistake' ? 0 : Math.max(0, step - 2);
-    note = 'Yanlış yaptı, aralık kısaldı.';
+    support = 2;
+    note = confidentlyWrong
+      ? 'Emin olduğu hâlde yanlış: kavram yanılgısı olabilir. Aralık kısaldı, farklı sorularla desteklenecek.'
+      : 'Yanlış yaptı, aralık kısaldı, farklı sorularla desteklenecek.';
   }
 
   if (item.track === 'mistake' && step >= ladder.length) {
@@ -301,7 +317,7 @@ function gradeItem(item, results, lgsDate) {
   }
   return {
     step, ease: Math.round(ease * 1000) / 1000, consecutive_wrong, interval_days: interval,
-    due_date: due, state: st, last_reviewed_at: new Date().toISOString(), note,
+    due_date: due, state: st, last_reviewed_at: new Date().toISOString(), note, support,
   };
 }
 
@@ -337,13 +353,14 @@ async function buildSession(track) {
   const used = new Set();
   const entries = [];
   let seconds = 0, shortage = 0;
-  const perItem = track === 'mistake' ? 1 : TOPIC_QUESTIONS_PER_REVIEW;
+  const basePerItem = track === 'mistake' ? 1 : TOPIC_QUESTIONS_PER_REVIEW;
   for (const it of items) {
     const styles = missedStyles[it.topic_id] || new Set();
     const candidates = shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id) && !used.has(p.id)))
       .sort((a, b) => overlap(b.styles, styles) - overlap(a.styles, styles));
     if (!candidates.length) { shortage++; continue; }
-    const picked = candidates.slice(0, perItem);
+    // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur.
+    const picked = pickVaried(candidates, basePerItem + (it.support || 0));
     const cost = picked.reduce((s, p) => s + p.target_seconds + 15, 0);
     if (entries.length && seconds + cost > budgetSec) break;
     picked.forEach((p, i) => { used.add(p.id); entries.push({ item: it, question: p, last: i === picked.length - 1 }); });
@@ -352,6 +369,20 @@ async function buildSession(track) {
   return { entries, shortage, seconds, dueCount: items.length };
 }
 function overlap(a, set) { return (a || []).filter((s) => set.has(s)).length; }
+function pickVaried(candidates, n) {
+  const picked = [], shown = new Set(), rest = [...candidates];
+  while (picked.length < n && rest.length) {
+    let best = 0, bestNew = -1;
+    rest.forEach((c, i) => {
+      const fresh = (c.styles || []).filter((s) => !shown.has(s)).length;
+      if (fresh > bestNew) { best = i; bestNew = fresh; }
+    });
+    const [c] = rest.splice(best, 1);
+    (c.styles || []).forEach((s) => shown.add(s));
+    picked.push(c);
+  }
+  return picked;
+}
 
 // ---------------------------------------------------------------- öğrenci: bugün
 
@@ -454,11 +485,12 @@ function showQuestion() {
   const subject = question.subject;
   const target = question.target_seconds || SUBJECTS[subject]?.sec || 90;
   const startedAt = Date.now();
-  let selected = null, hintUsed = false, timerId;
+  // Süre şık seçildiği anda durur; emin olma ölçeğini işaretlemek süreye eklenmez.
+  let selected = null, chosenAt = null, hintUsed = false, confidence = null, timerId;
 
   const timer = h('span', { class: 'timer num' }, '0:00');
   const tick = () => {
-    const sec = Math.round((Date.now() - startedAt) / 1000);
+    const sec = Math.round(((chosenAt || Date.now()) - startedAt) / 1000);
     timer.textContent = `${fmtDuration(sec)} / ${fmtDuration(target)}`;
     timer.classList.toggle('over', sec > target);
   };
@@ -468,6 +500,9 @@ function showQuestion() {
   const choiceBtns = ['A', 'B', 'C', 'D'].filter((k) => question.choices?.[k] !== undefined).map((k) =>
     h('button', { class: 'choice', 'aria-pressed': 'false', onclick: () => {
       selected = k;
+      chosenAt = Date.now();
+      clearInterval(timerId);
+      tick();
       choiceBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === k)));
       confirmRow.hidden = false;
     }, 'data-k': k }, h('b', {}, k), h('span', {}, question.choices[k])));
@@ -498,12 +533,13 @@ function showQuestion() {
     due_date: item.due_date, state: item.state, last_reviewed_at: item.last_reviewed_at, note: item.note,
   });
 
-  const submit = async (confident) => {
-    if (answered) return;
+  const submit = async () => {
+    if (answered || !selected || !confidence) return;
     answered = true;
     clearInterval(timerId);
-    const duration = Math.round((Date.now() - startedAt) / 1000);
+    const duration = Math.round(((chosenAt || Date.now()) - startedAt) / 1000);
     const correct = selected === question.answer;
+    const confident = confidence === 100;
     const strong = correct && confident && !hintUsed && duration <= target * 1.5;
     confirmRow.hidden = true;
     choiceBtns.forEach((b) => {
@@ -513,12 +549,16 @@ function showQuestion() {
     });
     ss.stats.total++; if (correct) ss.stats.correct++;
     const list = ss.results.get(item.id) || [];
-    myResult = { correct, strong };
+    myResult = { correct, strong, confidence };
     list.push(myResult);
     ss.results.set(item.id, list);
 
+    const coachNote = !correct && confidence >= 75
+      ? 'Emin olduğun hâlde yanlış: burada bir kavramı farklı biliyor olabilirsin. Çözümü dikkatle oku.'
+      : correct && confidence <= 50 ? 'Doğru, ama tahmine yakındı. Bu konuyu farklı sorularla biraz daha göreceğiz.' : null;
     feedback.replaceChildren(
       h('p', { class: 'verdict ' + (correct ? 'ok' : 'no') }, correct ? 'Doğru' : `Yanlış. Doğru cevap ${question.answer}.`),
+      coachNote ? h('p', { class: 'small' }, coachNote) : null,
       question.solution ? h('div', { class: 'note teacher' }, question.solution) : null,
       h('button', { class: 'primary block', onclick: () => { ss.index++; showQuestion(); } },
         ss.index + 1 < ss.entries.length ? 'Sonraki soru' : 'Bitir'));
@@ -528,7 +568,7 @@ function showQuestion() {
     try {
       const rv = await q(sb.from('reviews').insert({
         item_id: item.id, question_id: question.id, track: item.track, answer: selected,
-        correct, duration_sec: duration, confident, hint_used: hintUsed,
+        correct, duration_sec: duration, confident, confidence, hint_used: hintUsed,
       }).select('id').single());
       reviewId = rv.id;
       if (entry.last) {
@@ -602,11 +642,17 @@ function showQuestion() {
     if (skipped) { ss.index++; showQuestion(); }
   }
 
+  const sendBtn = h('button', { class: 'primary block', disabled: true, onclick: submit }, 'Cevabı gönder');
+  const confBtns = CONFIDENCE_LEVELS.map(([v, label]) =>
+    h('button', { class: 'conf', role: 'radio', 'aria-checked': 'false', onclick: (e) => {
+      confidence = v;
+      confBtns.forEach((b) => b.setAttribute('aria-checked', String(b === e.currentTarget)));
+      sendBtn.disabled = false;
+    } }, h('b', { class: 'num' }, `%${v}`), h('span', {}, label)));
   const confirmRow = h('div', { class: 'stack', hidden: true },
-    h('p', { class: 'small muted' }, 'Bu cevaptan emin misin?'),
-    h('div', { class: 'row' },
-      h('button', { class: 'primary', style: 'flex: 1', onclick: () => submit(true) }, 'Eminim'),
-      h('button', { style: 'flex: 1', onclick: () => submit(false) }, 'Emin değilim')));
+    h('p', { class: 'small muted' }, 'Bu cevaptan ne kadar eminsin?'),
+    h('div', { class: 'scale', role: 'radiogroup', 'aria-label': 'Emin olma ölçeği' }, confBtns),
+    sendBtn);
   const feedback = h('div', { class: 'stack', hidden: true });
 
   render(
@@ -988,7 +1034,7 @@ async function viewReport() {
     q(sb.from('topics').select('*')),
     q(sb.from('topic_status').select('*')),
     q(sb.from('items').select('*')),
-    q(sb.from('reviews').select('track, correct, duration_sec, confident, hint_used, answered_at, questions(subject, target_seconds)').eq('voided', false).gte('answered_at', addDays(localDate(), -14))),
+    q(sb.from('reviews').select('track, correct, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, target_seconds)').eq('voided', false).gte('answered_at', addDays(localDate(), -14))),
     q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name)').neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
     q(sb.from('job_runs').select('*').order('started_at', { ascending: false }).limit(1)),
   ]);
@@ -1085,20 +1131,26 @@ async function viewReport() {
     const bySub = {};
     for (const r of reviews) {
       const s = r.questions?.subject; if (!s) continue;
-      bySub[s] ||= { n: 0, ok: 0, slow: 0 };
+      bySub[s] ||= { n: 0, ok: 0, slow: 0, sureWrong: 0, luckyRight: 0 };
       bySub[s].n++; if (r.correct) bySub[s].ok++;
       if (r.duration_sec > (r.questions.target_seconds || 90)) bySub[s].slow++;
+      if (!r.correct && r.confidence >= 75) bySub[s].sureWrong++;
+      if (r.correct && r.confidence && r.confidence <= 50) bySub[s].luckyRight++;
     }
     const days = new Set(reviews.map((r) => r.answered_at.slice(0, 10))).size;
+    const sureWrong = Object.values(bySub).reduce((a, b) => a + b.sureWrong, 0);
     return h('section', { class: 'card' },
       h('h2', {}, 'Son 14 gün tekrarlar'),
       h('p', { class: 'small muted' }, `${reviews.length} soru, ${days} farklı günde.`),
       h('div', { class: 'scroll-x' }, h('table', {},
-        h('thead', {}, h('tr', {}, h('th', {}, 'Ders'), h('th', {}, 'Soru'), h('th', {}, 'Doğru'), h('th', {}, 'Süreyi aşan'))),
+        h('thead', {}, h('tr', {}, h('th', {}, 'Ders'), h('th', {}, 'Soru'), h('th', {}, 'Doğru'), h('th', {}, 'Süreyi aşan'), h('th', {}, 'Emin ama yanlış'), h('th', {}, 'Tahminle doğru'))),
         h('tbody', {}, SUBJECT_ORDER.filter((s) => bySub[s]).map((s) => h('tr', {},
           h('td', {}, SUBJECTS[s].name), h('td', {}, bySub[s].n),
           h('td', {}, `%${Math.round((bySub[s].ok / bySub[s].n) * 100)}`),
-          h('td', {}, `%${Math.round((bySub[s].slow / bySub[s].n) * 100)}`)))))));
+          h('td', {}, `%${Math.round((bySub[s].slow / bySub[s].n) * 100)}`),
+          h('td', {}, bySub[s].sureWrong),
+          h('td', {}, bySub[s].luckyRight)))))),
+      sureWrong ? h('p', { class: 'small' }, h('b', {}, 'Emin ama yanlış'), ' cevaplar en önemli sinyal: genelde yanlış öğrenilmiş bir kavramı gösterir. Özel derste öncelik bunlara verilmeli.') : null);
   })() : null;
 
   // Yaklaşan yük
