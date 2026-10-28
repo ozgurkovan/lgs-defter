@@ -121,6 +121,18 @@ try {
       out({ id: u.id, email: u.email, confirmed: !!u.email_confirmed_at });
       break;
     }
+    case 'recovery-link': {
+      // E-posta göndermeden şifre sıfırlama bağlantısı üretir (1 saat geçerli, tek kullanımlık).
+      const res = await fetch(`${base}/auth/v1/admin/generate_link`, {
+        method: 'POST',
+        headers: serviceHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ type: 'recovery', email: args[0], redirect_to: 'https://ozgurkovan.github.io/lgs-defter/' }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      const data = await res.json();
+      process.stdout.write((data.action_link || data.properties?.action_link) + '\n');
+      break;
+    }
     case 'get':
       out(await rest('GET', args[0]));
       break;
