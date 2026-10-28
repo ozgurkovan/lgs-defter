@@ -218,7 +218,7 @@ function renderTabs() {
   document.querySelector('nav.tabs')?.remove();
   if (!state.profile || state.session) return;
   const tabs = state.profile.role === 'parent'
-    ? [['report', 'Rapor', 'report'], ['upload', 'Deneme yükle', 'upload'], ['book', 'Kitap ekle', 'topics'], ['settings', 'Ayarlar', 'settings']]
+    ? [['report', 'Rapor', 'report'], ['topics', 'Konular', 'topics'], ['upload', 'Deneme', 'upload'], ['book', 'Kitap', 'upload'], ['settings', 'Ayarlar', 'settings']]
     : [['home', 'Bugün', 'home'], ['upload', 'Deneme yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']];
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
@@ -1146,7 +1146,6 @@ async function viewTopics() {
   const byId = Object.fromEntries(topics.map((t) => [t.id, t]));
   const gaps = statuses.filter((s) => s.status === 'gap' && byId[s.topic_id]);
   const maybe = statuses.filter((s) => s.status === 'maybe_not_taught' && byId[s.topic_id]);
-  const waiting = statuses.filter((s) => s.status === 'not_taught' && byId[s.topic_id]);
 
   const setStatus = async (topicId, status) => {
     await q(sb.from('topic_status').upsert({ student_id: sid(), topic_id: topicId, status, updated_at: new Date().toISOString() }));
@@ -1166,7 +1165,9 @@ async function viewTopics() {
   };
 
   render(
-    h('header', { class: 'stack', style: 'gap: 4px' }, h('p', { class: 'label' }, 'Konularım'), h('h1', {}, 'Ne durumdayım?')),
+    h('header', { class: 'stack', style: 'gap: 4px' },
+      h('p', { class: 'label' }, isParentView() ? `Konular · ${state.student.display_name}` : 'Konularım'),
+      h('h1', {}, isParentView() ? 'Konular' : 'Ne durumdayım?')),
     gaps.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Tekrar çalışılacak konular'),
       gaps.map((g) => h('div', { class: 'card' },
@@ -1181,23 +1182,70 @@ async function viewTopics() {
         h('div', { class: 'row' },
           h('button', { style: 'flex: 1', onclick: () => setStatus(m.topic_id, 'not_taught') }, 'Henüz işlemedik'),
           h('button', { style: 'flex: 1', onclick: () => setStatus(m.topic_id, 'active') }, 'İşledik'))))) : null,
-    waiting.length ? h('section', { class: 'stack' },
-      h('h2', {}, 'Okulda işlenmesini bekleyenler'),
-      h('p', { class: 'small muted' }, 'Bu konuları sormuyorum. Okulda işleyince “İşledik” de.'),
-      waiting.map((m) => h('div', { class: 'card', style: 'padding: 12px' },
-        h('div', { class: 'spread' },
-          h('div', { class: 'row' }, subjTag(byId[m.topic_id].subject), h('span', {}, byId[m.topic_id].name)),
-          h('button', { onclick: () => setStatus(m.topic_id, 'active') }, 'İşledik'))))) : null,
+    h('section', { class: 'stack', style: 'gap: 4px' },
+      h('h2', {}, 'Okulda işlenen konular'),
+      h('p', { class: 'small muted' }, isParentView()
+        ? 'İşlenen konuları işaretleyin; işaretli konular tekrar takvimine girer. İşaretsizler, yıllık plandaki haftası gelince kendiliğinden açılır.'
+        : 'İşlediğin konuları işaretle; işaretli konular tekrar takvimine girer. İşlemediğin bir konunun işaretini kaldırırsan o konudan soru gelmez.')),
     SUBJECT_ORDER.map((s) => {
-      const tracked = (t) => st[t.id] && st[t.id].status !== 'not_taught';
-      const list = topics.filter((t) => t.subject === s && tracked(t)).sort((a, b) => a.sort - b.sort);
-      const upcoming = topics.filter((t) => t.subject === s && !st[t.id]).length;
+      const list = topics.filter((t) => t.subject === s).sort((a, b) => a.sort - b.sort);
       if (!list.length) return null;
+      const covered = (t) => st[t.id] && st[t.id].status !== 'not_taught';
+      const count = h('span', { class: 'small muted' }, `${list.filter(covered).length} / ${list.length} işlendi`);
       return h('section', { class: 'card' },
-        h('div', { class: 'spread' }, subjTag(s), h('span', { class: 'small muted' }, `${list.length} konu takipte${upcoming ? ` · ${upcoming} konu sırada` : ''}`)),
-        list.map((t) => { const [label, color] = level(t.id); return h('div', { class: 'spread small' }, h('span', {}, t.name), h('span', { class: 'tag ' + color }, label)); }));
+        h('div', { class: 'spread' }, subjTag(s), count),
+        list.map((t) => {
+          const tag = h('span', { class: 'tag' });
+          const paint = () => {
+            if (!covered(t)) {
+              tag.className = 'tag';
+              tag.textContent = st[t.id]?.status === 'not_taught' ? 'Bekliyor'
+                : t.planned_start ? `Plan: ${fmtDate(t.planned_start)}` : '';
+              return;
+            }
+            const [label, color] = level(t.id);
+            tag.className = 'tag ' + color;
+            tag.textContent = label;
+          };
+          paint();
+          const box = h('input', { type: 'checkbox', id: 'topic-' + t.id, checked: covered(t) || null, onchange: async () => {
+            box.disabled = true;
+            try {
+              await setCovered(t.id, box.checked);
+              st[t.id] = { ...(st[t.id] || {}), status: box.checked ? 'active' : 'not_taught' };
+              if (box.checked && !items.some((i) => i.topic_id === t.id && i.track === 'topic')) items.push({ topic_id: t.id, track: 'topic', step: 0, state: 'active' });
+              paint();
+              count.textContent = `${list.filter(covered).length} / ${list.length} işlendi`;
+            } catch (e) {
+              box.checked = !box.checked;
+              toast('Kaydedilemedi, tekrar dene.');
+            }
+            box.disabled = false;
+          } });
+          return h('label', { class: 'topic-row', for: 'topic-' + t.id }, box, h('span', { class: 'name' }, t.name), tag);
+        }));
     }),
-    !topics.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'İlk denemeni yükleyince konuların burada görünecek.')) : null);
+    !topics.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'Bu sınıfın konu listesi henüz yüklenmedi.')) : null);
+}
+
+function isParentView() { return state.profile?.role === 'parent'; }
+
+/* Konuyu "okulda işlendi" (takibe al) ya da "işlenmedi" (beklet) yapar.
+   İlk kez işaretlenen konunun ilk tekrarı yarın gelir. */
+async function setCovered(topicId, covered) {
+  const now = new Date().toISOString();
+  if (!covered) {
+    await q(sb.from('topic_status').upsert({ student_id: sid(), topic_id: topicId, status: 'not_taught', updated_at: now }));
+    await q(sb.from('items').update({ state: 'paused' }).eq('student_id', sid()).eq('topic_id', topicId).eq('state', 'active'));
+    return;
+  }
+  await q(sb.from('topic_status').upsert({ student_id: sid(), topic_id: topicId, status: 'active', first_seen: localDate(), updated_at: now }));
+  const existing = await q(sb.from('items').select('id').eq('student_id', sid()).eq('topic_id', topicId).eq('track', 'topic'));
+  if (existing.length) {
+    await q(sb.from('items').update({ state: 'active' }).eq('student_id', sid()).eq('topic_id', topicId).eq('state', 'paused'));
+  } else {
+    await q(sb.from('items').insert({ student_id: sid(), track: 'topic', topic_id: topicId, step: 0, interval_days: 1, due_date: addDays(localDate(), 1) }));
+  }
 }
 
 // ---------------------------------------------------------------- ayarlar

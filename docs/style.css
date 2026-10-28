@@ -170,6 +170,16 @@ input, select, textarea {
 .topbar button { min-height: 40px; color: var(--ink-soft); }
 .topbar select.switch { width: auto; min-height: 40px; padding: 6px 10px; font-weight: 600; }
 
+/* Konu listesi: tüm satır dokunulabilir, onay kutusu büyük */
+.topic-row {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
+  min-height: 44px; padding-block: 4px; border-bottom: 1px solid var(--rule); cursor: pointer; font-size: 0.95rem;
+}
+.topic-row:last-child { border-bottom: 0; }
+.topic-row input { width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--accent); }
+.topic-row .name { min-width: 0; }
+.topic-row .tag { white-space: nowrap; }
+
 /* Alt menü */
 nav.tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
