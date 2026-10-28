@@ -168,6 +168,7 @@ input, select, textarea {
 
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: -8px; }
 .topbar button { min-height: 40px; color: var(--ink-soft); }
+.topbar select.switch { width: auto; min-height: 40px; padding: 6px 10px; font-weight: 600; }
 
 /* Alt menü */
 nav.tabs {

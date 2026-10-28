@@ -121,6 +121,24 @@ try {
       out({ id: u.id, email: u.email, confirmed: !!u.email_confirmed_at });
       break;
     }
+    case 'add-student': {
+      // Supabase'de açılmış bir hesabı öğrenci yapar: add-student <user_id> <ad> <sınıf>
+      const [id, name, grade] = args;
+      out(await rest('POST', 'profiles', { id, role: 'student', display_name: name, grade: Number(grade || 8) }));
+      break;
+    }
+    case 'add-parent': {
+      // add-parent <user_id> <ad>
+      const [id, name] = args;
+      out(await rest('POST', 'profiles', { id, role: 'parent', display_name: name }));
+      break;
+    }
+    case 'link': {
+      // Veliyi öğrenciye bağlar: link <veli_id> <öğrenci_id>
+      const [parent_id, student_id] = args;
+      out(await rest('POST', 'family_links', { parent_id, student_id }));
+      break;
+    }
     case 'recovery-link': {
       // E-posta göndermeden şifre sıfırlama bağlantısı üretir (1 saat geçerli, tek kullanımlık).
       const res = await fetch(`${base}/auth/v1/admin/generate_link`, {

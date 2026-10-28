@@ -129,13 +129,28 @@ function toast(msg) {
 function render(...nodes) {
   // Soru çözerken dikkat dağılmasın diye üst çubuk ve menü gizlenir.
   const bar = state.profile && !state.session
-    ? h('div', { class: 'topbar' },
-        h('span', { class: 'small muted' }, state.profile.display_name || ''),
+    ? h('div', { class: 'topbar' }, studentSwitcher(),
         h('button', { class: 'ghost small', onclick: signOut }, 'Çıkış yap'))
     : null;
   app.replaceChildren(...[bar, ...nodes].filter(Boolean));
   renderTabs();
 }
+// Seçili öğrenci: öğrencinin kendisi ya da velinin baktığı çocuk.
+const sid = () => state.student?.id;
+
+function studentSwitcher() {
+  const me = state.profile;
+  if (me.role !== 'parent' || (state.students || []).length < 2) {
+    return h('span', { class: 'small muted' }, me.role === 'parent' && state.student
+      ? `${me.display_name || ''} · ${state.student.display_name}` : me.display_name || '');
+  }
+  return h('select', { id: 'student-switch', class: 'switch', 'aria-label': 'Hangi çocuk', onchange: (e) => {
+    state.student = state.students.find((s) => s.id === e.target.value);
+    try { localStorage.setItem('defter.student', state.student.id); } catch (err) { /* önemli değil */ }
+    go(state.tab);
+  } }, state.students.map((s) => h('option', { value: s.id, selected: s.id === sid() }, `${s.display_name} · ${s.grade}. sınıf`)));
+}
+
 function loading(msg = 'Yükleniyor…') {
   render(h('p', { class: 'boot' }, msg));
 }
@@ -194,7 +209,7 @@ function renderTabs() {
   document.querySelector('nav.tabs')?.remove();
   if (!state.profile || state.session) return;
   const tabs = state.profile.role === 'parent'
-    ? [['report', 'Rapor', 'report'], ['book', 'Kitap ekle', 'upload'], ['settings', 'Ayarlar', 'settings']]
+    ? [['report', 'Rapor', 'report'], ['upload', 'Deneme yükle', 'upload'], ['book', 'Kitap ekle', 'topics'], ['settings', 'Ayarlar', 'settings']]
     : [['home', 'Bugün', 'home'], ['upload', 'Deneme yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']];
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
@@ -228,9 +243,23 @@ async function start() {
       h('button', { onclick: signOut }, 'Çıkış yap')));
   }
   state.profile = profile;
-  // Veli tarafı, öğrencinin ayarlarını ve adını öğrencinin profilinden okur.
-  state.student = profile.role === 'student' ? profile
-    : await q(sb.from('profiles').select('*').eq('role', 'student').order('created_at').limit(1).maybeSingle());
+  // Öğrenci kendi verisiyle çalışır; veli bağlı olduğu bütün çocukları görür ve aralarında geçiş yapar.
+  if (profile.role === 'student') {
+    state.students = [profile];
+  } else {
+    const links = await q(sb.from('family_links').select('student_id').eq('parent_id', profile.id));
+    state.students = links.length
+      ? await q(sb.from('profiles').select('*').in('id', links.map((l) => l.student_id)).order('display_name'))
+      : [];
+  }
+  let remembered = null;
+  try { remembered = localStorage.getItem('defter.student'); } catch (e) { /* tarayıcı izin vermiyor */ }
+  state.student = state.students.find((s) => s.id === remembered) || state.students[0] || null;
+  if (!state.student) {
+    return render(h('div', { class: 'card' },
+      h('h2', {}, 'Bağlı öğrenci yok'),
+      h('p', { class: 'muted' }, 'Bu veli hesabına henüz bir öğrenci bağlanmamış. Bunu Claude ile tamamlayın.')));
+  }
   go(profile.role === 'parent' ? 'report' : 'home');
 }
 
@@ -376,17 +405,17 @@ function gradeItem(item, results, lgsDate) {
    her birine daha önce hiç görülmemiş bir soru seçilir, süre bütçesine sığdırılır. */
 async function buildSession(track) {
   const today = localDate();
-  const budgetSec = (track === 'mistake' ? state.profile.mistake_minutes : state.profile.topic_minutes) * 60;
+  const budgetSec = (track === 'mistake' ? state.student.mistake_minutes : state.student.topic_minutes) * 60;
   const items = await q(sb.from('items').select('*, topics(subject, name)')
-    .eq('track', track).eq('state', 'active').lte('due_date', today));
+    .eq('student_id', sid()).eq('track', track).eq('state', 'active').lte('due_date', today));
   if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0 };
 
   const topicIds = [...new Set(items.map((i) => i.topic_id))];
   const [pool, seenRows, missRows] = await Promise.all([
     q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution')
       .in('topic_id', topicIds).eq('active', true)),
-    q(sb.from('reviews').select('question_id')),
-    q(sb.from('exam_questions').select('topic_id, styles').neq('outcome', 'dogru').in('topic_id', topicIds)),
+    q(sb.from('reviews').select('question_id').eq('student_id', sid())),
+    q(sb.from('exam_questions').select('topic_id, styles').eq('student_id', sid()).neq('outcome', 'dogru').in('topic_id', topicIds)),
   ]);
   const seen = new Set(seenRows.map((r) => r.question_id));
   const missedStyles = {};
@@ -442,15 +471,15 @@ async function viewHome() {
   const [mistake, topic, reasons, subs] = await Promise.all([
     buildSession('mistake'),
     buildSession('topic'),
-    q(sb.from('exam_questions').select('id', { count: 'exact', head: false }).neq('outcome', 'dogru')
+    q(sb.from('exam_questions').select('id').eq('student_id', sid()).neq('outcome', 'dogru')
       .is('student_reason', null).not('diagnosis_cause', 'is', null)),
     q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name)')
-      .neq('status', 'draft').order('created_at', { ascending: false }).limit(4)),
+      .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(4)),
   ]);
   const [todayCount, replies] = await Promise.all([
-    q(sb.from('reviews').select('id, track, correct').eq('voided', false).gte('answered_at', localDate() + 'T00:00:00')),
+    q(sb.from('reviews').select('id, track, correct').eq('student_id', sid()).eq('voided', false).gte('answered_at', localDate() + 'T00:00:00')),
     q(sb.from('question_feedback').select('id, kind, verdict, response, questions(stem, subject)')
-      .not('response', 'is', null).eq('response_seen', false).order('checked_at')),
+      .eq('student_id', sid()).not('response', 'is', null).eq('response_seen', false).order('checked_at')),
   ]);
   state.cache = { mistake, topic };
 
@@ -475,7 +504,7 @@ async function viewHome() {
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })),
       h('h1', {}, name ? `${hello}, ${name}` : hello),
-      h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.profile.lgs_date)} gün var.`)),
+      h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`)),
     reasons.length
       ? h('section', { class: 'card', style: 'border-color: var(--red)' },
           h('p', { class: 'label', style: 'color: var(--red)' }, 'Önce bu'),
@@ -563,8 +592,8 @@ function showQuestion() {
     clearInterval(timerId);
     notTaughtBtn.disabled = true;
     try {
-      await q(sb.from('topic_status').upsert({ topic_id: item.topic_id, status: 'not_taught', updated_at: new Date().toISOString() }));
-      await q(sb.from('items').update({ state: 'paused' }).eq('topic_id', item.topic_id).neq('state', 'done'));
+      await q(sb.from('topic_status').upsert({ student_id: sid(), topic_id: item.topic_id, status: 'not_taught', updated_at: new Date().toISOString() }));
+      await q(sb.from('items').update({ state: 'paused' }).eq('student_id', sid()).eq('topic_id', item.topic_id).neq('state', 'done'));
     } catch (e) { notTaughtBtn.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
     const rest = ss.entries.slice(ss.index + 1).filter((en) => en.item.topic_id !== item.topic_id);
     ss.entries = [...ss.entries.slice(0, ss.index), ...rest];
@@ -618,7 +647,7 @@ function showQuestion() {
 
     try {
       const rv = await q(sb.from('reviews').insert({
-        item_id: item.id, question_id: question.id, track: item.track, answer: selected,
+        student_id: sid(), item_id: item.id, question_id: question.id, track: item.track, answer: selected,
         correct, duration_sec: duration, confident, confidence, hint_used: hintUsed,
       }).select('id').single());
       reviewId = rv.id;
@@ -661,7 +690,7 @@ function showQuestion() {
         answered = true;
         clearInterval(timerId);
         const rv = await q(sb.from('reviews').insert({
-          item_id: item.id, question_id: question.id, track: item.track, answer: null, correct: false,
+          student_id: sid(), item_id: item.id, question_id: question.id, track: item.track, answer: null, correct: false,
           duration_sec: Math.round((Date.now() - startedAt) / 1000), hint_used: hintUsed, voided: true,
         }).select('id').single());
         reviewId = rv.id;
@@ -675,12 +704,12 @@ function showQuestion() {
           const madeGap = item.consecutive_wrong >= 3 && prevItem.consecutive_wrong < 3;
           await q(sb.from('items').update(prevItem).eq('id', item.id));
           Object.assign(item, prevItem);
-          if (madeGap) await q(sb.from('topic_status').update({ status: 'active', gap_since: null }).eq('topic_id', item.topic_id).eq('gap_since', localDate()));
+          if (madeGap) await q(sb.from('topic_status').update({ status: 'active', gap_since: null }).eq('student_id', sid()).eq('topic_id', item.topic_id).eq('gap_since', localDate()));
           if (list.length) await saveItemGrade(item, list);
         }
       }
-      if (dispute) await q(sb.from('questions').update({ active: false }).eq('id', question.id));
-      await q(sb.from('question_feedback').insert({ question_id: question.id, review_id: reviewId, kind: reportKind, note: reportNote.value.trim() || null }));
+      if (dispute) await q(sb.rpc('retire_reported_question', { qid: question.id }));
+      await q(sb.from('question_feedback').insert({ student_id: sid(), question_id: question.id, review_id: reviewId, kind: reportKind, note: reportNote.value.trim() || null }));
       if (skipped && entry.last && list.length) await saveItemGrade(item, list);
     } catch (e) {
       console.error(e);
@@ -730,18 +759,18 @@ function showQuestion() {
 }
 
 async function saveItemGrade(item, results) {
-  const upd = gradeItem(item, results, state.profile.lgs_date);
+  const upd = gradeItem(item, results, state.student.lgs_date);
   await q(sb.from('items').update(upd).eq('id', item.id));
   Object.assign(item, upd);
   if (upd.state === 'done') {
     // Hata takibi bitti: konu tekrarı yoksa başlat.
-    const existing = await q(sb.from('items').select('id').eq('track', 'topic').eq('topic_id', item.topic_id));
+    const existing = await q(sb.from('items').select('id').eq('student_id', sid()).eq('track', 'topic').eq('topic_id', item.topic_id));
     if (!existing.length) {
-      await q(sb.from('items').insert({ track: 'topic', topic_id: item.topic_id, step: 1, interval_days: 3, due_date: addDays(localDate(), 3) }));
+      await q(sb.from('items').insert({ student_id: sid(), track: 'topic', topic_id: item.topic_id, step: 1, interval_days: 3, due_date: addDays(localDate(), 3) }));
     }
   }
   if (upd.consecutive_wrong >= 3) {
-    await q(sb.from('topic_status').upsert({ topic_id: item.topic_id, status: 'gap', gap_since: localDate(), updated_at: new Date().toISOString() }));
+    await q(sb.from('topic_status').upsert({ student_id: sid(), topic_id: item.topic_id, status: 'gap', gap_since: localDate(), updated_at: new Date().toISOString() }));
   }
 }
 
@@ -763,7 +792,7 @@ async function viewReasons() {
   loading();
   const rows = await q(sb.from('exam_questions')
     .select('*, topics(name), exams(name)')
-    .neq('outcome', 'dogru').is('student_reason', null).not('diagnosis_cause', 'is', null)
+    .eq('student_id', sid()).neq('outcome', 'dogru').is('student_reason', null).not('diagnosis_cause', 'is', null)
     .order('exam_id').order('subject').order('q_no'));
   if (!rows.length) return go('home');
   let i = 0;
@@ -878,7 +907,7 @@ function photoPicker(title, hint, role, list, onChange) {
 
 async function viewUpload(kind) {
   loading();
-  const exams = kind === 'deneme' ? await q(sb.from('exams').select('*').order('exam_date', { ascending: false })) : [];
+  const exams = kind === 'deneme' ? await q(sb.from('exams').select('*').eq('student_id', sid()).order('exam_date', { ascending: false })) : [];
   const photos = [];
   let timeNote = null;
 
@@ -922,15 +951,18 @@ async function viewUpload(kind) {
       if (kind === 'deneme') {
         examId = examSel.value;
         if (examId === '__new') {
-          const ex = await q(sb.from('exams').insert({ name: newName.value.trim(), exam_date: newDate.value, kind: newKind.value, time_note: timeNote }).select().single());
+          const ex = await q(sb.from('exams').insert({ student_id: sid(), name: newName.value.trim(), exam_date: newDate.value, kind: newKind.value, time_note: timeNote }).select().single());
           examId = ex.id;
         } else if (timeNote) {
           await q(sb.from('exams').update({ time_note: timeNote }).eq('id', examId));
         }
       }
+      // Deneme öğrenciye aittir; kitap sayfaları herkesin kullandığı ortak havuza gider.
       const sub = await q(sb.from('submissions').insert({
-        kind, exam_id: examId, uploaded_by: state.user.id, note: kind === 'kitap' ? noteInput.value.trim() || null : null,
+        kind, exam_id: examId, student_id: kind === 'deneme' ? sid() : null, uploaded_by: state.user.id,
+        note: kind === 'kitap' ? noteInput.value.trim() || null : null,
       }).select().single());
+      const folder = kind === 'deneme' ? `${sid()}/${sub.id}` : `books/${sub.id}`;
       const order = { kitapcik: 0, cevap_anahtari: 1, optik: 2, kitap_sayfa: 0 };
       const sorted = [...photos].sort((a, b) => order[a.role] - order[b.role]);
       let n = 0;
@@ -938,7 +970,7 @@ async function viewUpload(kind) {
         n++;
         status.textContent = `Fotoğraflar yükleniyor: ${n} / ${sorted.length}`;
         const blob = await compressImage(p.file);
-        const path = `${sub.id}/${String(n).padStart(3, '0')}-${p.role}.jpg`;
+        const path = `${folder}/${String(n).padStart(3, '0')}-${p.role}.jpg`;
         const { error } = await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
         if (error) throw error;
         await q(sb.from('submission_photos').insert({ submission_id: sub.id, storage_path: path, photo_role: p.role, sort: n }));
@@ -972,7 +1004,8 @@ async function viewUpload(kind) {
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
-      h('p', { class: 'label' }, 'Deneme yükle'), h('h1', {}, 'Denemeni gönder'),
+      h('p', { class: 'label' }, 'Deneme yükle'),
+      h('h1', {}, state.profile.role === 'parent' ? `${state.student.display_name} için deneme gönder` : 'Denemeni gönder'),
       h('p', { class: 'muted' }, 'Kitapçığın tamamı, cevap anahtarı ve varsa optik formun.')),
     h('section', { class: 'card' }, h('label', { class: 'field' }, 'Hangi deneme?', examSel), newBox),
     photoPicker('1. Kitapçık sayfaları', 'Tüm sayfalar, sırayla. Karalamaların görünsün; T ve yuvarlak işaretlerin de.', 'kitapcik', photos, refresh),
@@ -987,9 +1020,9 @@ async function viewUpload(kind) {
 async function viewTopics() {
   loading();
   const [topics, statuses, items] = await Promise.all([
-    q(sb.from('topics').select('*')),
-    q(sb.from('topic_status').select('*')),
-    q(sb.from('items').select('topic_id, track, step, state, due_date')),
+    q(sb.from('topics').select('*').eq('grade', state.student.grade)),
+    q(sb.from('topic_status').select('*').eq('student_id', sid())),
+    q(sb.from('items').select('topic_id, track, step, state, due_date').eq('student_id', sid())),
   ]);
   const st = Object.fromEntries(statuses.map((s) => [s.topic_id, s]));
   const byId = Object.fromEntries(topics.map((t) => [t.id, t]));
@@ -998,8 +1031,8 @@ async function viewTopics() {
   const waiting = statuses.filter((s) => s.status === 'not_taught' && byId[s.topic_id]);
 
   const setStatus = async (topicId, status) => {
-    await q(sb.from('topic_status').upsert({ topic_id: topicId, status, updated_at: new Date().toISOString() }));
-    await q(sb.from('items').update({ state: status === 'not_taught' ? 'paused' : 'active' }).eq('topic_id', topicId).neq('state', 'done'));
+    await q(sb.from('topic_status').upsert({ student_id: sid(), topic_id: topicId, status, updated_at: new Date().toISOString() }));
+    await q(sb.from('items').update({ state: status === 'not_taught' ? 'paused' : 'active' }).eq('student_id', sid()).eq('topic_id', topicId).neq('state', 'done'));
     toast(status === 'not_taught' ? 'Tamam, konu işlenene kadar bekletiyorum.' : 'Tamam, takibe aldım.');
     viewTopics();
   };
@@ -1052,18 +1085,23 @@ async function viewTopics() {
 // ---------------------------------------------------------------- ayarlar
 
 function viewSettings() {
-  const p = state.student || state.profile;
+  // Çalışma ayarları öğrencinindir; veli seçili çocuğun ayarlarını değiştirir.
+  const p = state.student;
+  const isParent = state.profile.role === 'parent';
   const mm = h('input', { id: 'mistake-min', type: 'number', min: 5, max: 120, step: 5, value: p.mistake_minutes, inputmode: 'numeric' });
   const tm = h('input', { id: 'topic-min', type: 'number', min: 5, max: 180, step: 5, value: p.topic_minutes, inputmode: 'numeric' });
   const lgs = h('input', { id: 'lgs-date', type: 'date', value: p.lgs_date });
+  const grade = h('select', { id: 'grade' }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === p.grade }, `${g}. sınıf`)));
   render(
-    h('header', {}, h('h1', {}, 'Ayarlar')),
+    h('header', {}, h('h1', {}, isParent ? `Ayarlar · ${p.display_name}` : 'Ayarlar')),
     h('section', { class: 'card' },
+      isParent ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
       h('label', { class: 'field' }, 'Hata tekrarı için günlük süre (dakika)', mm),
       h('label', { class: 'field' }, 'Konu tekrarı için günlük üst sınır (dakika)', tm),
       h('label', { class: 'field' }, 'LGS tarihi', lgs),
       h('button', { class: 'primary block', onclick: async () => {
         const upd = { mistake_minutes: +mm.value || 30, topic_minutes: +tm.value || 60, lgs_date: lgs.value || p.lgs_date };
+        if (isParent) upd.grade = +grade.value;
         // Süreler öğrencinin profilinde tutulur; veli de oradan değiştirir.
         await q(sb.from('profiles').update(upd).eq('id', p.id));
         Object.assign(p, upd);
@@ -1082,18 +1120,19 @@ function viewSettings() {
 
 async function viewReport() {
   loading('Rapor hazırlanıyor…');
+  const s = sid();
   const [exams, results, eqs, topics, statuses, items, reviews, subs, runs] = await Promise.all([
-    q(sb.from('exams').select('*').order('exam_date')),
-    q(sb.from('exam_results').select('*')),
-    q(sb.from('exam_questions').select('exam_id, subject, topic_id, styles, outcome, marked_guess, coding_error, diagnosis_cause, student_reason, misconception')),
-    q(sb.from('topics').select('*')),
-    q(sb.from('topic_status').select('*')),
-    q(sb.from('items').select('*')),
-    q(sb.from('reviews').select('track, correct, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, target_seconds)').eq('voided', false).gte('answered_at', addDays(localDate(), -14))),
-    q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name)').neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
+    q(sb.from('exams').select('*').eq('student_id', s).order('exam_date')),
+    q(sb.from('exam_results').select('*').eq('student_id', s)),
+    q(sb.from('exam_questions').select('exam_id, subject, topic_id, styles, outcome, marked_guess, coding_error, diagnosis_cause, student_reason, misconception').eq('student_id', s)),
+    q(sb.from('topics').select('*').eq('grade', state.student.grade)),
+    q(sb.from('topic_status').select('*').eq('student_id', s)),
+    q(sb.from('items').select('*').eq('student_id', s)),
+    q(sb.from('reviews').select('track, correct, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, target_seconds)').eq('student_id', s).eq('voided', false).gte('answered_at', addDays(localDate(), -14))),
+    q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name)').or(`student_id.eq.${s},student_id.is.null`).neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
     q(sb.from('job_runs').select('*').order('started_at', { ascending: false }).limit(1)),
   ]);
-  const feedbackRows = await q(sb.from('question_feedback').select('kind, verdict, status'));
+  const feedbackRows = await q(sb.from('question_feedback').select('kind, verdict, status').eq('student_id', s));
   const topicName = Object.fromEntries(topics.map((t) => [t.id, t]));
   const missed = eqs.filter((e) => e.outcome !== 'dogru');
   const studentName = state.student?.display_name || '';
