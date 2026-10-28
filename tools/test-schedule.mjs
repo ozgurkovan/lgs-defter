@@ -1,0 +1,62 @@
+// Tekrar takviminin (gradeItem) örnek senaryolarla kontrolü: node tools/test-schedule.mjs
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const src = readFileSync(join(root, 'docs', 'app.js'), 'utf8');
+const pick = (from, to) => src.slice(src.indexOf(from), src.indexOf(to));
+const code = [
+  pick('const MISTAKE_LADDER', 'const REASONS'),
+  pick('function localDate', 'function fmtDate'),
+  pick('function gradeItem', '/* Bugünün oturumunu'),
+  'return { gradeItem, localDate, addDays };',
+].join('\n');
+const { gradeItem, localDate, addDays } = new Function(code)();
+
+const today = localDate();
+const lgs = '2027-06-13';
+const ok = (r) => [{ correct: true, strong: r !== 'weak' }];
+const wrong = [{ correct: false, strong: false }];
+let fails = 0;
+const check = (label, cond, info) => { if (!cond) fails++; console.log(`${cond ? 'OK  ' : 'FAIL'} ${label}${info ? '  ' + info : ''}`); };
+
+// Hata takibi: hep rahat doğru → 2, 4, 14, 30 gün sonra bitiş (ease küçük artar)
+let it = { track: 'mistake', step: 0, ease: 1, consecutive_wrong: 0 };
+const gaps = [];
+for (let i = 0; i < 5; i++) { it = { ...it, ...gradeItem(it, ok(), lgs) }; gaps.push(it.interval_days + (it.state === 'done' ? '(bitti)' : '')); }
+check('hata takibi merdiveni', it.state === 'done', gaps.join(' → '));
+
+// Yanlış → başa döner, ertesi gün
+it = { track: 'mistake', step: 3, ease: 1, consecutive_wrong: 0 };
+it = { ...it, ...gradeItem(it, wrong, lgs) };
+check('yanlışta başa dönüş', it.step === 0 && it.interval_days === 1 && it.due_date === addDays(today, 1), `step ${it.step}, ${it.interval_days} gün, ease ${it.ease}`);
+
+// Yavaş/emin değil doğru → aralık aynı
+it = { track: 'mistake', step: 2, ease: 1, consecutive_wrong: 1 };
+it = { ...it, ...gradeItem(it, ok('weak'), lgs) };
+check('zayıf doğruda aralık aynı', it.step === 2 && it.interval_days === 4 && it.consecutive_wrong === 0, `${it.interval_days} gün`);
+
+// Üç yanlış üst üste → consecutive_wrong 3 (konu eksiği işareti)
+it = { track: 'mistake', step: 0, ease: 1, consecutive_wrong: 0 };
+for (let i = 0; i < 3; i++) it = { ...it, ...gradeItem(it, wrong, lgs) };
+check('3 yanlış üst üste', it.consecutive_wrong === 3);
+
+// Konu tekrarı Fibonacci
+it = { track: 'topic', step: 0, ease: 1, consecutive_wrong: 0 };
+const fib = [];
+for (let i = 0; i < 9; i++) { it = { ...it, ...gradeItem(it, [{ correct: true, strong: true }, { correct: true, strong: true }], '2030-06-01') }; fib.push(it.interval_days); }
+check('konu tekrarı aralıkları', fib[0] === 3 && fib[fib.length - 1] >= 55, fib.join(' → '));
+
+// Konu tekrarında yanlış → iki basamak geri
+it = { track: 'topic', step: 5, ease: 1, consecutive_wrong: 0 };
+it = { ...it, ...gradeItem(it, [{ correct: true, strong: true }, { correct: false, strong: false }], '2030-06-01') };
+check('konu tekrarında yanlış', it.step === 3, `step ${it.step}, ${it.interval_days} gün`);
+
+// Sınav yakınken uzun aralık son tekrara çekilir
+const nearLgs = addDays(today, 40);
+it = { track: 'topic', step: 6, ease: 1, consecutive_wrong: 0 };
+it = { ...it, ...gradeItem(it, [{ correct: true, strong: true }], nearLgs) };
+check('sınav öncesi son tekrar', it.due_date === addDays(nearLgs, -10), `${it.due_date} (sınav ${nearLgs})`);
+
+process.exit(fails ? 1 : 0);

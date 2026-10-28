@@ -1,0 +1,6 @@
+# Gizli anahtarlar asla repoya girmez
+.secrets/
+*.env
+node_modules/
+# Saatlik görevin indirdiği fotoğraflar ve ara dosyalar
+.work/
