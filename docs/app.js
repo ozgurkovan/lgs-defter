@@ -342,8 +342,15 @@ function viewNewPassword() {
 }
 
 async function signOut() {
-  await sb.auth.signOut();
-  state.user = null; state.profile = null;
+  // Sunucu oturumu bulamazsa kütüphane yerel kaydı silmiyor; ortak telefonda hesap açık kalmasın diye
+  // önce normal çıkış, sonra yerel çıkış, en son kayıt anahtarı elle silinir.
+  try { await sb.auth.signOut(); } catch (e) { /* aşağıda yerelden temizlenir */ }
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) { /* aşağıda elle temizlenir */ }
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch (e) { /* tarayıcı depolamaya izin vermiyor */ }
+  state.user = null; state.profile = null; state.student = null; state.students = [];
   viewLogin();
 }
 
