@@ -280,31 +280,32 @@ function viewLogin() {
     e.preventDefault();
     msg.hidden = true;
     const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pass.value });
-    if (error) { msg.textContent = 'E-posta veya şifre yanlış.'; msg.hidden = false; return; }
+    if (error) { msg.className = 'error'; msg.textContent = 'E-posta veya şifre yanlış.'; msg.hidden = false; return; }
     start().catch((err) => render(failBox(err)));
   } },
     h('label', { class: 'field' }, 'E-posta', email),
     h('label', { class: 'field' }, 'Şifre', pass),
     msg,
-    h('button', { class: 'primary block', type: 'submit' }, 'Giriş yap'));
-  const forgot = h('button', { class: 'ghost small', type: 'button', onclick: async () => {
-    const mail = email.value.trim();
-    if (!mail) { msg.textContent = 'Önce e-posta adresini yaz.'; msg.hidden = false; return; }
-    forgot.disabled = true;
-    const { error } = await sb.auth.resetPasswordForEmail(mail, { redirectTo: location.origin + location.pathname });
-    msg.hidden = false;
-    msg.className = error ? 'error' : 'small';
-    msg.textContent = error
-      ? 'Gönderilemedi, birkaç dakika sonra tekrar dene.'
-      : 'Bu adres kayıtlıysa şifre sıfırlama bağlantısı gönderildi. E-postadaki bağlantıya dokun.';
-    forgot.disabled = false;
-  } }, 'Şifremi unuttum');
+    h('button', { class: 'primary block', type: 'submit' }, 'Giriş yap'),
+    h('button', { class: 'block', type: 'button', onclick: async (e) => {
+      const forgot = e.currentTarget;
+      const mail = email.value.trim();
+      msg.hidden = false;
+      if (!mail) { msg.className = 'error'; msg.textContent = 'Önce yukarıya e-posta adresini yaz.'; return; }
+      forgot.disabled = true;
+      const { error } = await sb.auth.resetPasswordForEmail(mail, { redirectTo: location.origin + location.pathname });
+      msg.className = error ? 'error' : 'small';
+      msg.textContent = error
+        ? 'Şu an gönderilemedi (saatte en fazla 2 sıfırlama e-postası gidebiliyor). Biraz sonra tekrar dene ya da velinden yardım iste.'
+        : 'Bu adres kayıtlıysa şifre sıfırlama bağlantısı gönderildi. E-postadaki bağlantıya dokun.';
+      forgot.disabled = false;
+    } }, 'Şifremi unuttum'));
   render(
     h('div', { class: 'stack', style: 'padding-top: 12vh' },
       h('p', { class: 'label' }, 'LGS 2027'),
       h('h1', {}, 'Defter'),
       h('p', { class: 'muted' }, 'Yanlışların nereden geldiğini bul, öğrendiğini unutma.')),
-    form, forgot);
+    form);
 }
 
 function newPasswordForm(onDone) {
