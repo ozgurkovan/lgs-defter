@@ -132,7 +132,7 @@ function toast(msg) {
 }
 // replaceChildren boş değerleri "null" yazısı olarak basar; bu yardımcı onları atlar.
 function fill(el, ...nodes) {
-  el.replaceChildren(...nodes.flat().filter((n) => n !== null && n !== undefined && n !== false));
+  el.replaceChildren(...nodes.flat(Infinity).filter((n) => n !== null && n !== undefined && n !== false));
 }
 
 function render(...nodes) {
@@ -141,7 +141,7 @@ function render(...nodes) {
     ? h('div', { class: 'topbar' }, studentSwitcher(),
         h('button', { class: 'ghost small', onclick: signOut }, 'Çıkış yap'))
     : null;
-  app.replaceChildren(...[bar, ...nodes].filter(Boolean));
+  fill(app, bar, ...nodes);
   renderTabs();
 }
 // Seçili öğrenci: öğrencinin kendisi ya da velinin baktığı çocuk.
