@@ -1,27 +1,29 @@
 -- Saatlik görevin kullandığı görünümler (sadece gizli anahtarla erişilir).
 
--- Önümüzdeki 3 günde tekrarı gelecek konular için havuzda yeterli görülmemiş soru var mı?
--- to_generate > 0 olan konulara yeni soru eklenmeli.
-create or replace view public.pool_needs as
-with due as (
-  select topic_id,
-         sum(case when track = 'mistake' then 1 else 2 end) as need_soon
-  from public.items
-  where state = 'active' and due_date <= current_date + 3
-  group by topic_id
+-- Takipteki her konu için havuzda en az 30 görülmemiş soru olmalı.
+-- Tekrarı en yakın olan konu önce gelir; to_generate > 0 olan konulara yeni soru eklenmeli.
+drop view if exists public.pool_needs;
+create view public.pool_needs as
+with tracked as (
+  select i.topic_id, min(i.due_date) as next_due
+  from public.items i
+  join public.topic_status s on s.topic_id = i.topic_id and s.status in ('active', 'gap')
+  where i.state = 'active'
+  group by i.topic_id
 ), unseen as (
   select q.topic_id, count(*) as unseen
   from public.questions q
   where q.active and not exists (select 1 from public.reviews r where r.question_id = q.id)
   group by q.topic_id
 )
-select d.topic_id, t.subject, t.name, t.kazanim, d.need_soon,
+select tr.topic_id, t.subject, t.name, t.kazanim, tr.next_due,
        coalesce(u.unseen, 0) as unseen,
-       greatest(0, d.need_soon * 2 - coalesce(u.unseen, 0)) as to_generate
-from due d
-join public.topics t on t.id = d.topic_id
-left join unseen u on u.topic_id = d.topic_id
-where coalesce(u.unseen, 0) < d.need_soon * 2;
+       greatest(0, 30 - coalesce(u.unseen, 0)) as to_generate
+from tracked tr
+join public.topics t on t.id = tr.topic_id
+left join unseen u on u.topic_id = tr.topic_id
+where coalesce(u.unseen, 0) < 30
+order by tr.next_due, t.subject;
 
 -- Eksik işaretli konuların son tekrar sonuçları (eksik işaretini kaldırmak için).
 create or replace view public.gap_progress as

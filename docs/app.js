@@ -22,7 +22,7 @@ const SUBJECT_ORDER = ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'ingilizc
 // Hata takibi: 1 → 2 → 4 → 14 → 30 gün. Konu tekrarı: Fibonacci, 55'te sabitlenir.
 const MISTAKE_LADDER = [1, 2, 4, 14, 30];
 const TOPIC_LADDER = [1, 3, 5, 8, 13, 21, 34, 55];
-const TOPIC_QUESTIONS_PER_REVIEW = 2;
+const TOPIC_QUESTIONS_PER_REVIEW = 5;
 
 const REASONS = [
   ['bilmiyordum', 'Konuyu bilmiyordum'],

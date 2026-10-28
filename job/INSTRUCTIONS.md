@@ -96,7 +96,10 @@ for sözel and 120 for sayısal subjects. Then mark the submission `done` with a
 ```
 node tools/sb.mjs get "pool_needs?select=*"
 ```
-For every row add at least `to_generate` new questions for that topic. Rules:
+The target is 30 unseen questions for every tracked topic. Rows come in order of the nearest review
+(`next_due`). Work down the list and add up to 40 questions in one run (fewer if a deneme was
+processed in the same run); later runs continue where you stopped. Never trade quality for count.
+Rules:
 
 - The student must never see the same question twice, and never one of her own exam questions. Do
   not copy an `exam_questions` item into the pool. Each new question must differ in numbers,
