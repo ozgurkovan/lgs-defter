@@ -12,14 +12,18 @@ const sb = window.supabase.createClient(window.CONFIG.url, window.CONFIG.anonKey
 
 // ---------------------------------------------------------------- sabitler
 
+// sec: soru başına en fazla süre. LGS'de sözel oturum 50 soru / 75 dk, sayısal oturum 40 soru / 80 dk.
+// Oturum süresi derslere bölündü: Türkçe 40 + İnkılap 12,5 + Din 10 + İngilizce 12,5 = 75 dk;
+// Matematik 50 + Fen 30 = 80 dk.
 const SUBJECTS = {
-  turkce: { name: 'Türkçe', coef: 4, sec: 90 },
-  matematik: { name: 'Matematik', coef: 4, sec: 120 },
-  fen: { name: 'Fen Bilimleri', coef: 4, sec: 120 },
-  inkilap: { name: 'İnkılap Tarihi', coef: 1, sec: 90 },
-  din: { name: 'Din Kültürü', coef: 1, sec: 90 },
-  ingilizce: { name: 'İngilizce', coef: 1, sec: 90 },
+  turkce: { name: 'Türkçe', coef: 4, sec: 120 },
+  matematik: { name: 'Matematik', coef: 4, sec: 150 },
+  fen: { name: 'Fen Bilimleri', coef: 4, sec: 90 },
+  inkilap: { name: 'İnkılap Tarihi', coef: 1, sec: 75 },
+  din: { name: 'Din Kültürü', coef: 1, sec: 60 },
+  ingilizce: { name: 'İngilizce', coef: 1, sec: 75 },
 };
+const maxSeconds = (subject) => SUBJECTS[subject]?.sec || 90;
 const SUBJECT_ORDER = ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'ingilizce'];
 
 // Hata takibi: 1 → 2 → 4 → 14 → 30 gün. Konu tekrarı: Fibonacci, 55'te sabitlenir.
@@ -441,7 +445,7 @@ async function buildSession(track) {
     if (!candidates.length) { shortage++; continue; }
     // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur.
     const picked = pickVaried(candidates, basePerItem + (it.support || 0));
-    const cost = picked.reduce((s, p) => s + p.target_seconds + 15, 0);
+    const cost = picked.reduce((s, p) => s + maxSeconds(p.subject) + 15, 0);
     if (entries.length && seconds + cost > budgetSec) break;
     picked.forEach((p, i) => { used.add(p.id); entries.push({ item: it, question: p, last: i === picked.length - 1 }); });
     seconds += cost;
@@ -563,7 +567,7 @@ function showQuestion() {
   const entry = ss.entries[ss.index];
   const { item, question } = entry;
   const subject = question.subject;
-  const target = question.target_seconds || SUBJECTS[subject]?.sec || 90;
+  const target = maxSeconds(subject);
   const startedAt = Date.now();
   // Süre şık seçildiği anda durur; emin olma ölçeğini işaretlemek süreye eklenmez.
   let selected = null, chosenAt = null, hintUsed = false, confidence = null, timerId;
@@ -620,7 +624,9 @@ function showQuestion() {
     const duration = Math.round(((chosenAt || Date.now()) - startedAt) / 1000);
     const correct = selected === question.answer;
     const confident = confidence === 100;
-    const strong = correct && confident && !hintUsed && duration <= target * 1.5;
+    const overTime = duration > target;
+    // Süre LGS'deki payı kadar: aşılırsa doğru da olsa "rahat bildi" sayılmaz.
+    const strong = correct && confident && !hintUsed && duration <= target;
     confirmRow.hidden = true;
     choiceBtns.forEach((b) => {
       b.disabled = true;
@@ -635,7 +641,9 @@ function showQuestion() {
 
     const coachNote = !correct && confidence >= 75
       ? 'Emin olduğun hâlde yanlış: burada bir kavramı farklı biliyor olabilirsin. Çözümü dikkatle oku.'
-      : correct && confidence <= 50 ? 'Doğru, ama tahmine yakındı. Bu konuyu farklı sorularla biraz daha göreceğiz.' : null;
+      : correct && confidence <= 50 ? 'Doğru, ama tahmine yakındı. Bu konuyu farklı sorularla biraz daha göreceğiz.'
+      : correct && overTime ? `Doğru, ama ${fmtDuration(duration)} sürdü. LGS'de ${SUBJECTS[subject].name} sorusuna en fazla ${fmtDuration(target)} ayırabilirsin; bu konuyu biraz daha hızlandıracağız.`
+      : null;
     feedback.replaceChildren(
       h('p', { class: 'verdict ' + (correct ? 'ok' : 'no') }, correct ? 'Doğru' : `Yanlış. Doğru cevap ${question.answer}.`),
       coachNote ? h('p', { class: 'small' }, coachNote) : null,
@@ -1273,7 +1281,7 @@ async function viewReport() {
       const s = r.questions?.subject; if (!s) continue;
       bySub[s] ||= { n: 0, ok: 0, slow: 0, sureWrong: 0, luckyRight: 0 };
       bySub[s].n++; if (r.correct) bySub[s].ok++;
-      if (r.duration_sec > (r.questions.target_seconds || 90)) bySub[s].slow++;
+      if (r.duration_sec > maxSeconds(s)) bySub[s].slow++;
       if (!r.correct && r.confidence >= 75) bySub[s].sureWrong++;
       if (r.correct && r.confidence && r.confidence <= 50) bySub[s].luckyRight++;
     }

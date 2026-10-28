@@ -7,12 +7,17 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(join(root, 'docs', 'app.js'), 'utf8');
 const pick = (from, to) => src.slice(src.indexOf(from), src.indexOf(to));
 const code = [
+  pick('const SUBJECTS', 'const SUBJECT_ORDER'),
   pick('const MISTAKE_LADDER', 'const REASONS'),
   pick('function localDate', 'function fmtDate'),
   pick('function gradeItem', '/* Bugünün oturumunu'),
-  'return { gradeItem, localDate, addDays };',
+  'return { gradeItem, localDate, addDays, SUBJECTS };',
 ].join('\n');
-const { gradeItem, localDate, addDays } = new Function(code)();
+const { gradeItem, localDate, addDays, SUBJECTS } = new Function(code)();
+
+// Soru süreleri LGS oturum sürelerine eşit olmalı: sözel 50 soru / 75 dk, sayısal 40 soru / 80 dk.
+const counts = { turkce: 20, inkilap: 10, din: 10, ingilizce: 10, matematik: 20, fen: 20 };
+const total = (list) => list.reduce((s, k) => s + counts[k] * SUBJECTS[k].sec, 0) / 60;
 
 const today = localDate();
 const lgs = '2027-06-13';
@@ -20,6 +25,9 @@ const ok = (r) => [{ correct: true, strong: r !== 'weak' }];
 const wrong = [{ correct: false, strong: false }];
 let fails = 0;
 const check = (label, cond, info) => { if (!cond) fails++; console.log(`${cond ? 'OK  ' : 'FAIL'} ${label}${info ? '  ' + info : ''}`); };
+
+check('sözel oturum 75 dk', total(['turkce', 'inkilap', 'din', 'ingilizce']) === 75, `${total(['turkce', 'inkilap', 'din', 'ingilizce'])} dk`);
+check('sayısal oturum 80 dk', total(['matematik', 'fen']) === 80, `${total(['matematik', 'fen'])} dk, fen ${SUBJECTS.fen.sec} sn/soru`);
 
 // Hata takibi: hep rahat doğru → 2, 4, 14, 30 gün sonra bitiş (ease küçük artar)
 let it = { track: 'mistake', step: 0, ease: 1, consecutive_wrong: 0 };

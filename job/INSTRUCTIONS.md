@@ -107,8 +107,13 @@ These feed the shared pool. Split each page into questions and add them to `ques
 question depends on a figure, graph or table that text cannot carry, crop it and upload to the
 `questions` bucket (`upload questions kitap/<submission_id>/<n>.jpg`) and set `image_path`. Use the
 book's answer key when present; otherwise solve it yourself twice by different routes and skip the
-question if the two disagree. Write `hint` and `solution`, set `verified=true`, `target_seconds` 90
-for sözel and 120 for sayısal subjects. Then mark the submission `done` with a `result_note`.
+question if the two disagree. Write `hint` and `solution`, set `verified=true` and `target_seconds`
+from the time table below. Then mark the submission `done` with a `result_note`.
+
+Time per question (the student's share of the real LGS session; the app enforces these):
+Türkçe 120 s, İnkılap 75 s, Din 60 s, İngilizce 75 s (sözel: 50 questions / 75 min);
+Matematik 150 s, Fen 90 s (sayısal: 40 questions / 80 min). Write questions that a well-prepared
+student can solve within that time; LGS questions are long to read, not long to compute.
 
 ## 2. Keep the question pool stocked (every run)
 
@@ -133,7 +138,7 @@ count. Rules:
 - Matematik and Fen: solve every generated question twice by independent methods before saving;
   discard it if the answers disagree or if a figure is required that text cannot describe precisely.
 - Fill `source=claude`, `subject`, `topic_id`, `styles`, `stem`, `choices` (JSON object with keys
-  A–D), `answer`, `hint`, `solution`, `target_seconds`, `verified=true`.
+  A–D), `answer`, `hint`, `solution`, `target_seconds` (from the time table in 1b), `verified=true`.
 
 Post several questions at once: write a JSON array to `.work/new-questions.json` and run
 `node tools/sb.mjs post questions .work/new-questions.json`.

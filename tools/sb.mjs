@@ -139,12 +139,14 @@ try {
       out(await rest('POST', 'family_links', { parent_id, student_id }));
       break;
     }
-    case 'recovery-link': {
-      // E-posta göndermeden şifre sıfırlama bağlantısı üretir (1 saat geçerli, tek kullanımlık).
+    case 'recovery-link':
+    case 'login-link': {
+      // E-posta göndermeden şifre sıfırlama (recovery-link) ya da şifresiz giriş (login-link) bağlantısı
+      // üretir: 1 saat geçerli, tek kullanımlık. login-link sadece test hesapları için kullanılır.
       const res = await fetch(`${base}/auth/v1/admin/generate_link`, {
         method: 'POST',
         headers: serviceHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ type: 'recovery', email: args[0], redirect_to: 'https://ozgurkovan.github.io/lgs-defter/' }),
+        body: JSON.stringify({ type: cmd === 'login-link' ? 'magiclink' : 'recovery', email: args[0], redirect_to: 'https://ozgurkovan.github.io/lgs-defter/' }),
       });
       if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
       const data = await res.json();
