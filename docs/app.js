@@ -1465,6 +1465,15 @@ function splitBar(label, counts) {
 
 // ---------------------------------------------------------------- başlat
 
+// Süresi dolmuş ya da kullanılmış bir giriş/sıfırlama bağlantısı açılırsa adres hatayla gelir.
+const linkError = new URLSearchParams(location.hash.slice(1)).get('error_code');
+if (linkError) {
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => toast(linkError === 'otp_expired'
+    ? 'Bu bağlantının süresi dolmuş ya da daha önce kullanılmış. Şifrenle giriş yap ya da yeni bağlantı iste.'
+    : 'Bağlantı açılamadı. Şifrenle giriş yap ya da yeni bağlantı iste.'), 600);
+}
+
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') viewLogin();
   if (event === 'PASSWORD_RECOVERY') {

@@ -262,7 +262,8 @@ td.wrap { white-space: normal; min-width: 160px; }
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   background: var(--ink); color: var(--paper);
   padding: 10px 16px; border-radius: 12px; font-weight: 600; z-index: 30;
-  max-width: calc(100% - 32px);
+  max-width: min(480px, calc(100% - 32px));
+  text-align: center;
 }
 .error { color: var(--red); font-weight: 600; }
 
