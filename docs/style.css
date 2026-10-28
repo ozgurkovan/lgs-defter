@@ -186,6 +186,12 @@ details.card > summary { cursor: pointer; list-style: none; }
 details.card > summary::-webkit-details-marker { display: none; }
 .row.small input[type="checkbox"] { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
 
+/* Sorular sayfası: şık listesi */
+.opt { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--rule); }
+.opt b { font-family: var(--font-display); }
+.opt.right { border-color: var(--green); background: var(--green-soft); }
+.opt.wrong { border-color: var(--red); background: var(--red-soft); }
+
 /* Alt menü */
 nav.tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;

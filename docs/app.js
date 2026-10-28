@@ -146,6 +146,11 @@ function render(...nodes) {
 }
 // Seçili öğrenci: öğrencinin kendisi ya da velinin baktığı çocuk.
 const sid = () => state.student?.id;
+// Seçili öğrencide görülebilen dersler (öğretmen için kısıtlı olabilir; veritabanı da aynı kısıtı uygular).
+const visibleSubjects = () => {
+  const allowed = state.profile?.role === 'teacher' ? state.subjectsFor?.[sid()] : null;
+  return allowed ? SUBJECT_ORDER.filter((s) => allowed.includes(s)) : SUBJECT_ORDER;
+};
 
 function studentSwitcher() {
   const me = state.profile;
@@ -198,6 +203,7 @@ const ICONS = {
   upload: 'M12 16V4m0 0-5 5m5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3',
   topics: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11',
   report: 'M4 20V10m6 10V4m6 16v-7m4 7H2',
+  questions: 'M9 6h11M9 12h11M9 18h11M4.5 6l1 1 2-2M4.5 12l1 1 2-2M4.5 18l1 1 2-2',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L14.5 3h-5l-.4 2.6a7.6 7.6 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2 1.2l.4 2.6h5l.4-2.6a7.6 7.6 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z',
 };
 function icon(name) {
@@ -220,10 +226,10 @@ function renderTabs() {
   const role = state.profile.role;
   const tabs = role === 'parent'
     ? (state.student
-      ? [['report', 'Rapor', 'report'], ['topics', 'Konular', 'topics'], ['upload', 'Deneme', 'upload'], ['book', 'Kitap', 'upload'], ['settings', 'Ayarlar', 'settings']]
+      ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['upload', 'Deneme', 'upload'], ['settings', 'Ayarlar', 'settings']]
       : [['settings', 'Ayarlar', 'settings']])
     : role === 'teacher'
-      ? [['report', 'Rapor', 'report'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
+      ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
       : [['home', 'Bugün', 'home'], ['upload', 'Deneme yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']];
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
@@ -237,7 +243,7 @@ function go(tab) {
   window.scrollTo(0, 0);
   const views = {
     home: viewHome, upload: () => viewUpload('deneme'), book: () => viewUpload('kitap'),
-    topics: viewTopics, settings: viewSettings, report: viewReport, reasons: viewReasons,
+    topics: viewTopics, settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
 }
@@ -277,8 +283,10 @@ async function loadStudents() {
   if (profile.role === 'student') {
     state.students = [profile];
   } else {
-    const links = await q(sb.from('family_links').select('student_id')
+    const links = await q(sb.from('family_links').select('student_id, subjects')
       .eq('parent_id', profile.id).eq('relation', profile.role === 'teacher' ? 'teacher' : 'parent'));
+    // Öğretmenin her çocuk için görebildiği dersler (null = hepsi).
+    state.subjectsFor = Object.fromEntries(links.map((l) => [l.student_id, l.subjects]));
     state.students = links.length
       ? await q(sb.from('profiles').select('*').in('id', links.map((l) => l.student_id)).order('display_name'))
       : [];
@@ -1146,7 +1154,10 @@ async function viewUpload(kind) {
     photoPicker('2. Cevap anahtarı', 'Kitapçığın sonundaysa ya da yoksa boş bırakabilirsin.', 'cevap_anahtari', photos, refresh),
     photoPicker('3. Optik form (varsa)', null, 'optik', photos, refresh),
     h('section', { class: 'card' }, h('h3', {}, 'Süre yetti mi?'), h('div', { class: 'chips' }, timeChips)),
-    sendBtn, missingNote, status);
+    sendBtn, missingNote, status,
+    state.profile.role === 'parent' ? h('div', { class: 'card flat' },
+      h('p', { class: 'small muted' }, 'Soru bankasından sayfa eklemek ister misiniz? Bu sayfalar bütün çocukların ortak soru havuzuna gider.'),
+      h('button', { class: 'block', onclick: () => go('book') }, 'Kitap sayfası ekle')) : null);
   refresh();
 }
 
@@ -1206,7 +1217,7 @@ async function viewTopics() {
         : isParentView()
         ? 'İşlenen konuları işaretleyin; işaretli konular tekrar takvimine girer. İşaretsizler, yıllık plandaki haftası gelince kendiliğinden açılır.'
         : 'İşlediğin konuları işaretle; işaretli konular tekrar takvimine girer. İşlemediğin bir konunun işaretini kaldırırsan o konudan soru gelmez.')),
-    SUBJECT_ORDER.map((s) => {
+    visibleSubjects().map((s) => {
       const list = topics.filter((t) => t.subject === s).sort((a, b) => a.sort - b.sort);
       if (!list.length) return null;
       const covered = (t) => st[t.id] && st[t.id].status !== 'not_taught';
@@ -1313,6 +1324,13 @@ function viewSettings() {
 
 // ---------------------------------------------------------------- aile yönetimi (veli)
 
+// Ders onay kutuları: current null ise hepsi işaretli. selected() seçili ders anahtarlarını döner.
+function subjectChecklist(current) {
+  const inputs = SUBJECT_ORDER.map((s) => h('input', { type: 'checkbox', value: s, checked: (!current || current.includes(s)) || null }));
+  const el = h('div', { class: 'row' }, SUBJECT_ORDER.map((s, i) => h('label', { class: 'row small' }, inputs[i], SUBJECTS[s].name)));
+  return { el, selected: () => inputs.filter((i) => i.checked).map((i) => i.value) };
+}
+
 async function familyCall(body) {
   const { data, error } = await sb.functions.invoke('family', { body });
   if (error) {
@@ -1339,7 +1357,8 @@ function familySection() {
 
     const person = (m, extra) => h('div', { class: 'member' },
       h('div', { class: 'stack', style: 'gap: 0; min-width: 0' },
-        h('b', {}, m.display_name + (m.id === me ? ' (sen)' : '') + (m.grade ? ` · ${m.grade}. sınıf` : '')),
+        h('b', {}, m.display_name + (m.id === me ? ' (sen)' : '') + (m.grade ? ` · ${m.grade}. sınıf` : '') +
+          (m.role === 'teacher' ? ` · ${m.subjects ? m.subjects.map((s) => SUBJECTS[s]?.name).join(', ') : 'bütün dersler'}` : '')),
         h('span', { class: 'small muted', style: 'overflow-wrap: anywhere' }, m.email)),
       extra || null);
 
@@ -1366,17 +1385,19 @@ function familySection() {
     const teacherControl = (t) => {
       const boxes = kids.map((k) => h('label', { class: 'row small' },
         h('input', { type: 'checkbox', value: k.id, checked: t.student_ids?.includes(k.id) || null }), k.display_name));
+      const subjectBoxes = subjectChecklist(t.subjects);
       const save = h('button', { class: 'small', onclick: async () => {
         save.disabled = true;
         const ids = boxes.map((b) => b.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
         try {
-          await familyCall({ action: 'set_teacher_students', teacher_id: t.id, student_ids: ids });
-          toast(ids.length ? 'Öğretmenin gördüğü çocuklar güncellendi.' : 'Öğretmenin erişimi kaldırıldı.');
+          await familyCall({ action: 'set_teacher_students', teacher_id: t.id, student_ids: ids, subjects: subjectBoxes.selected() });
+          toast(ids.length ? 'Öğretmenin erişimi güncellendi.' : 'Öğretmenin erişimi kaldırıldı.');
           viewSettings();
         } catch (e) { toast(e.message); save.disabled = false; }
       } }, 'Kaydet');
       return h('div', { class: 'stack', style: 'gap: 6px' },
-        h('span', { class: 'small muted' }, 'Görebildiği çocuklar:'), h('div', { class: 'row' }, boxes), save);
+        h('span', { class: 'small muted' }, 'Görebildiği çocuklar:'), h('div', { class: 'row' }, boxes),
+        h('span', { class: 'small muted' }, 'Görebildiği dersler:'), subjectBoxes.el, save);
     };
 
     const addForm = (kind) => {
@@ -1385,6 +1406,7 @@ function familySection() {
       const password = h('input', { id: `${kind}-password`, type: 'text', autocomplete: 'off', placeholder: 'Şifre (en az 6 karakter)' });
       const grade = h('select', { id: `${kind}-grade` }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === 8 }, `${g}. sınıf`)));
       const kidBoxes = kids.map((k) => h('label', { class: 'row small' }, h('input', { type: 'checkbox', value: k.id }), k.display_name));
+      const subjectBoxes = subjectChecklist(null);
       const msg = h('p', { class: 'small', hidden: true });
       const submit = h('button', { class: 'primary block', onclick: async () => {
         submit.disabled = true;
@@ -1392,7 +1414,10 @@ function familySection() {
         const body = { action: { child: 'add_child', parent: 'add_parent', teacher: 'add_teacher' }[kind],
           name: name.value, email: email.value, password: password.value };
         if (kind === 'child') body.grade = +grade.value;
-        if (kind === 'teacher') body.student_ids = kidBoxes.map((b) => b.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
+        if (kind === 'teacher') {
+          body.student_ids = kidBoxes.map((b) => b.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
+          body.subjects = subjectBoxes.selected();
+        }
         try {
           const res = await familyCall(body);
           toast(kind === 'teacher' && res.existing ? 'Öğretmenin mevcut hesabı bağlandı.' : 'Eklendi. Giriş bilgilerini kendisine iletin.');
@@ -1405,12 +1430,13 @@ function familySection() {
         h('summary', {}, h('b', {}, { child: '+ Çocuk ekle', parent: '+ Veli ekle (eş)', teacher: '+ Öğretmen ekle' }[kind])),
         h('div', { class: 'stack', style: 'margin-top: 12px' },
           kind === 'child' ? h('p', { class: 'small muted' }, 'Çocuğun e-postası yoksa kendi adresinize + ekleyerek bir giriş adresi yazabilirsiniz, örneğin ad+cocuk@hotmail.com. E-postalar size gelir.') : null,
-          kind === 'teacher' ? h('p', { class: 'small muted' }, 'Öğretmen sadece seçtiğiniz çocukları görür ve hiçbir şeyi değiştiremez. Öğretmenin bu uygulamada hesabı varsa şifre boş kalabilir.') : null,
+          kind === 'teacher' ? h('p', { class: 'small muted' }, 'Öğretmen sadece seçtiğiniz çocukları ve dersleri görür, hiçbir şeyi değiştiremez. Öğretmenin bu uygulamada hesabı varsa şifre boş kalabilir.') : null,
           h('label', { class: 'field' }, 'Ad', name),
           h('label', { class: 'field' }, 'E-posta', email),
           h('label', { class: 'field' }, 'Şifre', password),
           kind === 'child' ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
           kind === 'teacher' ? h('div', { class: 'stack', style: 'gap: 6px' }, h('span', { class: 'small' }, 'Görebileceği çocuklar'), h('div', { class: 'row' }, kidBoxes)) : null,
+          kind === 'teacher' ? h('div', { class: 'stack', style: 'gap: 6px' }, h('span', { class: 'small' }, 'Görebileceği dersler'), subjectBoxes.el) : null,
           msg, submit));
     };
 
@@ -1431,6 +1457,106 @@ function familySection() {
       kids.length ? addForm('teacher') : null);
   }).catch((e) => fill(box, h('h2', {}, 'Aile'), h('p', { class: 'error small' }, e.message)));
   return box;
+}
+
+// ---------------------------------------------------------------- sorular (veli ve öğretmen)
+
+/* Öğrencinin çözdüğü her soru: denemelerdeki sorular (görsel, cevabı, teşhis, kendi gerekçesi)
+   ve tekrar soruları (metin, şıklar, seçimi, emin olma, süre). Öğretmen sadece kendi derslerini görür. */
+async function viewQuestions() {
+  loading('Sorular yükleniyor…');
+  const s = sid();
+  const [examRows, reviewRows] = await Promise.all([
+    q(sb.from('exam_questions').select('*, exams(name, exam_date), topics(name)').eq('student_id', s)
+      .order('created_at', { ascending: false }).limit(300)),
+    q(sb.from('reviews').select('answer, correct, confidence, duration_sec, hint_used, answered_at, track, questions(subject, stem, choices, answer, solution, image_path, topics(name))')
+      .eq('student_id', s).eq('voided', false).order('answered_at', { ascending: false }).limit(300)),
+  ]);
+  const subjects = visibleSubjects();
+  const filter = { source: 'exam', outcome: 'missed', subject: 'all' };
+  let shown = 20;
+  const list = h('div', { class: 'stack' });
+
+  const chipGroup = (key, options) => {
+    const btns = options.map(([v, label]) => h('button', { class: 'chip', 'aria-pressed': String(filter[key] === v), onclick: () => {
+      filter[key] = v; shown = 20;
+      btns.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i][0] === v)));
+      draw();
+    } }, label));
+    return h('div', { class: 'chips' }, btns);
+  };
+
+  const outcomeTag = (outcome) => ({
+    yanlis: h('span', { class: 'tag red' }, 'Yanlış'),
+    bos: h('span', { class: 'tag amber' }, 'Boş'),
+    dogru: h('span', { class: 'tag green' }, 'Doğru'),
+  })[outcome];
+
+  const examCard = (r) => h('article', { class: 'card' },
+    h('div', { class: 'spread' },
+      h('div', { class: 'row' }, subjTag(r.subject), h('span', { class: 'small muted' }, `${r.exams?.name || 'Deneme'} · ${r.q_no}. soru`)),
+      outcomeTag(r.outcome)),
+    r.image_path ? lazyImg('photos', r.image_path) : null,
+    h('p', { class: 'small' }, r.outcome === 'bos' ? `Boş bıraktı. Doğru cevap ${r.correct_answer || '?'}.`
+      : `Cevabı ${r.student_answer || '?'} · doğrusu ${r.correct_answer || '?'}`
+        + (r.marked_guess ? ' · tahmin (T) işaretlemiş' : '') + (r.coding_error ? ' · optiğe yanlış kodlamış' : '')),
+    h('p', { class: 'small muted' }, [r.topics?.name, fmtDate(r.exams?.exam_date)].filter(Boolean).join(' · ')),
+    r.outcome !== 'dogru' && (r.diagnosis_cause || r.student_reason) ? h('div', { class: 'note teacher small' },
+      r.diagnosis_cause ? h('p', {}, h('b', {}, 'Teşhis: '), CAUSE_LABEL[r.diagnosis_cause] || r.diagnosis_cause, r.diagnosis_text ? ` — ${r.diagnosis_text}` : '') : null,
+      r.student_reason ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Kendi gerekçesi: '),
+        (REASONS.find(([k]) => k === r.student_reason) || [, r.student_reason])[1],
+        r.student_confident === true ? ' (emin olarak işaretlemiş)' : r.student_confident === false ? ' (emin değilmiş)' : '') : null,
+      r.misconception ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Kavram yanılgısı: '), r.misconception) : null,
+      r.scratch_note ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Karalamasında: '), r.scratch_note) : null) : null,
+    r.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, r.solution)) : null);
+
+  const reviewCard = (r) => {
+    const qn = r.questions || {};
+    const max = maxSeconds(qn.subject);
+    return h('article', { class: 'card' },
+      h('div', { class: 'spread' },
+        h('div', { class: 'row' }, subjTag(qn.subject), h('span', { class: 'small muted' }, qn.topics?.name || '')),
+        outcomeTag(r.correct ? 'dogru' : 'yanlis')),
+      qn.image_path ? lazyImg('questions', qn.image_path) : null,
+      qn.stem ? h('p', { class: 'stem small' }, qn.stem) : null,
+      h('div', { class: 'stack', style: 'gap: 4px' }, ['A', 'B', 'C', 'D'].filter((k) => qn.choices?.[k] !== undefined).map((k) =>
+        h('div', { class: 'opt small' + (k === qn.answer ? ' right' : k === r.answer ? ' wrong' : '') },
+          h('b', {}, k), h('span', {}, qn.choices[k]),
+          k === r.answer ? h('span', { class: 'muted' }, ' ← seçimi') : null))),
+      h('p', { class: 'small muted' }, [
+        { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma' }[r.track] || '',
+        new Date(r.answered_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+        r.confidence ? `emin %${r.confidence}` : null,
+        `süre ${fmtDuration(r.duration_sec)} / ${fmtDuration(max)}${r.duration_sec > max ? ' (aştı)' : ''}`,
+        r.hint_used ? 'ipucu kullandı' : null,
+      ].filter(Boolean).join(' · ')),
+      !r.correct && r.confidence >= 75 ? h('p', { class: 'small error' }, 'Emin olduğu hâlde yanlış: kavram yanılgısı olabilir.') : null,
+      qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, qn.solution)) : null);
+  };
+
+  function draw() {
+    const subjOk = (subj) => filter.subject === 'all' || subj === filter.subject;
+    const outcomeOk = (correct) => filter.outcome === 'all' || (filter.outcome === 'missed' ? !correct : correct);
+    const rows = filter.source === 'exam'
+      ? examRows.filter((r) => subjOk(r.subject) && outcomeOk(r.outcome === 'dogru'))
+      : reviewRows.filter((r) => subjOk(r.questions?.subject) && outcomeOk(r.correct));
+    fill(list,
+      h('p', { class: 'small muted' }, `${rows.length} soru`),
+      rows.slice(0, shown).map(filter.source === 'exam' ? examCard : reviewCard),
+      rows.length > shown ? h('button', { class: 'block', onclick: () => { shown += 20; draw(); } }, 'Daha fazla göster') : null,
+      !rows.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted small' }, 'Bu seçimde soru yok.')) : null);
+  }
+
+  render(
+    h('header', { class: 'stack', style: 'gap: 4px' },
+      h('p', { class: 'label' }, `Sorular · ${state.student.display_name}`),
+      h('h1', {}, 'Hangi soruları yaptı, hangilerini kaçırdı?')),
+    h('section', { class: 'stack', style: 'gap: 8px' },
+      chipGroup('source', [['exam', 'Denemeler'], ['review', 'Tekrarlar']]),
+      chipGroup('outcome', [['missed', 'Kaçırdıkları'], ['correct', 'Doğruları'], ['all', 'Hepsi']]),
+      subjects.length > 1 ? chipGroup('subject', [['all', 'Bütün dersler'], ...subjects.map((x) => [x, SUBJECTS[x].name])]) : null),
+    list);
+  draw();
 }
 
 // ---------------------------------------------------------------- veli raporu
@@ -1473,12 +1599,12 @@ async function viewReport() {
 
   // Denemeler tablosu
   const examTable = exams.length ? h('div', { class: 'scroll-x' }, h('table', {},
-    h('thead', {}, h('tr', {}, h('th', {}, 'Deneme'), SUBJECT_ORDER.map((s) => h('th', {}, SUBJECTS[s].name.split(' ')[0])), h('th', {}, 'Net'))),
+    h('thead', {}, h('tr', {}, h('th', {}, 'Deneme'), visibleSubjects().map((s) => h('th', {}, SUBJECTS[s].name.split(' ')[0])), h('th', {}, 'Net'))),
     h('tbody', {}, [...exams].reverse().map((e) => {
       const rs = results.filter((r) => r.exam_id === e.id);
       return h('tr', {},
         h('td', {}, h('div', {}, e.name), h('div', { class: 'small muted' }, fmtDate(e.exam_date) + (e.time_note ? ' · ' + e.time_note : ''))),
-        SUBJECT_ORDER.map((s) => { const r = rs.find((x) => x.subject === s); return h('td', {}, r ? `${r.wrong}Y ${r.blank}B` : '–'); }),
+        visibleSubjects().map((s) => { const r = rs.find((x) => x.subject === s); return h('td', {}, r ? `${r.wrong}Y ${r.blank}B` : '–'); }),
         h('td', {}, rs.length ? net(rs).toFixed(2).replace('.', ',') : '–'));
     })))) : h('p', { class: 'muted' }, 'İlk deneme işlendiğinde burada görünecek.');
 

@@ -37,11 +37,18 @@ Deno.serve(async (req) => {
   const { data: myLinks } = await admin.from('family_links').select('student_id').eq('parent_id', me).eq('relation', 'parent');
   const myChildren = (myLinks ?? []).map((l) => l.student_id as string);
   const { data: coLinks } = myChildren.length
-    ? await admin.from('family_links').select('parent_id, student_id, relation').in('student_id', myChildren)
-    : { data: [] as { parent_id: string; student_id: string; relation: string }[] };
+    ? await admin.from('family_links').select('parent_id, student_id, relation, subjects').in('student_id', myChildren)
+    : { data: [] as { parent_id: string; student_id: string; relation: string; subjects: string[] | null }[] };
   const familyParents = [...new Set([me, ...(coLinks ?? []).filter((l) => l.relation === 'parent').map((l) => l.parent_id as string)])];
   const familyTeachers = [...new Set((coLinks ?? []).filter((l) => l.relation === 'teacher').map((l) => l.parent_id as string))];
   const onlyMyChildren = (ids: unknown) => (Array.isArray(ids) ? ids : []).map(String).filter((id) => myChildren.includes(id));
+  // Öğretmenin görebileceği dersler: hepsi seçiliyse null (bütün dersler).
+  const ALL_SUBJECTS = ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'ingilizce'];
+  const subjectsFrom = (v: unknown) => {
+    const list = [...new Set((Array.isArray(v) ? v : []).map(String).filter((s) => ALL_SUBJECTS.includes(s)))];
+    if (!list.length) throw new Error('Öğretmenin görebileceği en az bir ders seçin.');
+    return list.length === ALL_SUBJECTS.length ? null : list;
+  };
 
   async function findUserByEmail(mail: string) {
     for (let page = 1; page <= 20; page++) {
@@ -97,6 +104,7 @@ Deno.serve(async (req) => {
         // Öğretmen sadece seçilen çocukları görür. Hesabı varsa (başka ailenin de öğretmeniyse) ona bağlanır.
         const students = onlyMyChildren(body.student_ids);
         if (!students.length) throw new Error('Öğretmenin göreceği en az bir çocuk seçin.');
+        const subjects = subjectsFrom(body.subjects);
         const existing = email ? await findUserByEmail(email) : null;
         let id: string;
         if (existing) {
@@ -109,7 +117,7 @@ Deno.serve(async (req) => {
           const { error: pErr } = await admin.from('profiles').insert({ id, role: 'teacher', display_name: name });
           if (pErr) { await admin.auth.admin.deleteUser(id); throw new Error('Profil oluşturulamadı.'); }
         }
-        await admin.from('family_links').upsert(students.map((student_id) => ({ parent_id: id, student_id, relation: 'teacher' })));
+        await admin.from('family_links').upsert(students.map((student_id) => ({ parent_id: id, student_id, relation: 'teacher', subjects })));
         return reply(200, { ok: true, id, existing: !!existing });
       }
       case 'set_teacher_students': {
@@ -118,8 +126,9 @@ Deno.serve(async (req) => {
         if (!familyTeachers.includes(teacherId)) return reply(403, { error: 'Bu öğretmen sizin ailenizde değil.' });
         const keep = onlyMyChildren(body.student_ids);
         const drop = myChildren.filter((c) => !keep.includes(c));
+        const subjects = keep.length ? subjectsFrom(body.subjects) : null;
         if (drop.length) await admin.from('family_links').delete().eq('parent_id', teacherId).eq('relation', 'teacher').in('student_id', drop);
-        if (keep.length) await admin.from('family_links').upsert(keep.map((student_id) => ({ parent_id: teacherId, student_id, relation: 'teacher' })));
+        if (keep.length) await admin.from('family_links').upsert(keep.map((student_id) => ({ parent_id: teacherId, student_id, relation: 'teacher', subjects })));
         return reply(200, { ok: true });
       }
       case 'delete_child': {
@@ -145,10 +154,14 @@ Deno.serve(async (req) => {
           if (data?.user?.email) out[id] = data.user.email;
         }
         const { data: profiles } = await admin.from('profiles').select('id, role, display_name, grade').in('id', ids);
-        const sees = (id: string) => (coLinks ?? []).filter((l) => l.parent_id === id && l.relation === 'teacher').map((l) => l.student_id);
+        const teacherLinks = (id: string) => (coLinks ?? []).filter((l) => l.parent_id === id && l.relation === 'teacher');
         return reply(200, {
           ok: true, me,
-          members: (profiles ?? []).map((p) => ({ ...p, email: out[p.id] ?? '', student_ids: p.role === 'teacher' ? sees(p.id) : undefined })),
+          members: (profiles ?? []).map((p) => ({
+            ...p, email: out[p.id] ?? '',
+            student_ids: p.role === 'teacher' ? teacherLinks(p.id).map((l) => l.student_id) : undefined,
+            subjects: p.role === 'teacher' ? (teacherLinks(p.id)[0]?.subjects ?? null) : undefined,
+          })),
         });
       }
       default:
