@@ -4,7 +4,7 @@
 'use strict';
 
 // Şifre sıfırlama bağlantısıyla mı gelindi? (İstemci adresteki bilgiyi okuyup sildiği için önce bakılır.)
-let cameForRecovery = /type=recovery/.test(location.hash) || /type=recovery/.test(location.search);
+const cameForRecovery = /type=recovery/.test(location.hash) || /type=recovery/.test(location.search);
 
 const sb = window.supabase.createClient(window.CONFIG.url, window.CONFIG.anonKey, {
   auth: { persistSession: true, autoRefreshToken: true },
@@ -70,7 +70,8 @@ const TIME_NOTES = ['Süre yetti', 'Sözelde sıkıştım', 'Sayısalda sıkış
 // ---------------------------------------------------------------- yardımcılar
 
 const app = document.getElementById('app');
-const state = { user: null, profile: null, tab: 'home', session: null };
+// inRecovery: yeni şifre kaydedilene kadar uygulamanın başka hiçbir ekranı açılmaz.
+const state = { user: null, profile: null, tab: 'home', session: null, inRecovery: cameForRecovery };
 
 function h(tag, attrs, ...children) {
   const el = document.createElement(tag);
@@ -218,7 +219,7 @@ async function start() {
   const { data } = await sb.auth.getSession();
   if (!data.session) return viewLogin();
   state.user = data.session.user;
-  if (cameForRecovery || state.recovery) return viewNewPassword();
+  if (state.inRecovery) return viewNewPassword();
   const profile = await q(sb.from('profiles').select('*').eq('id', state.user.id).maybeSingle());
   if (!profile) {
     return render(h('div', { class: 'card' },
@@ -290,15 +291,16 @@ function newPasswordForm(onDone) {
 }
 
 function viewNewPassword() {
-  state.recovery = false;
-  cameForRecovery = false;
   history.replaceState(null, '', location.pathname);
   render(
     h('div', { class: 'stack', style: 'padding-top: 10vh' },
       h('p', { class: 'label' }, 'Şifre sıfırlama'),
       h('h1', {}, 'Yeni şifreni belirle'),
       h('p', { class: 'muted' }, state.user?.email || '')),
-    newPasswordForm(() => start().catch((err) => render(failBox(err)))));
+    newPasswordForm(() => {
+      state.inRecovery = false;
+      start().catch((err) => render(failBox(err)));
+    }));
 }
 
 async function signOut() {
@@ -1259,7 +1261,7 @@ function splitBar(label, counts) {
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') viewLogin();
   if (event === 'PASSWORD_RECOVERY') {
-    state.recovery = true;
+    state.inRecovery = true;
     state.user = session?.user || state.user;
     viewNewPassword();
   }
