@@ -452,6 +452,37 @@ async function buildSession(track) {
   }
   return { entries, shortage, seconds, dueCount: items.length };
 }
+/* Ek çalışma: günü gelen tekrarlar günlük hedef soru sayısını doldurmuyorsa açığı kapatır.
+   Takipteki konulardan en zayıf olanlardan başlar, her konudan sırayla görülmemiş bir soru alır.
+   Takvimi bozmaz: sadece yanlış yapılan konunun tekrarı yarına çekilir. */
+async function buildExtra(n, exclude) {
+  if (n <= 0) return { entries: [], seconds: 0 };
+  const today = localDate();
+  const items = await q(sb.from('items').select('*, topics(subject, name)')
+    .eq('student_id', sid()).eq('track', 'topic').eq('state', 'active').gt('due_date', today));
+  if (!items.length) return { entries: [], seconds: 0 };
+  const [pool, seenRows] = await Promise.all([
+    q(sb.from('questions').select('id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution')
+      .in('topic_id', [...new Set(items.map((i) => i.topic_id))]).eq('active', true)),
+    q(sb.from('reviews').select('question_id').eq('student_id', sid())),
+  ]);
+  const seen = new Set([...seenRows.map((r) => r.question_id), ...exclude]);
+  items.sort((a, b) => (b.consecutive_wrong - a.consecutive_wrong) || (a.step - b.step) || (a.due_date < b.due_date ? -1 : 1));
+  const queues = items.map((it) => ({ it, cands: shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id))) }));
+  const entries = [];
+  let seconds = 0;
+  while (entries.length < n && queues.some((x) => x.cands.length)) {
+    for (const x of queues) {
+      if (entries.length >= n) break;
+      const p = x.cands.shift();
+      if (!p) continue;
+      entries.push({ item: x.it, question: p, last: false, extra: true });
+      seconds += maxSeconds(p.subject) + 15;
+    }
+  }
+  return { entries, seconds };
+}
+
 function overlap(a, set) { return (a || []).filter((s) => set.has(s)).length; }
 function pickVaried(candidates, n) {
   const picked = [], shown = new Set(), rest = [...candidates];
@@ -485,7 +516,12 @@ async function viewHome() {
     q(sb.from('question_feedback').select('id, kind, verdict, response, questions(stem, subject)')
       .eq('student_id', sid()).not('response', 'is', null).eq('response_seen', false).order('checked_at')),
   ]);
-  state.cache = { mistake, topic };
+  // Günlük hedef: tekrarlar hedefi doldurmuyorsa açık ek çalışmayla kapatılır.
+  const dailyTarget = state.student.daily_questions || 40;
+  const dueNow = mistake.entries.length + topic.entries.length;
+  const extra = await buildExtra(dailyTarget - todayCount.length - dueNow,
+    [...mistake.entries, ...topic.entries].map((e) => e.question.id));
+  state.cache = { mistake, topic, extra };
 
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar';
@@ -518,6 +554,13 @@ async function viewHome() {
       : null,
     sessionCard('mistake', 'Hata tekrarı', mistake),
     sessionCard('topic', 'Konu tekrarı', topic),
+    extra.entries.length ? h('section', { class: 'card task' },
+      h('div', { class: 'spread' }, h('p', { class: 'label' }, 'Ek çalışma'),
+        h('span', { class: 'small muted num' }, `Günlük hedef ${dailyTarget} soru · bugün ${todayCount.length}`)),
+      h('div', { class: 'row' }, h('span', { class: 'big num' }, extra.entries.length),
+        h('span', { class: 'muted' }, `soru · yaklaşık ${Math.max(1, Math.round(extra.seconds / 60))} dakika`)),
+      h('p', { class: 'small muted' }, 'Tekrarlardan sonra hedefi tamamlamak için. En zayıf konularından başlıyor.'),
+      h('button', { class: dueNow ? 'block' : 'primary block', onclick: () => runSession('extra', extra) }, 'Başla')) : null,
     replies.length ? h('section', { class: 'stack' },
       h('p', { class: 'label' }, 'Bildirdiğin sorular'),
       replies.map((r) => {
@@ -655,11 +698,20 @@ function showQuestion() {
 
     try {
       const rv = await q(sb.from('reviews').insert({
-        student_id: sid(), item_id: item.id, question_id: question.id, track: item.track, answer: selected,
+        student_id: sid(), item_id: item.id, question_id: question.id, track: entry.extra ? 'extra' : item.track, answer: selected,
         correct, duration_sec: duration, confident, confidence, hint_used: hintUsed,
       }).select('id').single());
       reviewId = rv.id;
-      if (entry.last) {
+      if (entry.extra) {
+        // Ek çalışmada yanlış: konunun tekrarı yarına çekilir ve destek sorusu eklenir.
+        if (!correct || confidence <= 50) {
+          const tomorrow = addDays(localDate(), 1);
+          const upd = { support: Math.max(item.support || 0, 1), note: 'Ek çalışmada zorlandı, tekrar yarına çekildi.' };
+          if (item.due_date > tomorrow) upd.due_date = tomorrow;
+          await q(sb.from('items').update(upd).eq('id', item.id));
+          Object.assign(item, upd);
+        }
+      } else if (entry.last) {
         prevItem = itemSnapshot();
         gradePromise = saveItemGrade(item, list);
         await gradePromise;
@@ -698,7 +750,7 @@ function showQuestion() {
         answered = true;
         clearInterval(timerId);
         const rv = await q(sb.from('reviews').insert({
-          student_id: sid(), item_id: item.id, question_id: question.id, track: item.track, answer: null, correct: false,
+          student_id: sid(), item_id: item.id, question_id: question.id, track: entry.extra ? 'extra' : item.track, answer: null, correct: false,
           duration_sec: Math.round((Date.now() - startedAt) / 1000), hint_used: hintUsed, voided: true,
         }).select('id').single());
         reviewId = rv.id;
@@ -787,7 +839,7 @@ function showSessionEnd() {
   state.session = null;
   render(
     h('section', { class: 'card', style: 'margin-top: 10vh; text-align: center' },
-      h('p', { class: 'label' }, track === 'mistake' ? 'Hata tekrarı bitti' : 'Konu tekrarı bitti'),
+      h('p', { class: 'label' }, { mistake: 'Hata tekrarı bitti', topic: 'Konu tekrarı bitti', extra: 'Ek çalışma bitti' }[track]),
       h('p', { class: 'task' }, h('span', { class: 'big num' }, `${stats.correct} / ${stats.total}`)),
       h('p', { class: 'muted' }, stats.correct === stats.total ? 'Hepsi doğru. Bu konular bir süre rahat.' :
         'Yanlış yaptıkların yakında farklı sorularla tekrar gelecek.'),
@@ -1145,16 +1197,22 @@ function viewSettings() {
   const mm = h('input', { id: 'mistake-min', type: 'number', min: 5, max: 120, step: 5, value: p.mistake_minutes, inputmode: 'numeric' });
   const tm = h('input', { id: 'topic-min', type: 'number', min: 5, max: 180, step: 5, value: p.topic_minutes, inputmode: 'numeric' });
   const lgs = h('input', { id: 'lgs-date', type: 'date', value: p.lgs_date });
+  const daily = h('input', { id: 'daily-questions', type: 'number', min: 5, max: 200, step: 5, value: p.daily_questions || 40, inputmode: 'numeric' });
   const grade = h('select', { id: 'grade' }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === p.grade }, `${g}. sınıf`)));
   render(
     h('header', {}, h('h1', {}, isParent ? `Ayarlar · ${p.display_name}` : 'Ayarlar')),
     h('section', { class: 'card' },
       isParent ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
+      h('label', { class: 'field' }, 'Günlük hedef soru sayısı', daily),
+      h('p', { class: 'small muted' }, 'Tekrarlar bu sayıya ulaşmazsa açık, en zayıf konulardan ek çalışmayla tamamlanır.'),
       h('label', { class: 'field' }, 'Hata tekrarı için günlük süre (dakika)', mm),
       h('label', { class: 'field' }, 'Konu tekrarı için günlük üst sınır (dakika)', tm),
       h('label', { class: 'field' }, 'LGS tarihi', lgs),
       h('button', { class: 'primary block', onclick: async () => {
-        const upd = { mistake_minutes: +mm.value || 30, topic_minutes: +tm.value || 60, lgs_date: lgs.value || p.lgs_date };
+        const upd = {
+          mistake_minutes: +mm.value || 30, topic_minutes: +tm.value || 60, lgs_date: lgs.value || p.lgs_date,
+          daily_questions: Math.min(200, Math.max(5, +daily.value || 40)),
+        };
         if (isParent) upd.grade = +grade.value;
         // Süreler öğrencinin profilinde tutulur; veli de oradan değiştirir.
         await q(sb.from('profiles').update(upd).eq('id', p.id));
@@ -1175,18 +1233,19 @@ function viewSettings() {
 async function viewReport() {
   loading('Rapor hazırlanıyor…');
   const s = sid();
-  const [exams, results, eqs, topics, statuses, items, reviews, subs, runs] = await Promise.all([
+  const [exams, results, eqs, topics, statuses, items, reviews30, subs, runs] = await Promise.all([
     q(sb.from('exams').select('*').eq('student_id', s).order('exam_date')),
     q(sb.from('exam_results').select('*').eq('student_id', s)),
     q(sb.from('exam_questions').select('exam_id, subject, topic_id, styles, outcome, marked_guess, coding_error, diagnosis_cause, student_reason, misconception').eq('student_id', s)),
     q(sb.from('topics').select('*').eq('grade', state.student.grade)),
     q(sb.from('topic_status').select('*').eq('student_id', s)),
     q(sb.from('items').select('*').eq('student_id', s)),
-    q(sb.from('reviews').select('track, correct, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, target_seconds)').eq('student_id', s).eq('voided', false).gte('answered_at', addDays(localDate(), -14))),
+    q(sb.from('reviews').select('track, correct, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, topic_id)').eq('student_id', s).eq('voided', false).gte('answered_at', addDays(localDate(), -30))),
     q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name)').or(`student_id.eq.${s},student_id.is.null`).neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
     q(sb.from('job_runs').select('*').order('started_at', { ascending: false }).limit(1)),
   ]);
   const feedbackRows = await q(sb.from('question_feedback').select('kind, verdict, status').eq('student_id', s));
+  const reviews = reviews30.filter((r) => r.answered_at >= addDays(localDate(), -14));
   const topicName = Object.fromEntries(topics.map((t) => [t.id, t]));
   const missed = eqs.filter((e) => e.outcome !== 'dogru');
   const studentName = state.student?.display_name || '';
@@ -1272,7 +1331,50 @@ async function viewReport() {
       h('div', { class: 'row' }, subjTag(topicName[g.topic_id]?.subject), h('b', {}, topicName[g.topic_id]?.name || g.topic_id)),
       h('p', { class: 'small muted' }, `${fmtDate(g.gap_since)} tarihinden beri: aynı konuda 3 kez üst üste kaçırdı.`),
       g.tutor_note ? h('div', { class: 'note teacher' }, g.tutor_note) : h('p', { class: 'small muted' }, 'Not bir sonraki saatlik çalışmada hazırlanacak.'),
-      g.youtube_query ? h('a', { class: 'btn', href: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(g.youtube_query), target: '_blank', rel: 'noopener' }, 'YouTube araması') : null))) : null;
+      g.lesson ? h('details', {}, h('summary', {}, 'Öğrenciye yazılan konu anlatımı'), h('div', { class: 'note small', style: 'margin-top: 8px' }, g.lesson)) : null,
+      h('a', { class: 'btn', href: g.youtube_query ? 'https://www.youtube.com/results?search_query=' + encodeURIComponent(g.youtube_query)
+        : 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`LGS ${state.student.grade}. sınıf ${topicName[g.topic_id]?.name || ''} konu anlatımı`),
+        target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı')))) : null;
+
+  // Zayıf konular: son 30 günün tekrarları ve bütün denemeler birlikte; her konuya YouTube konu anlatımı.
+  const topicStats = {};
+  const ts = (id) => (topicStats[id] ||= { n: 0, ok: 0, sureWrong: 0, lucky: 0, examMiss: 0, misconceptions: [] });
+  for (const r of reviews30) {
+    const id = r.questions?.topic_id; if (!id) continue;
+    const t = ts(id);
+    t.n++; if (r.correct) t.ok++;
+    if (!r.correct && r.confidence >= 75) t.sureWrong++;
+    if (r.correct && r.confidence && r.confidence <= 50) t.lucky++;
+  }
+  for (const e of eqs) {
+    if (!e.topic_id) continue;
+    const t = ts(e.topic_id);
+    t.n++; if (e.outcome === 'dogru') t.ok++; else t.examMiss++;
+    if (e.misconception) t.misconceptions.push(e.misconception);
+  }
+  const gapIds = new Set(gaps.map((g) => g.topic_id));
+  const weak = Object.entries(topicStats)
+    .filter(([id, t]) => topicName[id] && !gapIds.has(id) && t.n >= 3 && (t.ok / t.n < 0.75 || t.sureWrong > 0))
+    .sort((a, b) => a[1].ok / a[1].n - b[1].ok / b[1].n)
+    .slice(0, 10);
+  const youtube = (name) => 'https://www.youtube.com/results?search_query=' +
+    encodeURIComponent(`LGS ${state.student.grade}. sınıf ${name} konu anlatımı`);
+  const weakCards = h('section', { class: 'stack' },
+    h('h2', {}, 'Zayıf konular'),
+    h('p', { class: 'small muted' }, 'Son 30 günün tekrarları ve denemeler. Başarısı %75’in altında olan ya da emin olduğu hâlde yanlış yaptığı konular.'),
+    weak.length ? weak.map(([id, t]) => h('div', { class: 'card' },
+      h('div', { class: 'spread' },
+        h('div', { class: 'row' }, subjTag(topicName[id].subject), h('b', {}, topicName[id].name)),
+        h('span', { class: 'tag ' + (t.ok / t.n < 0.5 ? 'red' : 'amber') }, `%${Math.round((t.ok / t.n) * 100)}`)),
+      h('p', { class: 'small' }, `${t.n} sorunun ${t.ok} tanesi doğru` +
+        (t.examMiss ? ` · denemelerde ${t.examMiss} yanlış/boş` : '') +
+        (t.sureWrong ? ` · ${t.sureWrong} kez emin ama yanlış` : '') +
+        (t.lucky ? ` · ${t.lucky} kez tahminle doğru` : '')),
+      t.misconceptions.length ? h('div', { class: 'note teacher small' }, h('b', {}, 'Görülen yanılgı: '), t.misconceptions[t.misconceptions.length - 1]) : null,
+      topicName[id].kazanim ? h('p', { class: 'small muted' }, 'Kapsam: ' + topicName[id].kazanim) : null,
+      h('a', { class: 'btn', href: youtube(topicName[id].name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı')))
+      : h('div', { class: 'card flat' }, h('p', { class: 'muted small' },
+          Object.keys(topicStats).length ? 'Şu an zayıf görünen konu yok.' : `${studentName || 'Öğrenci'} soru çözdükçe burada konu konu başarı görünecek.`)));
 
   // Son 14 günün tekrar performansı
   const perf = reviews.length ? (() => {
@@ -1328,7 +1430,7 @@ async function viewReport() {
       h('p', { class: 'label' }, 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
       h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)),
     tiles, h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
-    causes, subjects, styles, misconceptions, gapCards, perf, load, job);
+    gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
 }
 
 function tile(label, value, sub) {
