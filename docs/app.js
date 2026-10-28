@@ -436,6 +436,20 @@ function showQuestion() {
       confirmRow.hidden = false;
     }, 'data-k': k }, h('b', {}, k), h('span', {}, question.choices[k])));
 
+  // Okulda henüz işlenmemiş konu: soru sayılmaz, konu işlenene kadar bekletilir.
+  const notTaughtBtn = h('button', { class: 'ghost small muted', onclick: async () => {
+    clearInterval(timerId);
+    notTaughtBtn.disabled = true;
+    try {
+      await q(sb.from('topic_status').upsert({ topic_id: item.topic_id, status: 'not_taught', updated_at: new Date().toISOString() }));
+      await q(sb.from('items').update({ state: 'paused' }).eq('topic_id', item.topic_id).neq('state', 'done'));
+    } catch (e) { notTaughtBtn.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
+    const rest = ss.entries.slice(ss.index + 1).filter((en) => en.item.topic_id !== item.topic_id);
+    ss.entries = [...ss.entries.slice(0, ss.index), ...rest];
+    toast('Tamam, bu konu işlenene kadar sormayacağım.');
+    showQuestion();
+  } }, 'Bu konuyu okulda henüz işlemedik');
+
   const hintBox = h('div', { class: 'note', hidden: true }, question.hint || '');
   const hintBtn = question.hint ? h('button', { class: 'ghost small', onclick: () => {
     hintUsed = true; hintBox.hidden = false; hintBtn.remove();
@@ -500,7 +514,8 @@ function showQuestion() {
       hintBtn, hintBox),
     h('div', { class: 'choices' }, choiceBtns),
     confirmRow,
-    feedback);
+    feedback,
+    entry.item.track === 'topic' ? notTaughtBtn : null);
 }
 
 async function saveItemGrade(item, results) {
@@ -769,6 +784,7 @@ async function viewTopics() {
   const byId = Object.fromEntries(topics.map((t) => [t.id, t]));
   const gaps = statuses.filter((s) => s.status === 'gap' && byId[s.topic_id]);
   const maybe = statuses.filter((s) => s.status === 'maybe_not_taught' && byId[s.topic_id]);
+  const waiting = statuses.filter((s) => s.status === 'not_taught' && byId[s.topic_id]);
 
   const setStatus = async (topicId, status) => {
     await q(sb.from('topic_status').upsert({ topic_id: topicId, status, updated_at: new Date().toISOString() }));
@@ -803,11 +819,20 @@ async function viewTopics() {
         h('div', { class: 'row' },
           h('button', { style: 'flex: 1', onclick: () => setStatus(m.topic_id, 'not_taught') }, 'Henüz işlemedik'),
           h('button', { style: 'flex: 1', onclick: () => setStatus(m.topic_id, 'active') }, 'İşledik'))))) : null,
+    waiting.length ? h('section', { class: 'stack' },
+      h('h2', {}, 'Okulda işlenmesini bekleyenler'),
+      h('p', { class: 'small muted' }, 'Bu konuları sormuyorum. Okulda işleyince “İşledik” de.'),
+      waiting.map((m) => h('div', { class: 'card', style: 'padding: 12px' },
+        h('div', { class: 'spread' },
+          h('div', { class: 'row' }, subjTag(byId[m.topic_id].subject), h('span', {}, byId[m.topic_id].name)),
+          h('button', { onclick: () => setStatus(m.topic_id, 'active') }, 'İşledik'))))) : null,
     SUBJECT_ORDER.map((s) => {
-      const list = topics.filter((t) => t.subject === s && st[t.id]?.status !== 'not_taught');
+      const tracked = (t) => st[t.id] && st[t.id].status !== 'not_taught';
+      const list = topics.filter((t) => t.subject === s && tracked(t)).sort((a, b) => a.sort - b.sort);
+      const upcoming = topics.filter((t) => t.subject === s && !st[t.id]).length;
       if (!list.length) return null;
       return h('section', { class: 'card' },
-        h('div', { class: 'spread' }, subjTag(s), h('span', { class: 'small muted' }, `${list.length} konu`)),
+        h('div', { class: 'spread' }, subjTag(s), h('span', { class: 'small muted' }, `${list.length} konu takipte${upcoming ? ` · ${upcoming} konu sırada` : ''}`)),
         list.map((t) => { const [label, color] = level(t.id); return h('div', { class: 'spread small' }, h('span', {}, t.name), h('span', { class: 'tag ' + color }, label)); }));
     }),
     !topics.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'İlk denemeni yükleyince konuların burada görünecek.')) : null);

@@ -100,6 +100,27 @@ try {
         out({ disable_signup: c.disable_signup, site_url: c.site_url, uri_allow_list: c.uri_allow_list });
       }
       break;
+    case 'users': {
+      // Giriş hesapları: sadece e-posta ve kimlik (şifre asla görünmez).
+      const res = await fetch(`${base}/auth/v1/admin/users?per_page=50`, { headers: serviceHeaders() });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      const { users } = await res.json();
+      out(users.map((u) => ({ id: u.id, email: u.email, confirmed: !!u.email_confirmed_at, last_sign_in: u.last_sign_in_at })));
+      break;
+    }
+    case 'set-email': {
+      // Bir hesabın giriş e-postasını değiştirir (şifre aynı kalır).
+      const [id, email] = args;
+      const res = await fetch(`${base}/auth/v1/admin/users/${id}`, {
+        method: 'PUT',
+        headers: serviceHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email, email_confirm: true }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      const u = await res.json();
+      out({ id: u.id, email: u.email, confirmed: !!u.email_confirmed_at });
+      break;
+    }
     case 'get':
       out(await rest('GET', args[0]));
       break;

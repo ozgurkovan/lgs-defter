@@ -18,6 +18,11 @@ node tools/sb.mjs post job_runs '{"summary":"başladı"}'
 ```
 Keep the returned `id`; at the end patch `finished_at` and a one-line Turkish `summary`.
 
+Then start topics whose week in the MEB yearly plan has arrived (returns how many were added):
+```
+node tools/sb.mjs post rpc/activate_planned_topics '{}'
+```
+
 ## 1. New uploads
 
 ```
@@ -43,10 +48,10 @@ Sayısal: Matematik 1–20, Fen Bilimleri 1–20. Choices are A–D.
    student_answer, correct_answer, outcome (dogru|yanlis|bos), marked_guess, marked_skipped, coding_error`.
    - `subject`: turkce, matematik, fen, inkilap, din, ingilizce.
    - `styles` (any that apply): grafik, tablo, oncullu, degildir, paragraf, islem, deney, gorsel, kavram.
-   - `topic_id`: look up `topics` first (`get "topics?subject=eq.fen&select=id,name,unit"`) and reuse an
-     existing topic. Only create a new one when none fits: id `subject.unit-slug.topic-slug` (lowercase
-     ASCII, hyphens), Turkish `name` and `unit` as in the 8th grade MEB curriculum, `kazanim` with the
-     MEB code and text when you know it.
+   - `topic_id`: the whole 8th grade curriculum is already in `topics`
+     (`get "topics?subject=eq.fen&select=id,name,unit,kazanim&order=sort"`). Always map the question
+     to one of these. Only if a question truly fits none, create a topic with id `subject.slug`
+     (lowercase ASCII, hyphens), Turkish `name` and `unit`, and `planned_start` = exam date.
 5. For every `yanlis` or `bos` question also fill:
    - `image_path`: crop the question from its page with
      `python -I tools/crop.py <page.jpg> .work/<submission_id>/q-<subject>-<no>.jpg <left> <top> <right> <bottom>`
@@ -63,9 +68,9 @@ Sayısal: Matematik 1–20, Fen Bilimleri 1–20. Choices are A–D.
    Do not fill `student_reason`; she does that in the app before she sees your diagnosis.
 6. Upsert `exam_results` per subject: correct, wrong, blank counts.
 7. Topic status (`topic_status`), for every topic that appears in this exam:
-   - New topic (no row) → `active`, `first_seen` = exam date. Exception: if she missed or left blank
-     every question of a brand-new topic, use `maybe_not_taught` (it may not have been covered at
-     school yet; the app asks her).
+   - No row yet (its yearly-plan week has not come) → `active`, `first_seen` = exam date. Exception:
+     if she missed or left blank every question of that topic, use `maybe_not_taught` (it may not
+     have been covered at school yet; the app asks her).
    - Existing `not_taught` or `maybe_not_taught` and she now answers at least one of its questions
      correctly → `active`, and patch that topic's `items` from `paused` to `active`.
 8. Scheduling items (`items`), due tomorrow (local date, Europe/Istanbul):
