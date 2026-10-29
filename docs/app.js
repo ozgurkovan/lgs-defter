@@ -24,7 +24,8 @@ const SUBJECTS = {
   ingilizce: { name: 'İngilizce', coef: 1, sec: 75 },
 };
 const maxSeconds = (subject) => SUBJECTS[subject]?.sec || 90;
-const SUBJECT_ORDER = ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'ingilizce'];
+// LGS kitapçık sırası: sözel oturum Türkçe, İnkılap, Din, İngilizce; sayısal oturum Matematik, Fen.
+const SUBJECT_ORDER = ['turkce', 'inkilap', 'din', 'ingilizce', 'matematik', 'fen'];
 
 // Hata takibi: 1 → 2 → 4 → 14 → 30 gün. Konu tekrarı: Fibonacci, 55'te sabitlenir.
 const MISTAKE_LADDER = [1, 2, 4, 14, 30];
@@ -447,7 +448,7 @@ function gradeItem(item, results, lgsDate) {
 async function buildSession(track) {
   const today = localDate();
   const budgetSec = (track === 'mistake' ? state.student.mistake_minutes : state.student.topic_minutes) * 60;
-  const items = await q(sb.from('items').select('*, topics(subject, name)')
+  const items = await q(sb.from('items').select('*, topics(subject, name, sort)')
     .eq('student_id', sid()).eq('track', track).eq('state', 'active').lte('due_date', today));
   if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0 };
 
@@ -495,7 +496,7 @@ async function buildSession(track) {
 async function buildExtra(n, exclude) {
   if (n <= 0) return { entries: [], seconds: 0 };
   const today = localDate();
-  const items = await q(sb.from('items').select('*, topics(subject, name)')
+  const items = await q(sb.from('items').select('*, topics(subject, name, sort)')
     .eq('student_id', sid()).eq('track', 'topic').eq('state', 'active').gt('due_date', today));
   if (!items.length) return { entries: [], seconds: 0 };
   const [pool, seenRows] = await Promise.all([
@@ -534,6 +535,16 @@ function pickVaried(candidates, n) {
     picked.push(c);
   }
   return picked;
+}
+
+/* Sorular sınavdaki gibi derslere göre gruplanır (LGS kitapçık sırası), ders içinde
+   müfredat sırasıyla gelir. Aynı maddenin destek soruları yan yana kalır (sort kararlı). */
+function examOrder(entries) {
+  const rank = (e) => {
+    const i = SUBJECT_ORDER.indexOf(e.question.subject || e.item.topics?.subject);
+    return i < 0 ? SUBJECT_ORDER.length : i;
+  };
+  return [...entries].sort((a, b) => (rank(a) - rank(b)) || ((a.item.topics?.sort ?? 0) - (b.item.topics?.sort ?? 0)));
 }
 
 // ---------------------------------------------------------------- öğrenci: bugün
@@ -637,7 +648,7 @@ function statusTag(status) {
 // ---------------------------------------------------------------- öğrenci: soru oturumu
 
 function runSession(track, s) {
-  state.session = { track, entries: s.entries, index: 0, results: new Map(), stats: { correct: 0, total: 0 } };
+  state.session = { track, entries: examOrder(s.entries), index: 0, results: new Map(), stats: { correct: 0, total: 0 } };
   showQuestion();
 }
 
@@ -649,6 +660,9 @@ function showQuestion() {
   const subject = question.subject;
   const target = maxSeconds(subject);
   const startedAt = Date.now();
+  // Ders bölümünde kaçıncı soru: "Matematik 3 / 8".
+  const sameSubject = ss.entries.filter((en) => en.question.subject === subject);
+  const sectionNo = sameSubject.indexOf(entry) + 1, sectionLen = sameSubject.length;
   // Süre şık seçildiği anda durur; emin olma ölçeğini işaretlemek süreye eklenmez.
   let selected = null, chosenAt = null, hintUsed = false, confidence = null, timerId;
 
@@ -842,7 +856,7 @@ function showQuestion() {
     h('section', { class: 'card' },
       h('div', { class: 'spread' },
         h('div', { class: 'row' }, subjTag(subject), h('span', { class: 'small muted' }, item.topics?.name || '')),
-        h('span', { class: 'small muted num' }, `${ss.index + 1} / ${ss.entries.length}`)),
+        h('span', { class: 'small muted num' }, `${SUBJECTS[subject]?.name || ''} ${sectionNo} / ${sectionLen} · ${ss.index + 1} / ${ss.entries.length}`)),
       question.image_path ? lazyImg('questions', question.image_path) : null,
       question.stem ? h('p', { class: 'stem' }, question.stem) : null,
       hintBtn, hintBox),

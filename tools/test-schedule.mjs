@@ -7,13 +7,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(join(root, 'docs', 'app.js'), 'utf8');
 const pick = (from, to) => src.slice(src.indexOf(from), src.indexOf(to));
 const code = [
-  pick('const SUBJECTS', 'const SUBJECT_ORDER'),
+  pick('const SUBJECTS', '// Hata takibi:'),
   pick('const MISTAKE_LADDER', 'const REASONS'),
   pick('function localDate', 'function fmtDate'),
   pick('function gradeItem', '/* Bugünün oturumunu'),
-  'return { gradeItem, localDate, addDays, SUBJECTS };',
+  pick('/* Sorular sınavdaki gibi', '// ---------------------------------------------------------------- öğrenci: bugün'),
+  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder };',
 ].join('\n');
-const { gradeItem, localDate, addDays, SUBJECTS } = new Function(code)();
+const { gradeItem, localDate, addDays, SUBJECTS, examOrder } = new Function(code)();
 
 // Soru süreleri LGS oturum sürelerine eşit olmalı: sözel 50 soru / 75 dk, sayısal 40 soru / 80 dk.
 const counts = { turkce: 20, inkilap: 10, din: 10, ingilizce: 10, matematik: 20, fen: 20 };
@@ -77,5 +78,12 @@ const nearLgs = addDays(today, 40);
 it = { track: 'topic', step: 6, ease: 1, consecutive_wrong: 0 };
 it = { ...it, ...gradeItem(it, [{ correct: true, strong: true }], nearLgs) };
 check('sınav öncesi son tekrar', it.due_date === addDays(nearLgs, -10), `${it.due_date} (sınav ${nearLgs})`);
+
+// Oturum soruları LGS kitapçık sırasıyla gruplanır; ders içinde müfredat sırası, destek soruları yan yana.
+const e = (subject, sort, id) => ({ item: { topics: { subject, sort } }, question: { subject, id } });
+const mixed = [e('fen', 2, 'f2'), e('turkce', 5, 't5'), e('matematik', 1, 'm1'), e('fen', 1, 'f1a'), e('fen', 1, 'f1b'),
+  e('ingilizce', 1, 'i1'), e('turkce', 2, 't2'), e('din', 1, 'd1'), e('inkilap', 3, 'k3')];
+const ordered = examOrder(mixed).map((x) => x.question.id).join(' ');
+check('sınav sırasıyla gruplama', ordered === 't2 t5 k3 d1 i1 m1 f1a f1b f2', ordered);
 
 process.exit(fails ? 1 : 0);
