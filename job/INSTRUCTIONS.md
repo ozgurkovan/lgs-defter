@@ -110,9 +110,10 @@ Sayısal: Matematik 1–20, Fen Bilimleri 1–20. Choices are A–D.
      step=0, interval_days=1, due_date=tomorrow`); `state=paused` if the topic is `maybe_not_taught`.
      Their similar questions come from section 1c (in this run if time allows, otherwise the next).
    - one `topic` item per active topic that does not have one yet for this student (`track=topic,
-     step=0, interval_days=1, due_date=tomorrow`). If the topic is rare in LGS (`lgs_avg < 0.5`), create
-     it with `state=paused` and the note "LGS'de nadir çıkıyor; konu tekrarı kapalı (Konular'dan açılabilir).";
-     the family can switch it on in the app.
+     step=0, interval_days=1, due_date=tomorrow`). Topics rare in LGS (`lgs_avg < 0.5`) are tracked
+     too; the app widens their intervals by the student's `rare_factor`. Only if `rare_factor = 0`
+     (the parent chose not to repeat them) create the item with `state=paused` and the note
+     "LGS'de nadir çıkıyor; konu tekrarı kapalı (Konular'dan açılabilir).".
 9. Patch the submission: `status=done, processed_at=now`, and a short Turkish `result_note`, for
    example "13 yanlış, 4 boş işlendi. 2 yeni konu eklendi."
 
@@ -188,9 +189,10 @@ for count. Rules:
 - Grade 8: write in the style of the current LGS: long stems set in a real-life context, often built
   on a table or graph (write tables as text), multi-step reasoning rather than recall, negative stems
   ("değildir", "yanlıştır") and close distractors. `topics.lgs_avg` is how many questions the topic got
-  per LGS (2024–2026 average); spend the effort where it is high. MEB's sample booklets and past exams
-  (links in `supabase/lgs-weights.json`) are copyrighted: use them only as style models, never copy or
-  paraphrase their questions.
+  per LGS (2024–2026 average); spend the effort where it is high. Questions you write are your own: use
+  MEB's sample booklets and past exams (links in `supabase/lgs-weights.json`) only as style models.
+  Original MEB questions may be in the pool for this family's private practice (`source='meb'`); never
+  copy them into new questions, and never put them anywhere public.
 - Matematik and Fen: solve every generated question twice by independent methods before saving;
   discard it if the answers disagree or if a figure is required that text cannot describe precisely.
 - Fill `source=claude`, `subject`, `topic_id`, `styles`, `stem`, `choices` (JSON object with keys

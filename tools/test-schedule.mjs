@@ -91,6 +91,14 @@ const freq = gradeItem({ track: 'topic', step: 6, ease: 1, consecutive_wrong: 0,
 const rare = gradeItem({ track: 'topic', step: 6, ease: 1, consecutive_wrong: 0, topics: { lgs_avg: 1 } }, [{ correct: true, strong: true }], '2030-06-01');
 check('sık çıkan konu en çok 21 gün', freq.interval_days === 21 && rare.interval_days > 21, `sık ${freq.interval_days} gün, diğer ${rare.interval_days} gün`);
 
+// Seyrek konu (yılda < 0,5 soru): aralık velinin seçtiği kat kadar açılır; kat 1 iken normal.
+const seyrek = { track: 'topic', step: 4, ease: 1, consecutive_wrong: 0, topics: { lgs_avg: 0.1 } };
+const s1 = gradeItem(seyrek, [{ correct: true, strong: true }], '2030-06-01', 1);
+const s2 = gradeItem(seyrek, [{ correct: true, strong: true }], '2030-06-01', 2);
+const sw = gradeItem(seyrek, [{ correct: false, strong: false }], '2030-06-01', 2);
+check('seyrek konu aralığı 2 kat', s2.interval_days === s1.interval_days * 2, `normal ${s1.interval_days} gün, 2 kat ${s2.interval_days} gün`);
+check('seyrek konuda yanlışta yine kısalır', sw.interval_days < s1.interval_days, `yanlışta ${sw.interval_days} gün`);
+
 // Varsayılan günlük plan 40 soruyu LGS ağırlığıyla böler; velinin planı varsa o kullanılır.
 check('varsayılan plan 40 soru', planTotal(dailyPlan({ daily_questions: 40 })) === 40, JSON.stringify(dailyPlan({})));
 // Velinin yazdığı sayı geçerli; planda hiç olmayan ders (sonradan açılan) varsayılan payını alır, 0 yazılmışsa 0 kalır.

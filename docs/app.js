@@ -531,7 +531,7 @@ async function signOut() {
    results: o madde için bu oturumda çözülen soruların sonuçları {correct, strong, confidence}.
    confidence: öğrencinin emin olma ölçeği (25, 50, 75, 100).
    support: bir sonraki tekrarda eklenecek, farklı tarzda destek sorusu sayısı. */
-function gradeItem(item, results, lgsDate) {
+function gradeItem(item, results, lgsDate, rareFactor = 1) {
   const today = localDate();
   const ladder = item.track === 'mistake' ? MISTAKE_LADDER : TOPIC_LADDER;
   const allCorrect = results.every((r) => r.correct);
@@ -575,9 +575,15 @@ function gradeItem(item, results, lgsDate) {
   }
   let interval = step === 0 ? 1 : Math.max(1, Math.round(ladder[Math.min(step, ladder.length - 1)] * ease));
   // LGS'de her yıl 2 ve daha fazla soru gelen konu (topics.lgs_avg) 21 günden uzun aralığa düşmez.
-  if (item.track === 'topic' && (item.topics?.lgs_avg ?? 0) >= 2 && interval > 21) {
+  const lgsAvg = item.topics?.lgs_avg;
+  if (item.track === 'topic' && (lgsAvg ?? 0) >= 2 && interval > 21) {
     interval = 21;
     note += ' LGS\'de sık çıkan konu, en geç 3 haftada bir tekrar.';
+  }
+  // Seyrek çıkan konuda (yılda yarım sorudan az) aralık velinin seçtiği kat kadar açılır.
+  if (item.track === 'topic' && lgsAvg != null && +lgsAvg < 0.5 && rareFactor > 1 && step > 0) {
+    interval = Math.round(interval * rareFactor);
+    note += ` LGS'de seyrek konu, aralık ${String(rareFactor).replace('.', ',')} kat.`;
   }
   let due = addDays(today, interval);
   // Sınavdan önceki son haftalarda her konu bir kez daha görülsün.
@@ -1133,7 +1139,7 @@ function showQuestion() {
 }
 
 async function saveItemGrade(item, results) {
-  const upd = gradeItem(item, results, state.student.lgs_date);
+  const upd = gradeItem(item, results, state.student.lgs_date, +(state.student.rare_factor ?? 2));
   await q(sb.from('items').update(upd).eq('id', item.id));
   Object.assign(item, upd);
   if (upd.state === 'done') {
@@ -1707,9 +1713,9 @@ async function viewTopics() {
           const box = h('input', { type: 'checkbox', id: 'topic-' + t.id, checked: covered(t) || null, disabled: isTeacherView() || null, onchange: async () => {
             box.disabled = true;
             try {
-              await setCovered(t.id, box.checked, isRare(t));
+              await setCovered(t.id, box.checked, isRare(t) && rareOff());
               st[t.id] = { ...(st[t.id] || {}), status: box.checked ? 'active' : 'not_taught' };
-              if (box.checked && !items.some((i) => i.topic_id === t.id && i.track === 'topic')) items.push({ topic_id: t.id, track: 'topic', step: 0, state: isRare(t) ? 'paused' : 'active' });
+              if (box.checked && !items.some((i) => i.topic_id === t.id && i.track === 'topic')) items.push({ topic_id: t.id, track: 'topic', step: 0, state: isRare(t) && rareOff() ? 'paused' : 'active' });
               paint();
               count.textContent = countText();
             } catch (e) {
@@ -1720,7 +1726,8 @@ async function viewTopics() {
           } });
           // 8. sınıfta konunun LGS'de yılda kaç soru getirdiği; nadir konunun tekrarı açılıp kapanabilir.
           const lgsInfo = t.lgs_avg == null ? null : h('span', { class: 'small muted', style: 'display: block' },
-            isRare(t) ? 'LGS\'de nadir çıkıyor' : `LGS'de yılda ~${String(+t.lgs_avg).replace('.', ',')} soru`);
+            isRare(t) ? `LGS'de nadir çıkıyor${rareOff() ? '' : ` · tekrar aralığı ${String(+(state.student.rare_factor ?? 2)).replace('.', ',')} kat`}`
+              : `LGS'de yılda ~${String(+t.lgs_avg).replace('.', ',')} soru`);
           const topicItem = () => items.find((i) => i.topic_id === t.id && i.track === 'topic');
           const rareBtn = isRare(t) && !isTeacherView() ? h('button', { class: 'ghost small', style: 'padding: 2px 0; min-height: 0; display: block', onclick: async (e) => {
             e.preventDefault();
@@ -1749,8 +1756,10 @@ function isTeacherView() { return state.profile?.role === 'teacher'; }
 
 /* Konuyu "okulda işlendi" (takibe al) ya da "işlenmedi" (beklet) yapar.
    İlk kez işaretlenen konunun ilk tekrarı yarın gelir. */
-// LGS'de yılda ortalama yarım sorudan az gelen konu (8. sınıf): konu tekrarı kapalı başlar.
+// LGS'de yılda ortalama yarım sorudan az gelen konu (8. sınıf). Tekrar aralığı velinin seçtiği kat kadar
+// açılır (profiles.rare_factor); "tekrar etme" (0) seçildiyse bu konuların tekrarı kapalı başlar.
 const isRare = (t) => t?.lgs_avg != null && +t.lgs_avg < 0.5;
+const rareOff = () => +(state.student?.rare_factor ?? 2) === 0;
 
 async function setCovered(topicId, covered, rare = false) {
   const now = new Date().toISOString();
@@ -1781,6 +1790,9 @@ function viewSettings() {
   const lgs = p && h('input', { id: 'lgs-date', type: 'date', value: p.lgs_date });
   const grade = p && h('select', { id: 'grade' }, [1, 2, 3, 4, 5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === p.grade }, `${g}. sınıf`)));
   const plan = p && dailyPlan(p);
+  // LGS'de seyrek çıkan konuların tekrar aralığı (sadece veli, 8. sınıf).
+  const rareSel = p && h('select', { id: 'rare-factor' }, [[1, 'Normal aralıkla'], [1.5, 'Aralık 1,5 kat'], [2, 'Aralık 2 kat (önerilen)'], [3, 'Aralık 3 kat'], [0, 'Tekrar etme']]
+    .map(([v, l]) => h('option', { value: v, selected: v === +(p.rare_factor ?? 2) || null }, l)));
   // İleri müfredat: küçük sınıftaki çocuğa bir üst sınıfın konuları da açılabilir (sadece veli).
   const nextUp = p && h('input', { type: 'checkbox', id: 'next-grade', checked: (p.extra_grades || []).length > 0 || null });
   const nextUpText = h('span', {});
@@ -1799,6 +1811,8 @@ function viewSettings() {
       isParent ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
       isParent ? nextUpRow : null,
       isLgsStudent(p) ? h('label', { class: 'field' }, 'LGS tarihi', lgs) : null,
+      isParent && isLgsStudent(p) ? h('label', { class: 'field' }, 'LGS\'de seyrek çıkan konuların tekrarı', rareSel) : null,
+      isParent && isLgsStudent(p) ? h('p', { class: 'small muted' }, 'Yılda ortalama yarım sorudan az gelen konular (fiilimsiler gibi). Bildiği konunun aralığı zaten açılıyor; bu ayar seyrek konularda aralığı ayrıca genişletir.') : null,
       // Günlük plan veli ayarıdır; öğrenci sadece görür (veritabanı da öğrencinin değiştirmesine izin vermez).
       !isParent ? h('div', { class: 'stack', style: 'gap: 4px' },
         h('p', { class: 'label' }, `Günlük plan · ${planTotal(plan)} soru`),
@@ -1806,11 +1820,27 @@ function viewSettings() {
         h('p', { class: 'small muted' }, 'Bu sayıları velin ayarlıyor.')) : null,
       h('button', { class: 'primary block', onclick: async () => {
         const upd = { lgs_date: lgs.value || p.lgs_date };
+        const wasOff = +(p.rare_factor ?? 2) === 0;
         if (isParent) {
           upd.grade = +grade.value;
           upd.extra_grades = nextUp.checked && upd.grade < 8 ? [upd.grade + 1] : [];
+          if (isLgsStudent(p)) upd.rare_factor = +rareSel.value;
         }
-        try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { return toast('Kaydedilemedi, tekrar dene.'); }
+        try {
+          await q(sb.from('profiles').update(upd).eq('id', p.id));
+          // "Tekrar etme" seçilince seyrek konuların açık tekrarları kapanır; geri açılınca yeniden başlar.
+          const nowOff = upd.rare_factor === 0;
+          if (upd.rare_factor !== undefined && nowOff !== wasOff) {
+            const rareIds = (await q(sb.from('topics').select('id').eq('grade', 8).lt('lgs_avg', 0.5))).map((t) => t.id);
+            if (nowOff) {
+              await q(sb.from('items').update({ state: 'paused', note: 'LGS\'de nadir çıkıyor; konu tekrarı kapalı (Konular\'dan açılabilir).' })
+                .eq('student_id', p.id).eq('track', 'topic').eq('state', 'active').in('topic_id', rareIds));
+            } else {
+              await q(sb.from('items').update({ state: 'active', note: 'LGS\'de nadir çıkıyor; tekrar aralığı geniş.' })
+                .eq('student_id', p.id).eq('track', 'topic').eq('state', 'paused').in('topic_id', rareIds).like('note', 'LGS\'de nadir%'));
+            }
+          }
+        } catch (e) { return toast('Kaydedilemedi, tekrar dene.'); }
         Object.assign(p, upd);
         toast('Kaydedildi.');
         if (isParent) viewSettings(); // sınıf değişince dersler ve günlük plan da değişir
