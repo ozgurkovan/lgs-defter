@@ -86,6 +86,11 @@ const mixed = [e('fen', 2, 'f2'), e('turkce', 5, 't5'), e('matematik', 1, 'm1'),
 const ordered = examOrder(mixed).map((x) => x.question.id).join(' ');
 check('sınav sırasıyla gruplama', ordered === 't2 t5 k3 d1 i1 m1 f1a f1b f2', ordered);
 
+// LGS'de sık çıkan konu (yılda 2+ soru) 21 günden uzun aralığa düşmez; seyrek konu normal merdivenle gider.
+const freq = gradeItem({ track: 'topic', step: 6, ease: 1, consecutive_wrong: 0, topics: { lgs_avg: 3 } }, [{ correct: true, strong: true }], '2030-06-01');
+const rare = gradeItem({ track: 'topic', step: 6, ease: 1, consecutive_wrong: 0, topics: { lgs_avg: 1 } }, [{ correct: true, strong: true }], '2030-06-01');
+check('sık çıkan konu en çok 21 gün', freq.interval_days === 21 && rare.interval_days > 21, `sık ${freq.interval_days} gün, diğer ${rare.interval_days} gün`);
+
 // Varsayılan günlük plan 40 soruyu LGS ağırlığıyla böler; velinin planı varsa o kullanılır.
 check('varsayılan plan 40 soru', planTotal(dailyPlan({ daily_questions: 40 })) === 40, JSON.stringify(dailyPlan({})));
 // Velinin yazdığı sayı geçerli; planda hiç olmayan ders (sonradan açılan) varsayılan payını alır, 0 yazılmışsa 0 kalır.

@@ -574,6 +574,11 @@ function gradeItem(item, results, lgsDate) {
     note = 'Hata takibi bitti, konu tekrarına geçti.';
   }
   let interval = step === 0 ? 1 : Math.max(1, Math.round(ladder[Math.min(step, ladder.length - 1)] * ease));
+  // LGS'de her yıl 2 ve daha fazla soru gelen konu (topics.lgs_avg) 21 günden uzun aralığa düşmez.
+  if (item.track === 'topic' && (item.topics?.lgs_avg ?? 0) >= 2 && interval > 21) {
+    interval = 21;
+    note += ' LGS\'de sık çıkan konu, en geç 3 haftada bir tekrar.';
+  }
   let due = addDays(today, interval);
   // Sınavdan önceki son haftalarda her konu bir kez daha görülsün.
   const finalReview = addDays(lgsDate, -10);
@@ -593,7 +598,7 @@ function gradeItem(item, results, lgsDate) {
    hakkıdır ve azaltılır; hakkı biten dersin maddeleri ertesi güne kalır (deferred). */
 async function buildSession(track, remaining) {
   const today = localDate();
-  const items = await q(sb.from('items').select('*, topics(subject, name, sort)')
+  const items = await q(sb.from('items').select('*, topics(subject, name, sort, lgs_avg)')
     .eq('student_id', sid()).eq('track', track).eq('state', 'active').lte('due_date', today));
   if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0, deferred: 0 };
 
@@ -614,7 +619,10 @@ async function buildSession(track, remaining) {
 
   for (const it of items) {
     const coef = SUBJECTS[it.topics?.subject]?.coef || 1;
-    it._priority = coef * (1 + Math.max(0, daysBetween(it.due_date, today))) + Math.random() * 0.5;
+    // LGS'de sık çıkan konu öne geçer (yılda 3+ soru 1,5 kat, hiç çıkmayan yarı ağırlık); ağırlığı olmayan konu 1.
+    const w = it.topics?.lgs_avg;
+    const weight = w == null ? 1 : 0.5 + Math.min(+w, 3) / 3;
+    it._priority = coef * (1 + Math.max(0, daysBetween(it.due_date, today))) * weight + Math.random() * 0.5;
   }
   items.sort((a, b) => b._priority - a._priority);
 
@@ -656,7 +664,7 @@ async function buildSession(track, remaining) {
 async function buildExtra(remaining, exclude) {
   if (!Object.keys(remaining).some((s) => remaining[s] > 0)) return { entries: [], seconds: 0 };
   const today = localDate();
-  const items = await q(sb.from('items').select('*, topics(subject, name, sort)')
+  const items = await q(sb.from('items').select('*, topics(subject, name, sort, lgs_avg)')
     .eq('student_id', sid()).eq('track', 'topic').eq('state', 'active').gt('due_date', today));
   if (!items.length) return { entries: [], seconds: 0 };
   const [pool, seenRows, reserved] = await Promise.all([
@@ -1007,17 +1015,35 @@ function showQuestion() {
   const report = h('div', { class: 'card', hidden: true });
   const reportLink = h('button', { class: 'ghost small muted', onclick: () => { report.hidden = !report.hidden; if (!report.hidden) report.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 'Soruda sorun var');
   let reportKind = null;
-  const reportNote = h('textarea', { id: 'report-note', rows: 2, placeholder: 'İstersen kısaca açıkla (isteğe bağlı)' });
+  // "Soru yanlış" türü bildirimlerde nerede sorun olduğunu yazması istenir: kontrol eden de veli de neyi
+  // kastettiğini anlasın. Diğer bildirimlerde açıklama isteğe bağlı.
+  const NOTE_ASK = {
+    cevap_yanlis: 'Hangi şık doğru olmalı, neden? Örn: "B de doğru, çünkü…"',
+    soru_hatali: 'Nerede hata var? Örn: "Tablodaki sayı metindekiyle aynı değil."',
+    anlasilmiyor: 'Hangi kısmı anlaşılmıyor?',
+  };
+  const reportNote = h('textarea', { id: 'report-note', rows: 3, maxlength: 500, placeholder: 'İstersen kısaca açıkla (isteğe bağlı)' });
   const reportSend = h('button', { class: 'primary', disabled: true, onclick: () => sendReport() }, 'Gönder');
+  const reportNeed = h('p', { class: 'small muted', hidden: true }, 'Göndermek için nerede sorun olduğunu kısaca yaz.');
+  const reportReady = () => {
+    const needsNote = !!NOTE_ASK[reportKind];
+    const ok = !!reportKind && (!needsNote || reportNote.value.trim().length >= 5);
+    reportSend.disabled = !ok;
+    reportNeed.hidden = ok || !needsNote;
+  };
+  reportNote.addEventListener('input', reportReady);
   const reportChips = FEEDBACK_KINDS.map(([k, label]) => h('button', { class: 'chip', 'aria-pressed': 'false', onclick: (e) => {
     reportKind = k;
     reportChips.forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget)));
-    reportSend.disabled = false;
+    reportNote.placeholder = NOTE_ASK[k] || 'İstersen kısaca açıkla (isteğe bağlı)';
+    reportReady();
+    if (NOTE_ASK[k]) reportNote.focus();
   } }, label));
   report.append(
     h('h3', {}, 'Bu soruda ne sorun var?'),
     h('div', { class: 'chips' }, reportChips),
     reportNote,
+    reportNeed,
     h('div', { class: 'row' }, reportSend, h('button', { class: 'ghost', onclick: () => { report.hidden = true; } }, 'Vazgeç')));
 
   async function sendReport() {
@@ -1230,6 +1256,33 @@ function messageBox() {
     h('label', { class: 'field' }, 'İmza', signature),
     all ? h('label', { class: 'row small', for: 'msg-all' }, all, 'Bütün çocuklara gönder') : null,
     send, list);
+}
+
+/* Öğrencinin "Soruda sorun var" bildirimleri: hangi soru, ne dedi (kendi açıklaması), kontrol sonucu.
+   Bildirim yoksa kart görünmez. */
+function reportedBox() {
+  const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
+  (async () => {
+    const rows = await q(sb.from('question_feedback').select('kind, note, status, verdict, response, created_at, questions(subject, stem, topics(name))')
+      .eq('student_id', sid()).order('created_at', { ascending: false }).limit(10));
+    if (!rows.length) return;
+    const kindLabel = Object.fromEntries(FEEDBACK_KINDS);
+    const verdictTag = (r) => r.status !== 'checked' ? h('span', { class: 'tag amber' }, 'Kontrol ediliyor')
+      : r.verdict === 'soru_hatali' ? h('span', { class: 'tag green' }, 'Haklı çıktı')
+      : r.verdict === 'soru_dogru' ? h('span', { class: 'tag' }, 'Soru doğruymuş') : h('span', { class: 'tag' }, 'Not alındı');
+    fill(box,
+      h('h2', {}, 'Bildirdiği sorular'),
+      h('p', { class: 'small muted' }, '"Soruda sorun var" dediği sorular ve kendi açıklaması. Hatalı bulunan soru havuzdan çıkar ve ona sayılmaz.'),
+      rows.map((r) => h('div', { class: 'stack', style: 'gap: 4px; padding: 8px 0; border-top: 1px solid var(--rule)' },
+        h('div', { class: 'spread' },
+          h('div', { class: 'row' }, r.questions?.subject ? subjTag(r.questions.subject) : null, h('span', { class: 'small' }, kindLabel[r.kind] || r.kind)),
+          verdictTag(r)),
+        r.questions?.stem ? h('p', { class: 'small muted' }, r.questions.stem.slice(0, 140) + (r.questions.stem.length > 140 ? '…' : '')) : null,
+        r.note ? h('p', { class: 'small' }, h('b', {}, 'Açıklaması: '), r.note) : h('p', { class: 'small muted' }, 'Açıklama yazmamış.'),
+        r.response ? h('div', { class: 'note teacher small' }, r.response) : null)));
+    box.hidden = false;
+  })().catch(() => {});
+  return box;
 }
 
 // Rapordaki ve öğrenci ana sayfasındaki özet kartı; liste ayrı sayfada açılır.
@@ -1565,7 +1618,7 @@ async function viewTopics() {
   const [topics, statuses, items] = await Promise.all([
     q(sb.from('topics').select('*').in('grade', studentGrades(state.student))),
     q(sb.from('topic_status').select('*').eq('student_id', sid())),
-    q(sb.from('items').select('topic_id, track, step, state, due_date').eq('student_id', sid())),
+    q(sb.from('items').select('topic_id, track, step, state, due_date, note').eq('student_id', sid())),
   ]);
   const st = Object.fromEntries(statuses.map((s) => [s.topic_id, s]));
   const byId = Object.fromEntries(topics.map((t) => [t.id, t]));
@@ -1584,6 +1637,7 @@ async function viewTopics() {
     const openMistakes = items.filter((i) => i.topic_id === topicId && i.track === 'mistake' && i.state === 'active').length;
     if (st[topicId]?.status === 'gap') return ['Eksik', 'red'];
     if (openMistakes) return [`${openMistakes} yanlış takipte`, 'amber'];
+    if (t && t.state === 'paused' && isRare(byId[topicId])) return ['Tekrar kapalı', ''];
     if (t && t.step >= 4) return ['Oturdu', 'green'];
     if (t) return ['Tekrarda', ''];
     return ['Yeni', ''];
@@ -1653,9 +1707,9 @@ async function viewTopics() {
           const box = h('input', { type: 'checkbox', id: 'topic-' + t.id, checked: covered(t) || null, disabled: isTeacherView() || null, onchange: async () => {
             box.disabled = true;
             try {
-              await setCovered(t.id, box.checked);
+              await setCovered(t.id, box.checked, isRare(t));
               st[t.id] = { ...(st[t.id] || {}), status: box.checked ? 'active' : 'not_taught' };
-              if (box.checked && !items.some((i) => i.topic_id === t.id && i.track === 'topic')) items.push({ topic_id: t.id, track: 'topic', step: 0, state: 'active' });
+              if (box.checked && !items.some((i) => i.topic_id === t.id && i.track === 'topic')) items.push({ topic_id: t.id, track: 'topic', step: 0, state: isRare(t) ? 'paused' : 'active' });
               paint();
               count.textContent = countText();
             } catch (e) {
@@ -1664,7 +1718,27 @@ async function viewTopics() {
             }
             box.disabled = false;
           } });
-          return h('label', { class: 'topic-row', for: 'topic-' + t.id }, box, h('span', { class: 'name' }, t.name), tag);
+          // 8. sınıfta konunun LGS'de yılda kaç soru getirdiği; nadir konunun tekrarı açılıp kapanabilir.
+          const lgsInfo = t.lgs_avg == null ? null : h('span', { class: 'small muted', style: 'display: block' },
+            isRare(t) ? 'LGS\'de nadir çıkıyor' : `LGS'de yılda ~${String(+t.lgs_avg).replace('.', ',')} soru`);
+          const topicItem = () => items.find((i) => i.topic_id === t.id && i.track === 'topic');
+          const rareBtn = isRare(t) && !isTeacherView() ? h('button', { class: 'ghost small', style: 'padding: 2px 0; min-height: 0; display: block', onclick: async (e) => {
+            e.preventDefault();
+            const it = topicItem();
+            if (!it) return toast('Önce konuyu işlendi olarak işaretle.');
+            const on = it.state !== 'active';
+            try {
+              await q(sb.from('items').update(on ? { state: 'active', note: 'Konu tekrarı elle açıldı.' }
+                : { state: 'paused', note: 'LGS\'de nadir çıkıyor; konu tekrarı kapalı (Konular\'dan açılabilir).' })
+                .eq('student_id', sid()).eq('topic_id', t.id).eq('track', 'topic'));
+            } catch (err) { return toast('Kaydedilemedi, tekrar dene.'); }
+            it.state = on ? 'active' : 'paused';
+            rareBtn.textContent = on ? 'Tekrarı kapat' : 'Tekrarı aç';
+            paint();
+            toast(on ? 'Tamam, bu konu da tekrar edilecek.' : 'Tamam, bu konunun tekrarı kapandı.');
+          } }, topicItem()?.state === 'active' ? 'Tekrarı kapat' : 'Tekrarı aç') : null;
+          return h('label', { class: 'topic-row', for: 'topic-' + t.id }, box,
+            h('span', { class: 'name' }, t.name, lgsInfo, rareBtn), tag);
         }));
     });
   }
@@ -1675,7 +1749,10 @@ function isTeacherView() { return state.profile?.role === 'teacher'; }
 
 /* Konuyu "okulda işlendi" (takibe al) ya da "işlenmedi" (beklet) yapar.
    İlk kez işaretlenen konunun ilk tekrarı yarın gelir. */
-async function setCovered(topicId, covered) {
+// LGS'de yılda ortalama yarım sorudan az gelen konu (8. sınıf): konu tekrarı kapalı başlar.
+const isRare = (t) => t?.lgs_avg != null && +t.lgs_avg < 0.5;
+
+async function setCovered(topicId, covered, rare = false) {
   const now = new Date().toISOString();
   if (!covered) {
     await q(sb.from('topic_status').upsert({ student_id: sid(), topic_id: topicId, status: 'not_taught', updated_at: now }));
@@ -1685,9 +1762,11 @@ async function setCovered(topicId, covered) {
   await q(sb.from('topic_status').upsert({ student_id: sid(), topic_id: topicId, status: 'active', first_seen: localDate(), updated_at: now }));
   const existing = await q(sb.from('items').select('id').eq('student_id', sid()).eq('topic_id', topicId).eq('track', 'topic'));
   if (existing.length) {
-    await q(sb.from('items').update({ state: 'active' }).eq('student_id', sid()).eq('topic_id', topicId).eq('state', 'paused'));
+    // Nadir konunun tekrarı işaretle açılmaz; açmak için Konular'daki "Tekrarı aç" düğmesi var.
+    if (!rare) await q(sb.from('items').update({ state: 'active' }).eq('student_id', sid()).eq('topic_id', topicId).eq('state', 'paused'));
   } else {
-    await q(sb.from('items').insert({ student_id: sid(), track: 'topic', topic_id: topicId, step: 0, interval_days: 1, due_date: addDays(localDate(), 1) }));
+    await q(sb.from('items').insert({ student_id: sid(), track: 'topic', topic_id: topicId, step: 0, interval_days: 1, due_date: addDays(localDate(), 1),
+      ...(rare ? { state: 'paused', note: 'LGS\'de nadir çıkıyor; konu tekrarı kapalı (Konular\'dan açılabilir).' } : {}) }));
   }
 }
 
@@ -2269,6 +2348,7 @@ async function viewReport() {
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
     tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
+    reportedBox(),
     h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
 }

@@ -1,0 +1,268 @@
+{
+  "_note": "Sayılar 2023-2026 LGS'lerinde her konudan çıkan soru sayısıdır; avg yalnızca tam yıl kapsamlı 2024, 2025 ve 2026 sınavlarının ortalamasıdır (2023 deprem nedeniyle yalnız 1. dönemdi, bilgi için verildi), ünite içi alt konu bölüşümleri ve notta '(tahmin)' geçen değerler okul analizlerinden çıkarılmış olup kesin değildir.",
+  "_scope": {
+    "2026": "Dönem kısıtlaması yok, 8. sınıfın tüm yılı: MEB 23.03.2026 kılavuz duyurusu \"Merkezî sınavda 8'inci sınıf öğretim programlarında yer alan kazanımlar esas alınacak.\" (sınav 13.06.2026'da yapıldı). 1. dönem sınırı yalnızca 2020 (pandemi) ve 2023'te (deprem) uygulandı; 2021, 2022, 2024 ve 2025 tüm yıldı. Uygulamada İnkılap 7. ve İngilizce 10. üniteden yıllardır soru gelmiyor.",
+    "2027": "henüz açıklanmadı (29.10.2026 itibarıyla 2027 kılavuzu ya da kapsam duyurusu yok; kılavuz genelde mart sonunda çıkar. Yalnızca MEBİ 2026-27 deneme takvimi yayımlandı.)",
+    "sources": [
+      "https://www.meb.gov.tr/2026-lgs-kapsamindaki-merkezi-sinav-icin-basvuru-ve-uygulama-kilavuzu-yayimlandi/haber/40200/tr",
+      "https://www.meb.gov.tr/basin-aciklamasi/haber/40315/tr",
+      "https://www.meb.gov.tr/lgs-sinav-sorularinin-temel-kaynagi-ucretsiz-dagitilan-ders-kitaplari-oldu/haber/38347/tr",
+      "https://www.meb.gov.tr/2023-lgsde-8-sinifin-yksde-12-sinifin-ikinci-donem-konulari-sinav-kapsamina-dahil-olmayacak/haber/29003/tr",
+      "https://www.meb.gov.tr/lgs-kapsamindaki-merkezi-sinav-sadece-birinci-donem-mufredatindan-yapilacak/haber/20591/tr",
+      "https://www.ntv.com.tr/egitim/son-dakika-meb-lgs-ve-yks-2020-2021-mufredatini-acikladi,WLYkEZvQ2E-Mw4CPoTJcYg",
+      "https://www.pervinkaplan.com/detay/2024-lgs-egitimciler-sorulari-nasil-degerlendirdi/29045",
+      "https://www.meb.gov.tr/mebi-2026-2027-yks-ve-lgs-deneme-takvimi-belli-oldu/haber/41943/tr"
+    ]
+  },
+  "_style": "Sorular dört seçenekli ve çoğunlukla günlük yaşam ya da güncel bir bağlamda (deney, proje, haber metni, diyalog) kurulmuş uzun öncüllüdür; ezberden çok okuduğunu anlama, çıkarım, akıl yürütme ve bilgiyi yeni duruma aktarma ölçülür ve MEB'e göre tüm sorular ücretsiz ders kitaplarındaki kazanım ve içerikle örtüşür. Matematik ve fende soruların yarıdan fazlası grafik, tablo, şekil ya da deney düzeneği içerir; birden çok kazanımı birleştiren çok adımlı sorular, I-II-III öncüllü yapılar, olumsuz soru kökleri, 'kesinlikle' gibi ifadeler ve birbirine çok yakın güçlü çeldiriciler sıktır. Türkçede metinler uzun ve kısmen edebîdir, dil bilgisi metin içinde sorulur; İnkılap ve Din'de kavram bilgisi kronoloji, alıntı/ayet ve neden-sonuç yorumuyla, İngilizcede ise dil bilgisi doğrudan değil diyalog, mesaj ve görsel okuma üzerinden yoklanır.",
+  "_meb_materials": [
+    {
+      "title": "2026 LGS soru kitapçıkları, Sözel/Sayısal A-D (ÖDSGM duyurusu, 13.06.2026)",
+      "url": "https://odsgm.meb.gov.tr/www/lgs-kapsamindaki-merkezi-sinavin-soru-kitapciklari-ve-cevap-anahtarlari-yayimlandi/icerik/1678",
+      "kind": "cikmis-soru",
+      "year": "2025-26",
+      "pdfs": [
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2026/06/trlgs/a_2026_sozel.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2026/06/trlgs/a_2026_sayisal.pdf",
+        "https://meb.ai/2026LgsSozelB",
+        "https://meb.ai/2026LgsSayisalB",
+        "https://meb.ai/2026LgsSozelC",
+        "https://meb.ai/2026LgsSayisalC",
+        "https://meb.ai/2026LgsSozelD",
+        "https://meb.ai/2026LgsSayisalD"
+      ]
+    },
+    {
+      "title": "2026 LGS soru kitapçıkları ve cevap anahtarları (meb.gov.tr haberi)",
+      "url": "https://www.meb.gov.tr/lgs-kapsamindaki-merkezi-sinavin-soru-kitapciklari-ve-cevap-anahtarlari-yayimlandi/haber/41055/tr",
+      "kind": "cikmis-soru",
+      "year": "2025-26"
+    },
+    {
+      "title": "2025 LGS soru kitapçıkları, Sözel/Sayısal A-D (ÖDSGM, 15.06.2025)",
+      "url": "https://odsgm.meb.gov.tr/www/lgs-kapsamindaki-merkezi-sinav-tamamlandi-soru-kitapciklari-yayimlandi/icerik/1446",
+      "kind": "cikmis-soru",
+      "year": "2024-25",
+      "pdfs": [
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2025/06/lgs/2025sozel.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2025/06/lgss/2025sayisal.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2025/06/lgs/B-2025Sozel.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2025/06/lgs/B-2025Sayisal.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2025/06/lgs/C-2025Sozel.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2025/06/lgs/C-2025Sayisal.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2025/06/lgs/D-2025Sozel.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2025/06/lgs/D-2025Sayisal.pdf"
+      ]
+    },
+    {
+      "title": "2024 LGS soru kitapçıkları ve cevap anahtarları (ÖDSGM; cevap anahtarı PDF'lerin içinde)",
+      "url": "https://odsgm.meb.gov.tr/www/02-haziran-2024-tarihinde-uygulanan-sinavla-ogrenci-alacak-ortaogretim-kurumlarina-iliskin-merkezi-sinavin-soru-kitapciklari-sayisal-ve-sozel-ve-cevap-anahtarlari/icerik/1245",
+      "kind": "cikmis-soru",
+      "year": "2023-24",
+      "pdfs": [
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2024/06/2024sozel.pdf",
+        "https://cdn.eba.gov.tr/yardimcikaynaklar/2024/06/2024sayisal.pdf"
+      ]
+    },
+    {
+      "title": "2023 LGS soru kitapçıkları ve cevap anahtarları (MEB duyurusu; yalnız 1. dönem kapsamlı sınav)",
+      "url": "https://www.meb.gov.tr/04062023-tarihinde-uygulanan-sinavla-ogrenci-alacak-ortaogretim-kurumlarina-iliskin-merkezi-sinavin-soru-kitapciklari-sayisal-ve-sozel-ve-cevap-anahtarlari/duyuru/30115",
+      "kind": "cikmis-soru",
+      "year": "2022-23",
+      "pdfs": [
+        "http://meb.ai/ImuyJ7",
+        "http://meb.ai/NADpaE"
+      ]
+    },
+    {
+      "title": "LGS 1. örnek soru kitapçıkları, 45 soru + çözüm videoları (MEBİ, 30.11.2025)",
+      "url": "https://www.meb.gov.tr/lgsye-yonelik-birinci-ornek-soru-kitapciklari-mebide-yayimlandi/haber/39138/tr",
+      "kind": "aylik-ornek",
+      "year": "2025-26"
+    },
+    {
+      "title": "LGS mart ayı örnek soru kitapçıkları (MEBİ, 06.03.2026)",
+      "url": "https://www.meb.gov.tr/mebide-lgs-ogrencileri-icin-mart-ayi-ornek-sorulari-yayimlandi/haber/40015/tr",
+      "kind": "aylik-ornek",
+      "year": "2025-26"
+    },
+    {
+      "title": "LGS nisan ayı örnek soru kitapçıkları (MEBİ, 29.04.2026)",
+      "url": "https://www.meb.gov.tr/mebide-lgs-ogrencileri-icin-nisan-ayi-ornek-sorulari-yayimlandi/haber/40594/tr",
+      "kind": "aylik-ornek",
+      "year": "2025-26"
+    },
+    {
+      "title": "LGS 1. örnek soru kitapçıkları, 45 soru (ÖDSGM, 18.11.2024)",
+      "url": "https://odsgm.meb.gov.tr/www/lgs-kapsamindaki-merkezi-sinava-yonelik-ornek-sorular-yayimlandi/icerik/1321",
+      "kind": "aylik-ornek",
+      "year": "2024-25",
+      "pdfs": [
+        "https://meb.ai/NrEYs7",
+        "https://meb.ai/URbuoyJ"
+      ]
+    },
+    {
+      "title": "LGS 2. örnek soru kitapçıkları, 45 soru (ÖDSGM, 10.02.2025)",
+      "url": "https://odsgm.meb.gov.tr/www/lgs-kapsamindaki-merkezi-sinava-yonelik-ikinci-ornek-soru-kitapciklari-yayimlandi/icerik/1405",
+      "kind": "aylik-ornek",
+      "year": "2024-25",
+      "pdfs": [
+        "https://meb.ai/UpK1KvA",
+        "https://meb.ai/UYYU83Z"
+      ]
+    },
+    {
+      "title": "LGS 3. örnek soru kitapçıkları, 45 soru (ÖDSGM, 15.04.2025)",
+      "url": "https://odsgm.meb.gov.tr/www/lgs-kapsamindaki-merkezi-sinava-yonelik-ucuncu-ornek-soru-kitapciklari-yayimlandi/icerik/1425",
+      "kind": "aylik-ornek",
+      "year": "2024-25",
+      "pdfs": [
+        "https://meb.ai/UKNwZ9o",
+        "https://meb.ai/aFxpbQ"
+      ]
+    },
+    {
+      "title": "LGS örnek soru kitapçıkları, 45 soru + ders kitabındaki karşılıkları (ÖDSGM, 15.02.2024)",
+      "url": "https://odsgm.meb.gov.tr/www/liselere-gecis-sistemi-lgs-kapsamindaki-merkezi-sinava-yonelik-ornek-sorular-yayimlandi/icerik/1171",
+      "kind": "aylik-ornek",
+      "year": "2023-24",
+      "pdfs": [
+        "https://meb.ai/xtx5MQ",
+        "https://meb.ai/Ubf3tSE",
+        "http://meb.ai/UE4eCUf"
+      ]
+    },
+    {
+      "title": "2025 LGS sorularının ders kitabıyla soru soru karşılaştırması, kazanım kodlarıyla (ÖDSGM raporu, 19.09.2025)",
+      "url": "https://www.meb.gov.tr/lgs-sinav-sorularinin-temel-kaynagi-ucretsiz-dagitilan-ders-kitaplari-oldu/haber/38347/tr",
+      "kind": "diger",
+      "year": "2024-25",
+      "pdfs": [
+        "https://www.meb.gov.tr/meb_iys_dosyalar/2025_09/19122251_sozell1.pdf",
+        "https://www.meb.gov.tr/meb_iys_dosyalar/2025_09/19122323_sayisal1.pdf"
+      ]
+    },
+    {
+      "title": "2026 LGS başvuru ve uygulama kılavuzu (MEB, 23.03.2026)",
+      "url": "https://www.meb.gov.tr/2026-lgs-kapsamindaki-merkezi-sinav-icin-basvuru-ve-uygulama-kilavuzu-yayimlandi/haber/40200/tr",
+      "kind": "diger",
+      "year": "2025-26",
+      "pdfs": [
+        "https://odsgm.meb.gov.tr/meb_iys_dosyalar/2026_04/69cfb9daaf8f2557696260_LGS_Basvuru_ve_Uygulama_K%C4%B1lavuzu_2026.pdf"
+      ]
+    },
+    {
+      "title": "MEBİ 2026-27 LGS deneme takvimi: 10 Türkiye geneli deneme, ilki 2-8 Kasım 2026 (MEB, 17.09.2026)",
+      "url": "https://www.meb.gov.tr/mebi-2026-2027-yks-ve-lgs-deneme-takvimi-belli-oldu/haber/41943/tr",
+      "kind": "diger",
+      "year": "2026-27",
+      "pdfs": [
+        "https://www.meb.gov.tr/meb_iys_dosyalar/2026_09/6aab8d1025122453495788_LGS-deneme-takvim.pdf"
+      ]
+    },
+    {
+      "title": "MEBİ platformu: örnek sorular, çıkmış sorular, denemeler (öğrenci girişiyle)",
+      "url": "https://mebi.eba.gov.tr/",
+      "kind": "diger",
+      "year": "2026-27"
+    },
+    {
+      "title": "Kullanım koşulları: MEB içeriğinin telifi MEB'e ait ('Tüm Hakları Saklıdır'), açık bir yeniden kullanım izni yok; sorular uygulamaya kopyalanmamalı, bağlantı ve stil referansı olarak kullanılmalı",
+      "url": "https://www.meb.gov.tr/gizlilik-kullanim-ve-telif-haklari/duyuru/28029/",
+      "kind": "diger",
+      "year": "genel"
+    }
+  ],
+  "_count_sources": [
+    "https://www.derslig.com/blog/lgs-soru-dagilimi-derslere-ve-konulara-gore-guncel-rehber",
+    "https://www.unirehberi.com/lgs-konulari-ve-soru-dagilimlari/",
+    "https://optimaegitim.com/rehber/lgs-soru-dagilimlari/",
+    "https://www.gulhaneakademi.com/lgs-matematik-konulari-ve-soru-dagilimlari-guncel-2026/",
+    "https://www.pervinkaplan.com/detay/2023-lgs-egitimciler-sorulari-nasil-degerlendirdi/26266",
+    "https://www.pervinkaplan.com/detay/2024-lgs-egitimciler-sorulari-nasil-degerlendirdi/29045",
+    "https://www.pervinkaplan.com/detay/lgs-sorularini-egitimciler-degerlendirdi-8-yilin-en-zor-turkce-sorulari/31449",
+    "https://www.pervinkaplan.com/detay/2026-lgs-sorulari-egitimciler-nasil-degerlendirdi/33673",
+    "https://www.dha.com.tr/egitim/kavram-egitim-kurumlari-bolum-baskanlari-2025-lgs-sorularini-degerlendirdi-2659543",
+    "https://www.dha.com.tr/egitim/kavram-egitim-kurumlarindaki-bolum-baskanlarindan-lgs-degerlendirmesi-2890859",
+    "https://www.cumhuriyet.com.tr/egitim/egitim-uzmanlarindan-2026-lgs-analizi-onceki-yillara-gore-daha-zor-ve-secici-bir-sinavdi-2511899",
+    "https://www.ekonomist.com.tr/egitim/egitim-uzmanlari-lgs-2026-yi-degerlendirdi-en-cok-zorlayan-lgs-sorulari-neydi--75537"
+  ],
+  "topics": {
+    "turkce.sozcukte-anlam": { "avg": 1.7, "by_year": { "2023": 1, "2024": 2, "2025": 2, "2026": 1 }, "first_semester": true, "note": "Deyim/atasözü dahil (2024'te 1 deyim sorusu); 2026 sayısı tahmin." },
+    "turkce.cumlede-anlam": { "avg": 2.3, "by_year": { "2023": 3, "2024": 3, "2025": 2, "2026": 2 }, "first_semester": true, "note": "2026 sayısı tahmin." },
+    "turkce.paragrafta-anlam": { "avg": 7.3, "by_year": { "2023": 6, "2024": 6, "2025": 7, "2026": 9 }, "first_semester": true, "note": "En ağır konu; metinler uzun ve kısmen edebî, hikâye unsurları dahil. 2026 sayısı tahmin." },
+    "turkce.sozel-mantik": { "avg": 3.3, "by_year": { "2023": 5, "2024": 3, "2025": 3, "2026": 4 }, "first_semester": true, "note": "Tablo/grafik/görsel okuma dahil, genelde 14-16. sorular; 2026 sayısı tahmin." },
+    "turkce.yazim-kurallari": { "avg": 1.0, "by_year": { "2023": 1, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "Her yıl 1 soru." },
+    "turkce.noktalama": { "avg": 1.0, "by_year": { "2023": 1, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "Her yıl 1 soru." },
+    "turkce.isim-fiil": { "avg": 0.1, "by_year": { "2023": 0.33, "2024": 0.33, "2025": 0, "2026": 0 }, "first_semester": true, "note": "Fiilimsi tek soru gelir, üç alt konuya bölündü; 2018-2024 çoğu yıl 1 soruydu, 2025-2026'da hiç sorulmadı." },
+    "turkce.sifat-fiil": { "avg": 0.1, "by_year": { "2023": 0.33, "2024": 0.33, "2025": 0, "2026": 0 }, "first_semester": true, "note": "Fiilimsi sorusu üçe bölündü; 2025-2026'da sorulmadı." },
+    "turkce.zarf-fiil": { "avg": 0.1, "by_year": { "2023": 0.33, "2024": 0.33, "2025": 0, "2026": 0 }, "first_semester": true, "note": "Fiilimsi sorusu üçe bölündü; 2025-2026'da sorulmadı." },
+    "turkce.cumlenin-ogeleri": { "avg": 0.3, "by_year": { "2023": 0, "2024": 0, "2025": 0, "2026": 1 }, "first_semester": true, "note": "2026'da 1 soru (yer tamlayıcısı); 2025'te yalnız anlatım bozukluğu sorusu içinde." },
+    "turkce.fiilde-cati": { "avg": 0.7, "by_year": { "2023": 0, "2024": 0, "2025": 1, "2026": 1 }, "first_semester": true, "note": "LGS'de ilk kez 2025'te soruldu, 2026'da da geldi." },
+    "turkce.cumle-turleri": { "avg": 0.7, "by_year": { "2023": 1, "2024": 1, "2025": 1, "2026": 0 }, "first_semester": false, "note": "2026'da sorulmadı." },
+    "turkce.soz-sanatlari": { "avg": 0.7, "by_year": { "2023": 1, "2024": 1, "2025": 1, "2026": 0 }, "first_semester": false, "note": "2023-2024 metin türleri, 2025 söz sanatı; 2026'da yok." },
+    "turkce.anlatim-bozukluklari": { "avg": 0.7, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 0 }, "first_semester": false, "note": "2026'da sorulmadı." },
+
+    "matematik.carpanlar-katlar": { "avg": 1.0, "by_year": { "2023": 3, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "Matematik dağılımı 2024-2026'da üç yıl birebir aynı (sabit plan); 2023'te (yalnız 1. dönem) 3 soru." },
+    "matematik.uslu-ifadeler": { "avg": 2.0, "by_year": { "2023": 4, "2024": 2, "2025": 2, "2026": 2 }, "first_semester": true, "note": "Bilimsel gösterim sık." },
+    "matematik.karekoklu-ifadeler": { "avg": 3.0, "by_year": { "2023": 5, "2024": 3, "2025": 3, "2026": 3 }, "first_semester": true, "note": "1. dönemin en ağır konusu." },
+    "matematik.veri-analizi": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "Sütun/çizgi/daire grafik; 2024'te daire grafiği yoktu, 2026'da vardı." },
+    "matematik.olasilik": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "2026'da grafikle birlikte soruldu." },
+    "matematik.cebirsel-ifadeler": { "avg": 2.0, "by_year": { "2023": 4, "2024": 2, "2025": 2, "2026": 2 }, "first_semester": true },
+    "matematik.dogrusal-denklemler": { "avg": 3.0, "by_year": { "2023": 0, "2024": 3, "2025": 3, "2026": 3 }, "first_semester": false, "note": "Eğim dahil; bir kaynak 2024 için 4 diyor (o zaman eşitsizlik 1)." },
+    "matematik.esitsizlikler": { "avg": 2.0, "by_year": { "2023": 0, "2024": 2, "2025": 2, "2026": 2 }, "first_semester": false },
+    "matematik.ucgenler": { "avg": 2.0, "by_year": { "2023": 0, "2024": 2, "2025": 2, "2026": 2 }, "first_semester": false, "note": "Pisagor ve üçgen eşitsizliği sık." },
+    "matematik.eslik-benzerlik": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false },
+    "matematik.donusum-geometrisi": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false },
+    "matematik.geometrik-cisimler": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false, "note": "2024-2026'da soru hep silindirdendi." },
+
+    "fen.mevsimlerin-olusumu": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "Ünite her yıl 1 soru; 2026 gün dönümü, 2023-2025 alt konusu tahmin." },
+    "fen.iklim-hava-hareketleri": { "avg": 0.0, "by_year": { "2023": 1, "2024": 0, "2025": 0, "2026": 0 }, "first_semester": true, "note": "2024-2026'da tespit edilmedi (ünite sorusu mevsimlere sayıldı, kesin değil); 2023 tahmin." },
+    "fen.dna-genetik-kod": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "DNA ünitesi 2024'te 4, 2025-2026'da 3 soru; 2025 DNA eşlenmesi, 2026 nükleotit; 2023-2024 tahmin." },
+    "fen.kalitim": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "2023-2024 tahmin." },
+    "fen.mutasyon-modifikasyon": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "2023-2024 mutasyon, 2026 modifikasyon soruldu; 2025 tahmin." },
+    "fen.adaptasyon": { "avg": 0.0, "by_year": { "2023": 1, "2024": 0, "2025": 0, "2026": 0 }, "first_semester": true, "note": "2024-2026'da tespit edilmedi; 2023 tahmin." },
+    "fen.biyoteknoloji": { "avg": 0.3, "by_year": { "2023": 1, "2024": 1, "2025": 0, "2026": 0 }, "first_semester": true, "note": "2023 gen aktarımı sorusu; 2024 tahmin." },
+    "fen.kati-basinci": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "2023 tahmin." },
+    "fen.sivi-gaz-basinci": { "avg": 1.0, "by_year": { "2023": 3, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "Sıvı basıncı deney soruları sık; gaz basıncı son yıllarda sorulmadı. 2023 tahmin." },
+    "fen.periyodik-sistem": { "avg": 1.0, "by_year": { "2023": 1, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "2023 tahmin." },
+    "fen.fiziksel-kimyasal-degisim": { "avg": 0.3, "by_year": { "2023": 1, "2024": 0, "2025": 1, "2026": 0 }, "first_semester": true, "note": "2023 tahmin." },
+    "fen.kimyasal-tepkimeler": { "avg": 0.7, "by_year": { "2023": 1, "2024": 1, "2025": 0, "2026": 1 }, "first_semester": true, "note": "2023 tahmin." },
+    "fen.asitler-bazlar": { "avg": 0.7, "by_year": { "2023": 1, "2024": 1, "2025": 0, "2026": 1 }, "first_semester": false, "note": "2023'te 1. dönem kapsamında soruldu; 2024 tahmin." },
+    "fen.madde-isi-etkilesimi": { "avg": 2.3, "by_year": { "2023": 0, "2024": 2, "2025": 3, "2026": 2 }, "first_semester": false, "note": "Isı-sıcaklık, öz ısı, hâl değişimi; ayırt edici sorular buradan. 2025'in 3. sorusu tahmin." },
+    "fen.kimya-endustrisi": { "avg": 0.0, "by_year": { "2023": 0, "2024": 0, "2025": 0, "2026": 0 }, "first_semester": false, "note": "2020-2026 arası soru tespit edilmedi." },
+    "fen.basit-makineler": { "avg": 2.0, "by_year": { "2023": 0, "2024": 2, "2025": 2, "2026": 2 }, "first_semester": false, "note": "Her yıl 2 soru (makara, eğik düzlem, çıkrık, kaldıraç); zor sorular çıkar." },
+    "fen.besin-zinciri-enerji": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false, "note": "2024 tahmin." },
+    "fen.fotosentez-solunum": { "avg": 1.3, "by_year": { "2023": 0, "2024": 1, "2025": 2, "2026": 1 }, "first_semester": false, "note": "2025'teki 2. soru (CO2 artışı) tahmin." },
+    "fen.madde-donguleri": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false, "note": "2024 küresel ısınma, 2025 azot, 2026 karbon döngüsü." },
+    "fen.surdurulebilir-kalkinma": { "avg": 0.7, "by_year": { "2023": 0, "2024": 1, "2025": 0, "2026": 1 }, "first_semester": false, "note": "2026 geri dönüşüm; 2024 tahmin." },
+    "fen.elektriklenme": { "avg": 2.0, "by_year": { "2023": 0, "2024": 1, "2025": 2, "2026": 3 }, "first_semester": false, "note": "Yılın son ünitesi ama her yıl soru gelir (topraklama, teknolojide uygulamalar); 2026 bölüşümü tahmin." },
+    "fen.elektrik-enerjisi-donusumu": { "avg": 0.7, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 0 }, "first_semester": false, "note": "2025 motor/jeneratör; 2024 tahmin." },
+
+    "inkilap.bir-kahraman-doguyor": { "avg": 1.0, "by_year": { "2023": 3, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true },
+    "inkilap.milli-uyanis": { "avg": 2.7, "by_year": { "2023": 4, "2024": 2, "2025": 2, "2026": 4 }, "first_semester": true, "note": "2026 değeri tek kaynak (Derslig); bazı okul analizleri 2026'da 3. ünitenin ağır bastığını söylüyor." },
+    "inkilap.ya-istiklal-ya-olum": { "avg": 1.7, "by_year": { "2023": 3, "2024": 2, "2025": 2, "2026": 1 }, "first_semester": true, "note": "2026 değeri tartışmalı (Derslig 1; Ari Okulları 'ağırlıklı bu ünite' diyor)." },
+    "inkilap.ataturkculuk-cagdaslasma": { "avg": 2.7, "by_year": { "2023": 0, "2024": 3, "2025": 3, "2026": 2 }, "first_semester": false, "note": "Bir 2024 analizi 4 diyor." },
+    "inkilap.demokratiklesme-cabalari": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false },
+    "inkilap.ataturk-donemi-dis-politika": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false },
+    "inkilap.ataturkun-olumu-sonrasi": { "avg": 0.0, "by_year": { "2023": 0, "2024": 0, "2025": 0, "2026": 0 }, "first_semester": false, "note": "Kapsamda ama 2019-2026 arası hiç soru çıkmadı." },
+
+    "din.kader-inanci": { "avg": 3.0, "by_year": { "2023": 3, "2024": 3, "2025": 4, "2026": 2 }, "first_semester": true, "note": "2023 bazı tablolarda 4, 2025 bir tabloda 3." },
+    "din.zekat-sadaka": { "avg": 2.3, "by_year": { "2023": 4, "2024": 3, "2025": 2, "2026": 2 }, "first_semester": true, "note": "2023 bazı tablolarda 3." },
+    "din.din-ve-hayat": { "avg": 1.3, "by_year": { "2023": 3, "2024": 2, "2025": 0, "2026": 2 }, "first_semester": true, "note": "2025 için kaynaklar 0-2 arası (iki okul analizi 0)." },
+    "din.hz-muhammedin-ornekligi": { "avg": 2.7, "by_year": { "2023": 0, "2024": 1, "2025": 3, "2026": 4 }, "first_semester": false, "note": "Ağırlığı artıyor; 2026 için bir analiz 2 diyor." },
+    "din.kuran-ozellikleri": { "avg": 0.7, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 0 }, "first_semester": false, "note": "2026'da soru yok (Kavram; Bilfen 2 diyor), 2025 bir analizde 0." },
+
+    "ingilizce.friendship": { "avg": 1.7, "by_year": { "2023": 2, "2024": 1, "2025": 2, "2026": 2 }, "first_semester": true, "note": "2026'daki 2. soru tahmin (o yıl bir ünite 2 aldı, hangisi belirsiz); 2023 bazı tablolarda 4." },
+    "ingilizce.teen-life": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true, "note": "2023 okul analizlerine göre ilk 5 üniteye 2'şer; bazı tablolarda 0." },
+    "ingilizce.in-the-kitchen": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true },
+    "ingilizce.on-the-phone": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true },
+    "ingilizce.the-internet": { "avg": 1.0, "by_year": { "2023": 2, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": true },
+    "ingilizce.adventures": { "avg": 1.3, "by_year": { "2023": 0, "2024": 2, "2025": 1, "2026": 1 }, "first_semester": false, "note": "2024'te 2 soru (Işık Okulları tablosu)." },
+    "ingilizce.tourism": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false },
+    "ingilizce.chores": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false },
+    "ingilizce.science": { "avg": 1.0, "by_year": { "2023": 0, "2024": 1, "2025": 1, "2026": 1 }, "first_semester": false },
+    "ingilizce.natural-forces": { "avg": 0.0, "by_year": { "2023": 0, "2024": 0, "2025": 0, "2026": 0 }, "first_semester": false, "note": "Kapsamda ama 2018-2026'da soru tespit edilmedi (bir 2025 analizi aksini söylüyor)." }
+  }
+}
