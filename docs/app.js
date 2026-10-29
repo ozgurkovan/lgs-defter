@@ -786,6 +786,8 @@ async function viewHome() {
       h('p', { class: 'label' }, new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })),
       h('h1', {}, playfulGreeting(name) || (name ? `${hello}, ${name}` : hello)),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null),
+    // Ara sıra (üç girişte bir kadar) bir fıkra ya da şaka; gün yorucu geçmesin.
+    !messages.length && Math.random() < 0.3 ? jokeCard() : null,
     messages.map((m) => {
       const card = h('section', { class: 'card msg-card' },
         h('p', { class: 'label' }, m.signature ? `${m.signature} yazdı` : 'Sana bir mesaj var'),
@@ -1169,6 +1171,8 @@ function showSessionEnd() {
       h('p', { class: 'muted' }, stats.correct === stats.total ? 'Hepsi doğru. Bu konular bir süre rahat.' :
         'Yanlış yaptıkların yakında farklı sorularla tekrar gelecek.'),
       h('button', { class: 'primary block', onclick: () => go('home') }, 'Ana sayfa')),
+    // Oturum bitince çoğu zaman ödül gibi bir fıkra.
+    Math.random() < 0.6 ? jokeCard('Mola: ' + (Math.random() < 0.5 ? 'bir fıkra' : 'gülümse')) : null,
     together.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Birlikte bakılacaklar'),
       h('p', { class: 'small muted' }, 'Anlamadığın ya da tahmin ettiğin sorular. Velin ya da öğretmeninle birlikte üstünden geçin; onların raporunda da görünüyor.'),
@@ -1212,9 +1216,58 @@ function loadTogether() {
    Akla gelmezse tek dokunuşla tatlı bir söz ya da şaka önerilir (değiştirilebilir). */
 const SWEET_LINES = ['Seninle çok gurur duyuyorum!', 'Bugün de harikasın, kolay gelsin.', 'Akşam dondurma benden, söz!',
   'Yanlış yapmaktan korkma, öyle öğreniyoruz.', 'Seni çok seviyorum.'];
-const JOKES = ['Sıfır sekize ne demiş? "Kemerin çok yakışmış!"', 'Kalem silgiye ne demiş? "Sen olmasan hatalarımla ne yapardım!"',
-  'Matematik kitabı neden üzgünmüş? Çünkü çok problemi varmış.', 'Temel neden merdivenle okula gitmiş? Sınıf atlamak için!',
-  'Bilgisayar neden üşümüş? Pencereleri açık kalmış!', 'Ödev neden kaçmış? Yapılmak istememiş… ama sen onu yakaladın!'];
+// Çocuklara göre şakalar ve bilmeceler: soru görünür, cevap dokununca açılır. Velinin mesaj önerilerinde de kullanılır.
+const JOKES = [
+  ['Sıfır sekize ne demiş?', '"Kemerin çok yakışmış!"'],
+  ['Kalem silgiye ne demiş?', '"Sen olmasan hatalarımla ne yapardım!"'],
+  ['Matematik kitabı neden üzgünmüş?', 'Çünkü çok problemi varmış.'],
+  ['Temel neden merdivenle okula gitmiş?', 'Sınıf atlamak için!'],
+  ['Bilgisayar neden üşümüş?', 'Pencereleri açık kalmış!'],
+  ['Ödev neden kaçmış?', 'Yapılmak istememiş… ama sen onu yakaladın!'],
+  ['Kediler bilgisayarı neden sevmez?', 'Fare yüzünden!'],
+  ['En tembel sayı hangisi?', 'Sekiz: yan yatınca sonsuza kadar uyuyor.'],
+  ['Atom neden gülümsemiş?', 'Bir elektron kaybetmiş, pozitif olmuş!'],
+  ['Işık neden ders çalışmamış?', 'Zaten çok parlakmış!'],
+  ['Hangi ayda insanlar en az konuşur?', 'Şubat. En kısa ay o!'],
+  ['Ne kadar çok alırsan o kadar büyür?', 'Çukur!'],
+  ['Hangi soruya asla "evet" diyemezsin?', '"Uyuyor musun?"'],
+  ['Islandıkça kuruyan şey nedir?', 'Havlu!'],
+  ['Her yere gider ama yerinden hiç kıpırdamaz. Nedir?', 'Yol!'],
+  ['Dişleri vardır ama hiç ısırmaz. Nedir?', 'Tarak!'],
+  ['Ayakları vardır ama hiç yürümez. Nedir?', 'Masa!'],
+  ['Hep önündedir ama onu göremezsin. Nedir?', 'Gelecek!'],
+];
+// Fıkralar (Nasreddin Hoca, Temel): halk fıkraları, kısa anlatımla; sonu dokununca açılır.
+const FIKRALAR = [
+  ['Nasreddin Hoca komşusundan bir kazan ödünç alır. Geri verirken içine küçük bir tencere koyar: "Kazanın doğurdu!" Komşu sevinir. Bir süre sonra Hoca kazanı yine ödünç alır ama geri getirmez. Komşu sorunca Hoca "Kazanın öldü" der. Komşu şaşırır: "Kazan ölür mü hiç?"',
+    'Hoca: "Doğurduğuna inandın da öldüğüne neden inanmıyorsun?"'],
+  ['Nasreddin Hoca göl kenarında oturmuş, göle yoğurt mayası çalıyormuş. Görenler sormuş: "Hocam, ne yapıyorsun?" "Göle maya çalıyorum." "Göl hiç yoğurt olur mu?"',
+    'Hoca: "Ya tutarsa!"'],
+  ['Nasreddin Hoca bir düğüne eski elbiseleriyle gider; kimse yüzüne bakmaz. Eve dönüp kürkünü giyer, geri gelir. Bu sefer herkes ona yer açar, en güzel yemekleri önüne koyar. Hoca kürkünün yenini çorbaya batırır.',
+    '"Ye kürküm ye! Bu ikram sana."'],
+  ['Çocuklar, pazara giden Nasreddin Hoca\'dan düdük getirmesini ister. İçlerinden sadece biri Hoca\'ya para verir. Hoca dönüşte yalnızca o çocuğa düdük getirir. Ötekiler "Bize neden yok?" diye sorar.',
+    'Hoca: "Parayı veren düdüğü çalar."'],
+  ['Nasreddin Hoca kadılık yaparken davacıyı dinler: "Haklısın" der. Sonra öbür tarafı dinler: "Sen de haklısın" der. Hanımı itiraz eder: "Efendi, ikisi birden haklı olur mu?"',
+    'Hoca: "Hanım, sen de haklısın!"'],
+  ['Birisi Nasreddin Hoca\'ya sorar: "Hocam, dünyanın ortası neresi?" Hoca eşeğinin sol ön ayağının bastığı yeri gösterir: "Tam burası." "Nereden bildin?"',
+    'Hoca: "İnanmıyorsan ölç!"'],
+  ['Nasreddin Hoca eşeğine ters binmiş, öğrencileri de arkasından yürüyormuş. Görenler sormuş: "Hocam, eşeğe neden ters bindin?"',
+    'Hoca: "Önünüzden gitsem size arkamı dönmüş olurum, arkanızdan gitsem siz bana arkanızı dönersiniz. Böyle karşı karşıya gidiyoruz!"'],
+  ['Öğretmen Temel\'e sorar: "Temel, bir elinde 3 elma, öbür elinde 4 portakal olsa ne olur?"',
+    'Temel: "Çok büyük ellerim olur, öğretmenim!"'],
+  ['Öğretmen, Temel\'in ödevine bakıp sorar: "Temel, bu ödevi baban mı yaptı?"',
+    'Temel: "Hayır öğretmenim, babam çok yorgundu; annem yaptı!"'],
+];
+// Fıkra daha sık gelir; ara sıra kısa şaka ya da bilmece.
+function jokeCard(label) {
+  const fikra = Math.random() < 0.6;
+  const list = fikra ? FIKRALAR : JOKES;
+  const [question, answer] = list[Math.floor(Math.random() * list.length)];
+  const punch = h('p', { class: 'msg', hidden: true }, answer);
+  const reveal = h('button', { class: 'ghost small', onclick: () => { punch.hidden = false; reveal.remove(); } }, fikra ? 'Sonunu gör' : 'Cevabı gör');
+  return h('section', { class: 'card msg-card' }, h('p', { class: 'label' }, label || (fikra ? 'Bir fıkra' : 'Bir şaka')),
+    h('p', { class: 'msg' }, question), punch, reveal);
+}
 function messageBox() {
   const kid = state.student;
   const others = (state.students || []).filter((s) => s.id !== kid.id);
@@ -1263,7 +1316,7 @@ function messageBox() {
     body,
     h('div', { class: 'chips' },
       h('button', { class: 'chip', onclick: () => idea(SWEET_LINES) }, 'Tatlı bir söz'),
-      h('button', { class: 'chip', onclick: () => idea(JOKES) }, 'Bir şaka')),
+      h('button', { class: 'chip', onclick: () => idea(JOKES.map(([j, a]) => `${j} ${a}`)) }, 'Bir şaka')),
     h('label', { class: 'field' }, 'İmza', signature),
     all ? h('label', { class: 'row small', for: 'msg-all' }, all, 'Bütün çocuklara gönder') : null,
     send, list);
