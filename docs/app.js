@@ -489,15 +489,15 @@ async function buildSession(track, remaining) {
   for (const it of items) {
     // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur.
     const want = basePerItem + (it.support || 0);
+    // Tekrar yarım kalmasın: maddenin soruları dersin kalan hakkına sığmıyorsa madde ertesi güne kalır.
     const room = remaining[it.topics?.subject] || 0;
-    if (room <= 0) { deferred += want; continue; }
+    if (room < want) { deferred += want; continue; }
     const styles = missedStyles[it.topic_id] || new Set();
     const candidates = shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id) && !used.has(p.id)))
       .sort((a, b) => overlap(b.styles, styles) - overlap(a.styles, styles));
     if (!candidates.length) { shortage++; continue; }
-    const picked = pickVaried(candidates, Math.min(want, room));
+    const picked = pickVaried(candidates, want);
     remaining[it.topics.subject] -= picked.length;
-    if (picked.length < want && picked.length === room) deferred += want - picked.length;
     picked.forEach((p, i) => { used.add(p.id); entries.push({ item: it, question: p, last: i === picked.length - 1 }); });
     seconds += picked.reduce((s, p) => s + maxSeconds(p.subject) + 15, 0);
   }
@@ -601,7 +601,7 @@ async function viewHome() {
            h('button', { class: 'primary block', onclick: () => runSession(track, s) }, 'Başla')]
         : h('p', { class: 'muted' }, doneToday ? 'Bugünlük bu kadar. Aferin.' : 'Bugün tekrar edilecek soru yok.'),
       s.shortage ? h('p', { class: 'small muted' }, `${s.shortage} konu için yeni soru hazırlanıyor, yarın gelecek.`) : null,
-      s.deferred ? h('p', { class: 'small muted' }, `${s.deferred} soru günlük sınıra takıldı, yarın gelecek.`) : null);
+      s.deferred ? h('p', { class: 'small muted' }, `${s.deferred} soru günlük sınıra takıldı, yarın gelecek. Velin sınırı Ayarlar'dan artırabilir.`) : null);
   };
 
   render(
