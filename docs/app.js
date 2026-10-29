@@ -1171,8 +1171,8 @@ function showSessionEnd() {
       h('p', { class: 'muted' }, stats.correct === stats.total ? 'Hepsi doğru. Bu konular bir süre rahat.' :
         'Yanlış yaptıkların yakında farklı sorularla tekrar gelecek.'),
       h('button', { class: 'primary block', onclick: () => go('home') }, 'Ana sayfa')),
-    // Oturum bitince çoğu zaman ödül gibi bir fıkra.
-    Math.random() < 0.6 ? jokeCard('Mola: ' + (Math.random() < 0.5 ? 'bir fıkra' : 'gülümse')) : null,
+    // Oturum bitince çoğu zaman ödül gibi bir fıkra, bilmece ya da şiir.
+    Math.random() < 0.6 ? jokeCard('Mola') : null,
     together.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Birlikte bakılacaklar'),
       h('p', { class: 'small muted' }, 'Anlamadığın ya da tahmin ettiğin sorular. Velin ya da öğretmeninle birlikte üstünden geçin; onların raporunda da görünüyor.'),
@@ -1216,27 +1216,56 @@ function loadTogether() {
    Akla gelmezse tek dokunuşla tatlı bir söz ya da şaka önerilir (değiştirilebilir). */
 const SWEET_LINES = ['Seninle çok gurur duyuyorum!', 'Bugün de harikasın, kolay gelsin.', 'Akşam dondurma benden, söz!',
   'Yanlış yapmaktan korkma, öyle öğreniyoruz.', 'Seni çok seviyorum.'];
-// Çocuklara göre şakalar ve bilmeceler: soru görünür, cevap dokununca açılır. Velinin mesaj önerilerinde de kullanılır.
+// Çocuklara göre şakalar, bilmeceler ve hafif bulmacalar: soru görünür, cevap dokununca açılır. Velinin mesaj
+// önerilerinde de kullanılır. [soru, cevap, tür, seviye]; tür: saka | bilmece | bulmaca; seviye: 'kucuk' (1–4. sınıf),
+// 'buyuk' (5–8. sınıf) ya da boş (herkes). Bulmacalar bilerek az işlemli: ders zaten var, burası mola.
 const JOKES = [
-  ['Sıfır sekize ne demiş?', '"Kemerin çok yakışmış!"'],
-  ['Kalem silgiye ne demiş?', '"Sen olmasan hatalarımla ne yapardım!"'],
-  ['Matematik kitabı neden üzgünmüş?', 'Çünkü çok problemi varmış.'],
-  ['Temel neden merdivenle okula gitmiş?', 'Sınıf atlamak için!'],
-  ['Bilgisayar neden üşümüş?', 'Pencereleri açık kalmış!'],
-  ['Ödev neden kaçmış?', 'Yapılmak istememiş… ama sen onu yakaladın!'],
-  ['Kediler bilgisayarı neden sevmez?', 'Fare yüzünden!'],
-  ['En tembel sayı hangisi?', 'Sekiz: yan yatınca sonsuza kadar uyuyor.'],
-  ['Atom neden gülümsemiş?', 'Bir elektron kaybetmiş, pozitif olmuş!'],
-  ['Işık neden ders çalışmamış?', 'Zaten çok parlakmış!'],
-  ['Hangi ayda insanlar en az konuşur?', 'Şubat. En kısa ay o!'],
-  ['Ne kadar çok alırsan o kadar büyür?', 'Çukur!'],
-  ['Hangi soruya asla "evet" diyemezsin?', '"Uyuyor musun?"'],
-  ['Islandıkça kuruyan şey nedir?', 'Havlu!'],
-  ['Her yere gider ama yerinden hiç kıpırdamaz. Nedir?', 'Yol!'],
-  ['Dişleri vardır ama hiç ısırmaz. Nedir?', 'Tarak!'],
-  ['Ayakları vardır ama hiç yürümez. Nedir?', 'Masa!'],
-  ['Hep önündedir ama onu göremezsin. Nedir?', 'Gelecek!'],
+  ['Sıfır sekize ne demiş?', '"Kemerin çok yakışmış!"', 'saka'],
+  ['Kalem silgiye ne demiş?', '"Sen olmasan hatalarımla ne yapardım!"', 'saka'],
+  ['Matematik kitabı neden üzgünmüş?', 'Çünkü çok problemi varmış.', 'saka'],
+  ['Temel neden merdivenle okula gitmiş?', 'Sınıf atlamak için!', 'saka'],
+  ['Bilgisayar neden üşümüş?', 'Pencereleri açık kalmış!', 'saka'],
+  ['Ödev neden kaçmış?', 'Yapılmak istememiş… ama sen onu yakaladın!', 'saka'],
+  ['Kediler bilgisayarı neden sevmez?', 'Fare yüzünden!', 'saka'],
+  ['En tembel sayı hangisi?', 'Sekiz: yan yatınca sonsuza kadar uyuyor.', 'saka'],
+  ['Atom neden gülümsemiş?', 'Bir elektron kaybetmiş, pozitif olmuş!', 'saka', 'buyuk'],
+  ['Işık neden ders çalışmamış?', 'Zaten çok parlakmış!', 'saka'],
+  ['Kitap neden üşümüş?', 'Kapağı açık kalmış!', 'saka'],
+  ['Silgi neden çok yorgunmuş?', 'Bütün gün başkalarının hatalarını temizlemiş!', 'saka'],
+  ['Hangi ayda insanlar en az konuşur?', 'Şubat. En kısa ay o!', 'bilmece'],
+  ['Ne kadar çok alırsan o kadar büyür?', 'Çukur!', 'bilmece'],
+  ['Hangi soruya asla "evet" diyemezsin?', '"Uyuyor musun?"', 'bilmece'],
+  ['Islandıkça kuruyan şey nedir?', 'Havlu!', 'bilmece'],
+  ['Her yere gider ama yerinden hiç kıpırdamaz. Nedir?', 'Yol!', 'bilmece'],
+  ['Dişleri vardır ama hiç ısırmaz. Nedir?', 'Tarak!', 'bilmece'],
+  ['Ayakları vardır ama hiç yürümez. Nedir?', 'Masa!', 'bilmece'],
+  ['Hep önündedir ama onu göremezsin. Nedir?', 'Gelecek!', 'bilmece'],
+  ['Çarşıdan aldım bir tane, eve geldim bin tane. Nedir?', 'Nar!', 'bilmece'],
+  ['Dışı yeşil, içi kırmızı, çekirdeği kara. Nedir?', 'Karpuz!', 'bilmece'],
+  ['İki kardeş yan yana durur ama birbirini hiç göremez. Nedir?', 'Gözlerimiz!', 'bilmece'],
+  ['Akrebi var ama hiç sokmaz. Nedir?', 'Saat!', 'bilmece'],
+  ['Kırılmadan kullanılmaz. Nedir?', 'Yumurta!', 'bilmece'],
+  ['Yazın giyinir, kışın soyunur. Nedir?', 'Ağaç!', 'bilmece'],
+  ['Suya girer ama hiç ıslanmaz. Nedir?', 'Gölge!', 'bilmece'],
+  ['Senin ama başkaları senden çok kullanır. Nedir?', 'Adın!', 'bilmece'],
+  ['Sen gülersen o da güler, sen kızarsan o da kızar. Nedir?', 'Ayna!', 'bilmece'],
+  ['Ne kadar çok olursa o kadar az görürsün. Nedir?', 'Karanlık!', 'bilmece'],
+  ['Boynu var başı yok, kolları var eli yok. Nedir?', 'Gömlek!', 'bilmece'],
+  ['Ağzı var dili yok, konuşur ama sesi yok. Nedir?', 'Mektup!', 'bilmece'],
+  ['Gözü var ama hiç göremez. Nedir?', 'İğne!', 'bilmece'],
+  ['Bir yılda kaç ayın 28 günü vardır?', 'Hepsinin! On iki ayın da 28. günü var.', 'bulmaca'],
+  ['Bir kilo pamuk mu ağırdır, bir kilo demir mi?', 'İkisi de bir kilo!', 'bulmaca'],
+  ['Bir yarışta ikinciyi geçtin. Kaçıncı oldun?', 'İkinci!', 'bulmaca'],
+  ['Üç elmadan ikisini alırsan senin kaç elman olur?', 'İki: aldıkların!', 'bulmaca'],
+  ['Ayşe\'nin üç erkek kardeşi var. Her erkek kardeşinin bir kız kardeşi var. Ailede kaç çocuk var?', 'Dört! Kız kardeş Ayşe\'nin kendisi.', 'bulmaca'],
+  ['Elif sırada baştan 4., sondan 6. Sırada kaç kişi var?', 'Dokuz!', 'bulmaca', 'kucuk'],
+  ['Aklımdan bir sayı tuttum, iki katı 18. Tuttuğum sayı kaç?', 'Dokuz!', 'bulmaca', 'kucuk'],
+  ['2, 4, 8, 16… sıradaki sayı kaç?', '32: her sayı bir öncekinin iki katı.', 'bulmaca', 'buyuk'],
+  ['1, 1, 2, 3, 5, 8… sıradaki sayı kaç?', '13: her sayı önceki ikisinin toplamı.', 'bulmaca', 'buyuk'],
+  ['Saat tam 3\'te akrep ile yelkovan arasındaki açı kaç derece?', '90 derece, dik açı!', 'bulmaca', 'buyuk'],
 ];
+const JOKE_LABEL = { saka: 'Bir şaka', bilmece: 'Bir bilmece', bulmaca: 'Bir bulmaca' };
+const jokesFor = (p) => { const small = (p?.grade ?? 8) <= 4; return JOKES.filter((j) => !j[3] || (j[3] === 'kucuk') === small); };
 // Fıkralar (Nasreddin Hoca, Temel): halk fıkraları, kısa anlatımla; sonu dokununca açılır.
 const FIKRALAR = [
   ['Nasreddin Hoca komşusundan bir kazan ödünç alır. Geri verirken içine küçük bir tencere koyar: "Kazanın doğurdu!" Komşu sevinir. Bir süre sonra Hoca kazanı yine ödünç alır ama geri getirmez. Komşu sorunca Hoca "Kazanın öldü" der. Komşu şaşırır: "Kazan ölür mü hiç?"',
@@ -1257,16 +1286,148 @@ const FIKRALAR = [
     'Temel: "Çok büyük ellerim olur, öğretmenim!"'],
   ['Öğretmen, Temel\'in ödevine bakıp sorar: "Temel, bu ödevi baban mı yaptı?"',
     'Temel: "Hayır öğretmenim, babam çok yorgundu; annem yaptı!"'],
+  ['Nasreddin Hoca evde kaybettiği yüzüğünü sokakta arıyormuş. Komşusu sormuş: "Hocam, yüzüğü evde kaybetmedin mi? Neden sokakta arıyorsun?"',
+    'Hoca: "Ev karanlık, sokak aydınlık!"'],
+  ['Nasreddin Hoca\'nın eşeği kaybolmuş. Hoca ellerini açmış, şükrediyormuş. "Hocam, eşeğin kayboldu, neden şükrediyorsun?" diye sormuşlar.',
+    'Hoca: "İyi ki üstünde değilmişim, yoksa ben de kaybolurdum!"'],
+  ['Birisi Nasreddin Hoca\'ya sormuş: "Hocam, ay mı daha faydalı, güneş mi?"',
+    'Hoca: "Tabii ki ay! Güneş zaten ortalık aydınlıkken çıkıyor; ay ise karanlıkta yolumuzu aydınlatıyor."'],
+  ['Nasreddin Hoca\'ya yaşını sormuşlar: "Kırk." On yıl sonra yine sormuşlar: "Kırk." "Hocam, on yıl önce de kırk demiştin!"',
+    'Hoca: "Ben sözümden dönmem!"'],
 ];
-// Fıkra daha sık gelir; ara sıra kısa şaka ya da bilmece.
-function jokeCard(label) {
-  const fikra = Math.random() < 0.6;
-  const list = fikra ? FIKRALAR : JOKES;
-  const [question, answer] = list[Math.floor(Math.random() * list.length)];
+// Kart sırası: üçte biri "şiiri sen tamamla", dörtte biri fıkra, kalanı kısa şaka, bilmece ya da bulmaca; her çocuk
+// kendi seviyesindekileri görür. Seçim her seferinde rastgele; görülen bir daha gelmez diye bir kural yok.
+function jokeCard(prefix) {
+  const r = Math.random();
+  if (r < 0.33) return poemCard(prefix);
+  const fikra = r < 0.58;
+  const list = fikra ? FIKRALAR : jokesFor(state.student);
+  const pick = list[Math.floor(Math.random() * list.length)];
+  const [question, answer] = pick;
+  const kind = fikra ? 'Bir fıkra' : JOKE_LABEL[pick[2]] || 'Bir şaka';
   const punch = h('p', { class: 'msg', hidden: true }, answer);
   const reveal = h('button', { class: 'ghost small', onclick: () => { punch.hidden = false; reveal.remove(); } }, fikra ? 'Sonunu gör' : 'Cevabı gör');
-  return h('section', { class: 'card msg-card' }, h('p', { class: 'label' }, label || (fikra ? 'Bir fıkra' : 'Bir şaka')),
+  return h('section', { class: 'card msg-card' }, h('p', { class: 'label' }, prefix ? `${prefix}: ${kind.toLocaleLowerCase('tr')}` : kind),
     h('p', { class: 'msg' }, question), punch, reveal);
+}
+
+// Şiiri sen tamamla: son dize gizli; çocuk kendi dizesini yazar ya da sesli söyler, sonra aslını görür. Ardından
+// kafiyeyi ve anlamı anlatan bir not, bir de sesli okuma (hitabet) ipucu çıkar. Bu dosya herkese açık depoda
+// durduğu için telifli modern çocuk şiirleri giremez: halk ürünleri, Yunus Emre, Âkif, Rıza Tevfik ve Defter için
+// yazılmış şiirler var. pair: gizli dizenin kafiyelendiği dize sonları; yoksa (nakaratlı şiirler) kafiye ölçülmez.
+const POEMS = [
+  { show: ['Dandini dandini dastana,', 'Danalar girmiş bostana,', 'Kov bostancı danayı,'], hide: ['Yemesin lahanayı.'],
+    pair: ['danayı'], rhyme: 'dastana – bostana, danayı – lahanayı', by: 'Ninni (anonim)',
+    note: 'Ninnileri anneler bebeklerini uyuturken söyler; kimin yazdığı bilinmez, yüzyıllardır dilden dile gelir. Dize sonları ikişer ikişer aynı seslerle bittiği için beşik sallanır gibi tatlı bir ritim oluşuyor. Bir de düşün: koca danalar bostana dalmış, lahanaları yiyor… Ninni bile komik!' },
+  { show: ['Bir varmış, bir yokmuş;', 'Evvel zaman içinde,', 'Kalbur saman içinde;', 'Develer tellal iken,'], hide: ['Pireler berber iken…'],
+    pair: ['tellal iken'], rhyme: 'içinde – içinde, tellal iken – berber iken', by: 'Masal tekerlemesi (anonim)',
+    ask: 'Masalcı nasıl devam ediyor? Sen de "iken" ile biten komik bir dize uydur!',
+    note: 'Masalcılar masala böyle başlar. "İçinde, içinde… iken, iken…" tekrarları sözü davul gibi ritimli yapıyor. Deve tellal (eskiden sokakta bağırarak duyuru yapan kişi), pire berber olur mu hiç? Olmaz! Masalcı daha ilk cümlede "Şimdi hayal dünyasına giriyoruz" diye göz kırpıyor.' },
+  { show: ['Şu köşe yaz köşesi,', 'Şu köşe kış köşesi,'], hide: ['Ortada su şişesi!'],
+    pair: ['köşesi'], rhyme: 'köşesi – köşesi – şişesi', by: 'Tekerleme (anonim)',
+    ask: 'Üçüncü dizeyi sen uydur: sonu "köşesi" gibi "-şesi" ile bitsin!',
+    tip: 'Şimdi üç kere söyle, her seferinde biraz daha hızlı. Dilin dolaşmazsa diksiyonun süper!',
+    note: 'Tekerlemeler, hızlı söyleyince dil dolaştıran sözlerdir. Burada dize sonları hep "-şesi" ile bitiyor ve içlerinde bolca "ş" sesi var; dil bu yüzden sürçüyor. Spikerler ve hitabet ustaları da diksiyon çalışırken tekerleme söyler!' },
+  { show: ['Korkma, sönmez bu şafaklarda yüzen al sancak;', 'Sönmeden yurdumun üstünde tüten en son ocak.', 'O benim milletimin yıldızıdır, parlayacak;'],
+    hide: ['O benimdir, o benim milletimindir ancak.'],
+    pair: ['sancak', 'ocak', 'parlayacak'], rhyme: 'sancak – ocak – parlayacak – ancak', by: 'Mehmet Âkif Ersoy, İstiklâl Marşı',
+    ask: 'Bunu biliyorsun! Son dizeyi hatırla; yaz ya da ayağa kalkıp gür bir sesle söyle.',
+    note: 'Dört dizenin dördü de "-ak" sesiyle bitiyor; bu güçlü ses marşı gür ve kararlı yapıyor. Anlamı: Korkma! Bu yurtta tek bir ocak bile tütüyorsa bayrağımız sönmeyecek; o, milletimin yıldızıdır ve hep parlayacak. Âkif bunu Kurtuluş Savaşı sürerken yazdı; Meclis 12 Mart 1921\'de millî marşımız olarak kabul etti.' },
+  { show: ['Çatma, kurban olayım, çehreni ey nazlı hilâl!', 'Kahraman ırkıma bir gül! Ne bu şiddet, bu celâl?', 'Sana olmaz dökülen kanlarımız sonra helâl…'],
+    hide: ['Hakkıdır, Hakk\'a tapan milletimin istiklâl!'],
+    pair: ['hilâl', 'celâl', 'helâl'], rhyme: 'hilâl – celâl – helâl – istiklâl', by: 'Mehmet Âkif Ersoy, İstiklâl Marşı',
+    ask: 'İkinci kıtanın son dizesini hatırlıyor musun? Yaz ya da sesli söyle.',
+    note: 'Âkif bayrakla konuşuyor: "Kaşlarını çatma ey nazlı hilal, kahraman milletime bir gülümse!" (Çehre: yüz, celâl: öfke.) Bayrağa insan gibi seslenmeye kişileştirme denir; şiire sıcaklık katar. Dizelerin hepsi uzun "-âl" sesiyle bitiyor; marşı söylerken sesimiz bu yüzden yükselip uzuyor. Son dize: Allah\'a inanan milletimin bağımsızlığı (istiklâl) onun hakkıdır.' },
+  { show: ['Gelin tanış olalım,', 'İşi kolay kılalım,', 'Sevelim, sevilelim,'], hide: ['Dünya kimseye kalmaz.'],
+    rhyme: 'olalım – kılalım – sevilelim', by: 'Yunus Emre',
+    ask: 'Son dize, şiirin her dörtlüğünün sonunda tekrarlanan bir söz. Sence Yunus ne demiş olabilir?',
+    note: 'İlk üç dize "-lım, -lim" sesleriyle kafiyeli; dördüncüsü her dörtlüğün sonunda tekrarlanan bir nakarat. Anlamı: Gelin tanışalım, işleri birbirimize kolaylaştıralım, sevelim ve sevilelim; dünya kimseye kalmaz, kavgaya değmez. Yunus bunu 700 yıl kadar önce yazdı ve hâlâ aynı tatlılıkla okunuyor: sade sözle büyük bir şey anlatmak işte böyle olur.' },
+  { show: ['Söz ola kese savaşı,', 'Söz ola kestire başı,', 'Söz ola ağulu aşı'], hide: ['Bal ile yağ ede bir söz.'],
+    rhyme: 'savaşı – başı – aşı', by: 'Yunus Emre', level: 'buyuk',
+    ask: 'Yunus sözün gücünü anlatıyor. Bir söz, zehirli yemeği (ağulu aş) neye çevirir? Son dizeyi sen tamamla.',
+    note: 'Hitabetin özü bu dörtlükte: Bir söz savaşı bitirir, bir söz baş kestirir; bir söz de zehirli yemeği bal ile yağa çevirir. Yani söz çok güçlüdür; ne söylediğin kadar nasıl söylediğin de önemli. "Savaşı – başı – aşı" kafiyesi dizeleri zincir gibi bağlıyor; her dizenin başındaki "Söz ola" tekrarı da çekiç gibi vuruyor.' },
+  { show: ['Dolap niçin inilersin?', 'Derdim vardır inilerim,', 'Ben Mevlâ\'ya âşık oldum,'], hide: ['Anın için inilerim.'],
+    pair: ['inilerim'], rhyme: 'inilerim – inilerim (aynı sözün tekrarı: redif)', by: 'Yunus Emre', level: 'buyuk',
+    ask: 'Yunus su dolabına "Neden inliyorsun?" diye soruyor, dolap da cevap veriyor. Dolabın son sözünü sen söyle!',
+    note: 'Su dolabı, eskiden dereden su çeken büyük tahta çarktır; dönerken inler gibi gıcırdar. Yunus onu konuşturuyor: "Derdim var, Allah\'ı (Mevlâ) çok sevdim, onun için (anın için) inliyorum." Cansız bir varlığı insan gibi konuşturmaya kişileştirme ve konuşturma denir; Türkçe sorularında sık çıkar! "İnilerim" tekrarı, dolabın gıcırtısı gibi kulakta yankılanıyor.' },
+  { show: ['Uçun kuşlar, uçun, doğduğum yere;', 'Şimdi dağlarında mor sümbül vardır.', 'Ormanlar koynunda bir gizli dere,'],
+    hide: ['Dikenler içinde sarı gül vardır.'],
+    pair: ['mor sümbül vardır'], rhyme: 'yere – dere, sümbül vardır – sarı gül vardır', by: 'Rıza Tevfik Bölükbaşı, Uçun Kuşlar', level: 'buyuk',
+    note: 'Şair uzaklarda; doğduğu yerlere kuşlarla selam gönderiyor, özlemini kuşların kanadına yüklemiş. "Yere – dere" ve "sümbül – gül" kafiyeleri dizelere şarkı gibi bir akış veriyor; her seferinde tekrarlanan "vardır" sözüne redif denir. Dikenler arasında açan sarı gül de ayrı bir güzellik: zor yerde bile güzellik var.' },
+  { show: ['Ey şehid oğlu şehid, isteme benden makber,'], hide: ['Sana âgûşunu açmış duruyor Peygamber.'],
+    pair: ['makber'], rhyme: 'makber – Peygamber', by: 'Mehmet Âkif Ersoy, Çanakkale Şehitlerine', level: 'buyuk',
+    ask: 'Âkif şehide "Benden mezar (makber) isteme" diyor. Neden? İkinci dizeyi sen tamamla; sonu "-ber" ile bitsin.',
+    note: 'Âkif, Çanakkale\'de şehit düşen askere "Senin için bir mezar yapamam, çünkü Peygamber sana kucağını (âgûş) açmış bekliyor" diyor: hiçbir mezar o şerefe yetmez. "Makber – Peygamber" kafiyesi iki dizeyi bir anıt gibi birbirine kenetliyor. Çanakkale İnkılap Tarihi\'nde de var; bu beyit orada da işine yarar.' },
+  { show: ['Her kitapta bir kapı var,', 'Ardında yaz, ardında kar;', 'Bir sayfada sıcak bir çöl,'], hide: ['Bir sayfada deniz, rüzgâr.'],
+    pair: ['kapı var', 'kar'], rhyme: 'var – kar – rüzgâr', by: 'Defter için yazıldı',
+    note: 'Şiir kitabı bir kapıya benzetiyor (benzetme): açınca yazına da kışına da, çölüne de denizine de gidiyorsun. "Var – kar – rüzgâr" aynı "-ar" sesiyle bitiyor, dizeler birbirine tıkır tıkır oturuyor. Okudukça dünyan büyür!' },
+  { show: ['İki kardeş, iki kanat,', 'Birlikte uçmak ne rahat!', 'Biri düşse öbürü var,'], hide: ['Onunla güzel bu hayat.'],
+    pair: ['kanat', 'rahat'], rhyme: 'kanat – rahat – hayat', by: 'Defter için yazıldı',
+    note: 'Şiir kardeşleri bir kuşun iki kanadına benzetiyor: kuş tek kanatla uçamaz! Biri düşerse öbürü tutar. "Kanat – rahat – hayat" aynı "-at" sesiyle bitiyor; kısa ve sevimli bir şarkı gibi.' },
+  { show: ['Bir yanlışım oldu bugün,', 'Ne kızgınım ne de üzgün;', 'Yanlış bana yol gösterdi,'], hide: ['Doğruyu buldum öbür gün.'],
+    pair: ['bugün', 'üzgün'], rhyme: 'bugün – üzgün – gün', by: 'Defter için yazıldı',
+    note: 'Yanlışlar da öğretmendir: yanlışını gören, ertesi gün doğruyu bulur. Bu defterin sırrı da tam olarak bu! "Bugün – üzgün – gün" aynı "-ün" sesiyle bitiyor; şiir kısa ama dediği büyük.' },
+  { show: ['Dalda kalmış son bir yaprak,', 'Rüzgâr esti: "Haydi, bırak!"', 'Yaprak süzüldü korkmadan,'], hide: ['Toprağa yorgan olacak.'],
+    pair: ['yaprak', 'bırak'], rhyme: 'yaprak – bırak – olacak', by: 'Defter için yazıldı',
+    note: 'Yaprak korkmadan düşüyor, çünkü bir görevi var: kışın toprağı örten bir yorgan olacak. Şair yaprağa insan gibi cesaret vermiş (kişileştirme). Fen bilgisi de haklı çıkarıyor: dökülen yapraklar toprağı korur, çürüyünce de besler. "Yaprak – bırak – olacak" hep "-ak" ile bitiyor.' },
+  { show: ['Miyav dedi minik kedi,', 'Sabahtan beri bekledi;', 'Mama kabı boş kalınca,'], hide: ['Bana bakıp: "Hani?" dedi.'],
+    pair: ['kedi', 'bekledi'], rhyme: 'kedi – bekledi – dedi', by: 'Defter için yazıldı', level: 'kucuk',
+    note: 'Kedi tek bir kelimeyle derdini anlatıyor: "Hani?" Kısa ve net bir söz bazen uzun bir konuşmadan güçlüdür; buna "az ve öz" denir. "Kedi – bekledi – dedi" kafiyesi şiire zıplayan bir ritim veriyor.' },
+  { show: ['Bir yağmur yağdı geçen gün,', 'Çiçeklere oldu düğün;', 'Papatyalar içti suyu,'], hide: ['Gökkuşağı çıktı o gün.'],
+    pair: ['geçen gün', 'düğün'], rhyme: 'gün – düğün – gün', by: 'Defter için yazıldı', level: 'kucuk',
+    note: 'Şiir yağmuru çiçeklerin düğünü gibi anlatıyor: susamış çiçekler için yağmur bir bayram! Yağmurdan sonra güneş açınca damlalar ışığı renklere ayırır ve gökkuşağı çıkar. "Gün – düğün – gün" aynı "-ün" sesiyle bitiyor.' },
+  { show: ['Damla damla dolar göller,', 'Adım adım biter yollar;', 'Her gün biraz çalışırsan,'], hide: ['Yaza açar bütün güller.'],
+    pair: ['göller', 'yollar'], rhyme: 'göller – yollar – güller', by: 'Defter için yazıldı', level: 'buyuk',
+    note: 'Damla damla göl olur, adım adım yol biter: büyük işler küçük ama her gün yapılan emeklerle olur. "Yaza" sözcüğüne dikkat: LGS haziranda! Her gün biraz çalışan, yazın emeğinin güllerini toplar. "Göller – yollar – güller" kafiyesi de dizeleri birbirine bağlıyor.' },
+];
+const POEM_TIPS = [
+  'Şimdi bütün şiiri sesli ve duygulu oku: virgülde kısa, noktada biraz daha uzun dur.',
+  'Kafiyeli kelimeleri hafifçe vurgulayarak oku; şiirin müziğini duyacaksın.',
+  'Bir de birine oku: annene, babana ya da kardeşine, gözlerine bakarak!',
+  'Önce fısıldayarak, sonra gür bir sesle oku. Hangisi bu şiire daha çok yakıştı?',
+];
+const poemsFor = (p) => { const small = (p?.grade ?? 8) <= 4; return POEMS.filter((x) => !x.level || (x.level === 'kucuk') === small); };
+// Küçük harf, şapkasız, noktalamasız; iki dizenin ortak sonu en az iki harfse kafiye sayılır.
+const poemNorm = (s) => s.toLocaleLowerCase('tr').replace(/[âîû]/g, (c) => ({ â: 'a', î: 'i', û: 'u' })[c])
+  .replace(/[^a-zçğıöşü ]/g, '').replace(/\s+/g, ' ').trim();
+function sharedEnd(a, b) {
+  let i = 0;
+  while (i < a.length && i < b.length && a[a.length - 1 - i] === b[b.length - 1 - i]) i++;
+  return a.slice(a.length - i).trim();
+}
+function poemFeedback(poem, said) {
+  const mine = poemNorm(said);
+  const real = poemNorm(poem.hide.join(' '));
+  if (mine === real || (mine.length >= 8 && real.includes(mine))) return 'Aslını aynen bildin! 🌟';
+  if (!poem.pair) return 'Kendi dizeni yazdın, bravo! Şimdi aslıyla karşılaştır: hangisi sana daha güzel geldi?';
+  const shared = poem.pair.map((p) => sharedEnd(mine, poemNorm(p))).sort((a, b) => b.length - a.length)[0];
+  return shared.replace(/ /g, '').length >= 2
+    ? `Senin dizen de “…${shared}” sesiyle bitiyor: kafiyeli! Tam bir şair gibi düşünmüşsün 👏`
+    : 'Güzel deneme! Kafiye için son sesleri öncekilere benzetmeyi dene. Bak, şair nasıl yapmış:';
+}
+function poemCard(prefix) {
+  const list = poemsFor(state.student);
+  const poem = list[Math.floor(Math.random() * list.length)];
+  const gap = h('span', { class: 'poem-gap' }, '……………… ?');
+  const mine = h('input', { type: 'text', maxlength: 120, autocomplete: 'off', placeholder: 'Senin dizen (yaz ya da sesli söyle)',
+    onkeydown: (e) => { if (e.key === 'Enter') reveal.click(); } });
+  const ask = h('p', { class: 'small' }, poem.ask || 'Son dizeyi sen uydur: öncekilerle aynı sesle bitsin. Sonra sesli oku!');
+  const after = h('div', { class: 'stack', style: 'gap: 8px', hidden: true });
+  const reveal = h('button', { class: 'ghost small', onclick: () => {
+    const said = mine.value.trim();
+    gap.replaceWith(h('strong', { class: 'poem-new' }, poem.hide.join('\n')));
+    ask.remove(); mine.remove(); reveal.remove();
+    fill(after, said ? h('p', { class: 'note small' }, `Senin dizen: “${said}”\n${poemFeedback(poem, said)}`) : null,
+      h('p', { class: 'small' }, h('strong', {}, 'Kafiye: '), poem.rhyme),
+      h('p', { class: 'small' }, poem.note),
+      h('p', { class: 'small muted' }, '🎤 ' + (poem.tip || POEM_TIPS[Math.floor(Math.random() * POEM_TIPS.length)])));
+    after.hidden = false;
+  } }, 'Devamını gör');
+  return h('section', { class: 'card msg-card' },
+    h('p', { class: 'label' }, prefix ? `${prefix}: şiiri sen tamamla` : 'Şiiri sen tamamla'),
+    h('p', { class: 'msg poem' }, poem.show.join('\n') + '\n', gap),
+    h('p', { class: 'small muted poem-by' }, '— ' + poem.by),
+    ask, mine, reveal, after);
 }
 function messageBox() {
   const kid = state.student;

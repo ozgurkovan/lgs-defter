@@ -269,6 +269,10 @@ nav.tabs svg { width: 22px; height: 22px; }
 /* Veliden çocuğa mesaj kartı (ana sayfa) */
 .msg-card { border-color: var(--amber); border-left-width: 4px; }
 .msg-card .msg { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.1rem; line-height: 1.5; margin: 4px 0 8px; }
+.msg-card .poem { font-style: italic; margin-bottom: 2px; }
+.poem-gap { color: var(--ink-soft); letter-spacing: 0.12em; }
+.poem-new { color: var(--accent); }
+.poem-by { text-align: right; margin-bottom: 6px; }
 
 /* Fotoğraf listesi */
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
