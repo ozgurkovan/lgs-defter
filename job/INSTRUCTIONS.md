@@ -158,6 +158,32 @@ grade rules apply (primary school: short sentences, three choices A–C up to gr
 Fen: solve each variant twice. Spread correct answers over the letters. Write up to 40 variants per
 run, nearest `due_date` first; they do not count against the limit in section 2.
 
+## 1d. MEB booklets (every run until all are done)
+
+The family downloaded MEB's past LGS booklets and sample-question sets for private practice. They
+live only in `.work/meb/lgs/` (git-ignored); their questions go into the private pool with
+`source='meb'` and must never appear anywhere public. Read `.work/meb/lgs/manifest.json`, take the first
+booklet whose `status` is not `tamam`, and import up to 25 questions per run starting at `next`:
+- Each booklet folder has `sayfalar/pNN.txt` (the PDF's text layer) and `sayfalar/pNN.png` (the page
+  image). Take the stem and choices word for word from the text (join words broken across lines), and
+  check them against the image. The answer key is on the last page; use it as `answer`.
+- Sözel booklets: Türkçe 1–20, İnkılap 1–10, Din 1–10, İngilizce 1–10. Sayısal: Matematik 1–20, Fen 1–20.
+  Sample sets: 10 + 10 per booklet (see their first page).
+- If the question needs its figure, table or graph, crop the whole question from the page image with
+  `python -I tools/crop.py <pNN.png> .work/meb/lgs/<id>/q-<subject>-<no>.jpg <left> <top> <right> <bottom>`,
+  look at the crop, then `upload questions meb/<id>/q-<subject>-<no>.jpg <file>` and store that path in
+  `image_path` (keep the text in `stem` too when it reads well without the image).
+- `topic_id`: the grade-8 topic it belongs to (for the 2025 booklets the MEB mapping in
+  `.work/meb/lgs/kazanim-2025-*/sayfalar` names the kazanım of every question). `styles`, `hint`,
+  `solution` (your own short explanation) and `target_seconds` as usual; `verified=true`.
+- Fill `source='meb'`, `source_note` = the booklet title and question number,
+  `booklet` = the booklet id, `booklet_no` = the question's position in the whole booklet (1–50 sözel,
+  1–40 sayısal; sample sets 1–20), and `exam_only` from the manifest. Real LGS papers are
+  `exam_only=true`: kept out of daily practice and saved for full mock exams.
+- Update `next` (and `status: tamam` when the booklet is finished) in the manifest.
+These questions don't count against the limit in section 2. Never copy them into new questions;
+variants of a missed MEB question (section 1c) must be your own new questions.
+
 ## 2. Keep the question pool stocked (every run)
 
 ```

@@ -611,7 +611,7 @@ async function buildSession(track, remaining) {
   const topicIds = [...new Set(items.map((i) => i.topic_id))];
   const [pool, seenRows, missRows, reserved] = await Promise.all([
     q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
-      .in('topic_id', topicIds).eq('active', true)),
+      .in('topic_id', topicIds).eq('active', true).eq('exam_only', false)), // gerçek LGS soruları denemeye saklı
     q(sb.from('reviews').select('question_id').eq('student_id', sid())),
     q(sb.from('exam_questions').select('topic_id, styles').eq('student_id', sid()).neq('outcome', 'dogru').in('topic_id', topicIds)),
     reservedVariants(),
@@ -675,7 +675,7 @@ async function buildExtra(remaining, exclude) {
   if (!items.length) return { entries: [], seconds: 0 };
   const [pool, seenRows, reserved] = await Promise.all([
     q(sb.from('questions').select('id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
-      .in('topic_id', [...new Set(items.map((i) => i.topic_id))]).eq('active', true)),
+      .in('topic_id', [...new Set(items.map((i) => i.topic_id))]).eq('active', true).eq('exam_only', false)),
     q(sb.from('reviews').select('question_id').eq('student_id', sid())),
     reservedVariants(),
   ]);
