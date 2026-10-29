@@ -22,20 +22,58 @@ const SUBJECTS = {
   inkilap: { name: 'İnkılap Tarihi', coef: 1, sec: 75 },
   din: { name: 'Din Kültürü', coef: 1, sec: 60 },
   ingilizce: { name: 'İngilizce', coef: 1, sec: 75 },
+  // İlkokul dersleri (LGS'de yok).
+  hayat: { name: 'Hayat Bilgisi', coef: 1, sec: 90 },
+  sosyal: { name: 'Sosyal Bilgiler', coef: 1, sec: 90 },
 };
 const maxSeconds = (subject) => SUBJECTS[subject]?.sec || 90;
 // LGS kitapçık sırası: sözel oturum Türkçe, İnkılap, Din, İngilizce; sayısal oturum Matematik, Fen.
-const SUBJECT_ORDER = ['turkce', 'inkilap', 'din', 'ingilizce', 'matematik', 'fen'];
+// İlkokul dersleri sonda (öğretmen ders seçimi gibi genel listeler için).
+const SUBJECT_ORDER = ['turkce', 'inkilap', 'din', 'ingilizce', 'matematik', 'fen', 'hayat', 'sosyal'];
+const LGS_SUBJECTS = SUBJECT_ORDER.slice(0, 6);
 
-// Günlük plan: derse göre günde en fazla kaç soru. Veli ayarlamadıysa günlük hedef LGS'deki
-// soru ağırlığıyla bölünür (40 → Türkçe 9, İnkılap 4, Din 4, İngilizce 4, Matematik 10, Fen 9).
-const DEFAULT_PLAN = { turkce: 9, inkilap: 4, din: 4, ingilizce: 4, matematik: 10, fen: 9 };
-function dailyPlan(p) {
-  if (p?.daily_by_subject) return Object.fromEntries(SUBJECT_ORDER.map((s) => [s, Math.max(0, +p.daily_by_subject[s] || 0)]));
-  const k = (p?.daily_questions || 40) / 40;
-  return Object.fromEntries(SUBJECT_ORDER.map((s) => [s, Math.round(DEFAULT_PLAN[s] * k)]));
+// Sınıfa göre dersler. 8. sınıf LGS'ye hazırlanır; küçük sınıflar sadece pratik yapar.
+// extra_grades: veli bir üst sınıfın konularını da açabilir (3. sınıftaki çocuğa 4. sınıf konuları).
+const GRADE_SUBJECTS = {
+  1: ['turkce', 'matematik', 'hayat', 'ingilizce'],
+  2: ['turkce', 'matematik', 'hayat', 'ingilizce'],
+  3: ['turkce', 'matematik', 'hayat', 'fen', 'ingilizce'],
+  4: ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din'],
+};
+const PRIMARY_ORDER = ['turkce', 'matematik', 'hayat', 'fen', 'sosyal', 'ingilizce', 'din'];
+const isLgsStudent = (p) => !p?.grade || p.grade >= 8;
+const studentGrades = (p) => [...new Set([p?.grade || 8, ...(p?.extra_grades || [])])];
+function studentSubjects(p) {
+  if (isLgsStudent(p)) return LGS_SUBJECTS;
+  const set = new Set(studentGrades(p).flatMap((g) => GRADE_SUBJECTS[g] || ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din']));
+  return PRIMARY_ORDER.filter((s) => set.has(s));
 }
-const planTotal = (plan) => SUBJECT_ORDER.reduce((n, s) => n + (plan[s] || 0), 0);
+
+// Günlük plan: derse göre günde en fazla kaç soru. Veli ayarlamadıysa 8. sınıfta günlük hedef LGS'deki
+// soru ağırlığıyla bölünür (40 → Türkçe 9, İnkılap 4, Din 4, İngilizce 4, Matematik 10, Fen 9); küçük
+// sınıflarda Türkçe ve Matematik ağır basar. Velinin planında olmayan bir ders (sonradan açılan üst
+// sınıf dersi gibi) varsayılan payını alır.
+const DEFAULT_PLAN = { turkce: 9, inkilap: 4, din: 4, ingilizce: 4, matematik: 10, fen: 9 };
+const PRIMARY_WEIGHT = { turkce: 3, matematik: 3, fen: 2, hayat: 2, sosyal: 2, ingilizce: 1, din: 1 };
+function dailyPlan(p) {
+  const subjects = studentSubjects(p);
+  const total = p?.daily_questions || 40;
+  const weights = isLgsStudent(p) ? DEFAULT_PLAN : PRIMARY_WEIGHT;
+  const sum = isLgsStudent(p) ? 40 : subjects.reduce((a, s) => a + (weights[s] || 1), 0);
+  let plan;
+  if (isLgsStudent(p)) {
+    plan = Object.fromEntries(subjects.map((s) => [s, Math.round(total * weights[s] / sum)]));
+  } else {
+    // En büyük kalan yöntemi: paylar toplamı tam hedef olsun, her derse en az 1 soru.
+    const raw = subjects.map((s) => [s, total * (weights[s] || 1) / sum]);
+    plan = Object.fromEntries(raw.map(([s, x]) => [s, Math.max(1, Math.floor(x))]));
+    let left = total - planTotal(plan);
+    for (const [s] of [...raw].sort((a, b) => (b[1] % 1) - (a[1] % 1))) { if (left <= 0) break; plan[s]++; left--; }
+  }
+  for (const s of subjects) if (p?.daily_by_subject?.[s] !== undefined) plan[s] = Math.max(0, +p.daily_by_subject[s] || 0);
+  return plan;
+}
+const planTotal = (plan) => Object.values(plan).reduce((n, v) => n + (v || 0), 0);
 
 // Hata takibi: 1 → 2 → 4 → 14 → 30 gün. Konu tekrarı: Fibonacci, 55'te sabitlenir.
 const MISTAKE_LADDER = [1, 2, 4, 14, 30];
@@ -146,7 +184,8 @@ function authErrorText(error, wrongText = 'Bilgiler hatalı.') {
 }
 
 function youtubeSearch(topic) {
-  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`LGS ${state.student?.grade || 8}. sınıf ${topic || ''} konu anlatımı`);
+  const grade = state.student?.grade || 8;
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${grade >= 8 ? 'LGS ' : ''}${grade}. sınıf ${topic || ''} konu anlatımı`);
 }
 function subjTag(subject, text) {
   return h('span', { class: 'tag', style: `--subj: var(--c-${subject})` }, text || SUBJECTS[subject]?.name || subject);
@@ -179,7 +218,8 @@ const sid = () => state.student?.id;
 // Seçili öğrencide görülebilen dersler (öğretmen için kısıtlı olabilir; veritabanı da aynı kısıtı uygular).
 const visibleSubjects = () => {
   const allowed = state.profile?.role === 'teacher' ? state.subjectsFor?.[sid()] : null;
-  return allowed ? SUBJECT_ORDER.filter((s) => allowed.includes(s)) : SUBJECT_ORDER;
+  const mine = studentSubjects(state.student);
+  return allowed ? mine.filter((s) => allowed.includes(s)) : mine;
 };
 
 function studentSwitcher() {
@@ -580,7 +620,7 @@ async function buildSession(track, remaining) {
    Takipteki konulardan en zayıf olanlardan başlar, her konudan sırayla görülmemiş bir soru alır.
    Takvimi bozmaz: sadece yanlış yapılan konunun tekrarı yarına çekilir. */
 async function buildExtra(remaining, exclude) {
-  if (!SUBJECT_ORDER.some((s) => remaining[s] > 0)) return { entries: [], seconds: 0 };
+  if (!Object.keys(remaining).some((s) => remaining[s] > 0)) return { entries: [], seconds: 0 };
   const today = localDate();
   const items = await q(sb.from('items').select('*, topics(subject, name, sort)')
     .eq('student_id', sid()).eq('track', 'topic').eq('state', 'active').gt('due_date', today));
@@ -626,10 +666,10 @@ function pickVaried(candidates, n) {
 
 /* Sorular sınavdaki gibi derslere göre gruplanır (LGS kitapçık sırası), ders içinde
    müfredat sırasıyla gelir. Aynı maddenin destek soruları yan yana kalır (sort kararlı). */
-function examOrder(entries) {
+function examOrder(entries, order = SUBJECT_ORDER) {
   const rank = (e) => {
-    const i = SUBJECT_ORDER.indexOf(e.question.subject || e.item.topics?.subject);
-    return i < 0 ? SUBJECT_ORDER.length : i;
+    const i = order.indexOf(e.question.subject || e.item.topics?.subject);
+    return i < 0 ? order.length : i;
   };
   return [...entries].sort((a, b) => (rank(a) - rank(b)) || ((a.item.topics?.sort ?? 0) - (b.item.topics?.sort ?? 0)));
 }
@@ -682,7 +722,7 @@ async function viewHome() {
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })),
       h('h1', {}, name ? `${hello}, ${name}` : hello),
-      h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`)),
+      isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null),
     reasons.length
       ? h('section', { class: 'card', style: 'border-color: var(--red)' },
           h('p', { class: 'label', style: 'color: var(--red)' }, 'Önce bu'),
@@ -739,7 +779,7 @@ function statusTag(status) {
 // ---------------------------------------------------------------- öğrenci: soru oturumu
 
 function runSession(track, s) {
-  state.session = { track, entries: examOrder(s.entries), index: 0, results: new Map(), stats: { correct: 0, total: 0 }, together: [] };
+  state.session = { track, entries: examOrder(s.entries, studentSubjects(state.student)), index: 0, results: new Map(), stats: { correct: 0, total: 0 }, together: [] };
   showQuestion();
 }
 
@@ -835,7 +875,7 @@ function showQuestion() {
     const coachNote = !correct && confidence >= 75
       ? 'Emin olduğun hâlde yanlış: burada bir kavramı farklı biliyor olabilirsin. Çözümü dikkatle oku.'
       : correct && confidence <= 50 ? 'Doğru, ama tahmine yakındı. Bu konuyu farklı sorularla biraz daha göreceğiz.'
-      : correct && overTime ? `Doğru, ama ${fmtDuration(duration)} sürdü. LGS'de ${SUBJECTS[subject].name} sorusuna en fazla ${fmtDuration(target)} ayırabilirsin; bu konuyu biraz daha hızlandıracağız.`
+      : correct && overTime ? `Doğru, ama ${fmtDuration(duration)} sürdü. ${isLgsStudent(state.student) ? `LGS'de ${SUBJECTS[subject].name} sorusuna` : 'Böyle bir soruya'} en fazla ${fmtDuration(target)} ayırabilirsin; bu konuyu biraz daha hızlandıracağız.`
       : null;
     // Yanlışta kendi beyanı istenir (isteğe bağlı): veli raporunda "yanlışı anladı mı?" sorusunu cevaplar.
     // "Anlamadım" derse konu anlatımı bağlantısı açılır.
@@ -1394,7 +1434,7 @@ async function viewUpload(kind) {
 async function viewTopics() {
   loading();
   const [topics, statuses, items] = await Promise.all([
-    q(sb.from('topics').select('*').eq('grade', state.student.grade)),
+    q(sb.from('topics').select('*').in('grade', studentGrades(state.student))),
     q(sb.from('topic_status').select('*').eq('student_id', sid())),
     q(sb.from('items').select('topic_id, track, step, state, due_date').eq('student_id', sid())),
   ]);
@@ -1445,11 +1485,24 @@ async function viewTopics() {
         : isParentView()
         ? 'İşlenen konuları işaretleyin; işaretli konular tekrar takvimine girer. İşaretsizler, yıllık plandaki haftası gelince kendiliğinden açılır.'
         : 'İşlediğin konuları işaretle; işaretli konular tekrar takvimine girer. İşlemediğin bir konunun işaretini kaldırırsan o konudan soru gelmez.')),
-    visibleSubjects().map((s) => {
-      const list = topics.filter((t) => t.subject === s).sort((a, b) => a.sort - b.sort);
+    subjectCards(topics.filter((t) => t.grade === state.student.grade), false),
+    // Üst sınıf konuları (veli açtıysa): yıllık plana göre kendiliğinden açılmaz, işaretlenince takibe girer.
+    studentGrades(state.student).filter((g) => g !== state.student.grade).map((g) => [
+      h('section', { class: 'stack', style: 'gap: 4px; margin-top: 8px' },
+        h('h2', {}, `${g}. sınıf konuları`),
+        h('p', { class: 'small muted' }, isTeacherView()
+          ? 'Üst sınıfın konuları. İşaretli olanlar tekrar takviminde.'
+          : 'Bir üst sınıfın konuları. Bunlar kendiliğinden açılmaz; çalışmak istediğiniz konuyu işaretleyin, o konudan sorular gelmeye başlar.')),
+      subjectCards(topics.filter((t) => t.grade === g), true)]),
+    !topics.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'Bu sınıfın konu listesi henüz yüklenmedi.')) : null);
+
+  function subjectCards(gradeTopics, extra) {
+    return visibleSubjects().map((s) => {
+      const list = gradeTopics.filter((t) => t.subject === s).sort((a, b) => a.sort - b.sort);
       if (!list.length) return null;
       const covered = (t) => st[t.id] && st[t.id].status !== 'not_taught';
-      const count = h('span', { class: 'small muted' }, `${list.filter(covered).length} / ${list.length} işlendi`);
+      const countText = () => `${list.filter(covered).length} / ${list.length} ${extra ? 'açık' : 'işlendi'}`;
+      const count = h('span', { class: 'small muted' }, countText());
       return h('section', { class: 'card' },
         h('div', { class: 'spread' }, subjTag(s), count),
         list.map((t) => {
@@ -1458,9 +1511,11 @@ async function viewTopics() {
             if (!covered(t)) {
               tag.className = 'tag';
               tag.textContent = st[t.id]?.status === 'not_taught' ? 'Bekliyor'
-                : t.planned_start ? `Plan: ${fmtDate(t.planned_start)}` : '';
+                : !extra && t.planned_start ? `Plan: ${fmtDate(t.planned_start)}` : '';
+              tag.hidden = !tag.textContent; // boş etiket gri bir çizgi gibi görünmesin
               return;
             }
+            tag.hidden = false;
             const [label, color] = level(t.id);
             tag.className = 'tag ' + color;
             tag.textContent = label;
@@ -1473,7 +1528,7 @@ async function viewTopics() {
               st[t.id] = { ...(st[t.id] || {}), status: box.checked ? 'active' : 'not_taught' };
               if (box.checked && !items.some((i) => i.topic_id === t.id && i.track === 'topic')) items.push({ topic_id: t.id, track: 'topic', step: 0, state: 'active' });
               paint();
-              count.textContent = `${list.filter(covered).length} / ${list.length} işlendi`;
+              count.textContent = countText();
             } catch (e) {
               box.checked = !box.checked;
               toast('Kaydedilemedi, tekrar dene.');
@@ -1482,8 +1537,8 @@ async function viewTopics() {
           } });
           return h('label', { class: 'topic-row', for: 'topic-' + t.id }, box, h('span', { class: 'name' }, t.name), tag);
         }));
-    }),
-    !topics.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'Bu sınıfın konu listesi henüz yüklenmedi.')) : null);
+    });
+  }
 }
 
 function isParentView() { return state.profile?.role !== 'student'; }
@@ -1516,26 +1571,41 @@ function viewSettings() {
   const isParent = role === 'parent';
   const showStudent = p && role !== 'teacher';
   const lgs = p && h('input', { id: 'lgs-date', type: 'date', value: p.lgs_date });
-  const grade = p && h('select', { id: 'grade' }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === p.grade }, `${g}. sınıf`)));
+  const grade = p && h('select', { id: 'grade' }, [1, 2, 3, 4, 5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === p.grade }, `${g}. sınıf`)));
   const plan = p && dailyPlan(p);
+  // İleri müfredat: küçük sınıftaki çocuğa bir üst sınıfın konuları da açılabilir (sadece veli).
+  const nextUp = p && h('input', { type: 'checkbox', id: 'next-grade', checked: (p.extra_grades || []).length > 0 || null });
+  const nextUpText = h('span', {});
+  const nextUpRow = p && h('label', { class: 'row small', for: 'next-grade' }, nextUp, nextUpText);
+  const paintNextUp = () => {
+    const g = +grade.value;
+    nextUpRow.hidden = g >= 8;
+    nextUpText.textContent = `${g + 1}. sınıfın konularını da göster (Konular sayfasında işaretleyerek açılır)`;
+  };
+  if (p) { paintNextUp(); grade.addEventListener('change', paintNextUp); }
   render(
     h('header', {}, h('h1', {}, isParent && p ? `Ayarlar · ${p.display_name}` : 'Ayarlar')),
     isParent && p ? planSection(p) : null,
     isParent ? familySection() : null,
     showStudent && h('section', { class: 'card' },
       isParent ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
-      h('label', { class: 'field' }, 'LGS tarihi', lgs),
+      isParent ? nextUpRow : null,
+      isLgsStudent(p) ? h('label', { class: 'field' }, 'LGS tarihi', lgs) : null,
       // Günlük plan veli ayarıdır; öğrenci sadece görür (veritabanı da öğrencinin değiştirmesine izin vermez).
       !isParent ? h('div', { class: 'stack', style: 'gap: 4px' },
         h('p', { class: 'label' }, `Günlük plan · ${planTotal(plan)} soru`),
-        h('p', { class: 'small muted' }, SUBJECT_ORDER.filter((s) => plan[s]).map((s) => `${SUBJECTS[s].name} ${plan[s]}`).join(' · ')),
+        h('p', { class: 'small muted' }, studentSubjects(p).filter((s) => plan[s]).map((s) => `${SUBJECTS[s].name} ${plan[s]}`).join(' · ')),
         h('p', { class: 'small muted' }, 'Bu sayıları velin ayarlıyor.')) : null,
       h('button', { class: 'primary block', onclick: async () => {
         const upd = { lgs_date: lgs.value || p.lgs_date };
-        if (isParent) upd.grade = +grade.value;
-        await q(sb.from('profiles').update(upd).eq('id', p.id));
+        if (isParent) {
+          upd.grade = +grade.value;
+          upd.extra_grades = nextUp.checked && upd.grade < 8 ? [upd.grade + 1] : [];
+        }
+        try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { return toast('Kaydedilemedi, tekrar dene.'); }
         Object.assign(p, upd);
         toast('Kaydedildi.');
+        if (isParent) viewSettings(); // sınıf değişince dersler ve günlük plan da değişir
       } }, 'Kaydet')),
     h('section', { class: 'stack' },
       h('h2', {}, 'Şifreyi değiştir'),
@@ -1557,6 +1627,7 @@ function fmtMinutes(sec) {
    ve bugün biriken hata tekrarları. Bir dersin hata tekrarı sayısı sınırı aşarsa uyarır: aşan kısım
    ertesi güne kalır, sınır en az o kadar olmalı. */
 function planSection(p) {
+  const subjects = studentSubjects(p);
   const plan = dailyPlan(p);
   const box = h('section', { class: 'card stack' }, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yükleniyor…'));
   (async () => {
@@ -1566,7 +1637,7 @@ function planSection(p) {
         .gte('answered_at', addDays(today, -6) + 'T00:00:00')),
       q(sb.from('items').select('support, topics(subject)').eq('student_id', p.id).eq('track', 'mistake').eq('state', 'active').lte('due_date', today)),
     ]);
-    const stat = Object.fromEntries(SUBJECT_ORDER.map((s) => [s, { n: 0, sec: 0, week: 0, due: 0 }]));
+    const stat = Object.fromEntries(subjects.map((s) => [s, { n: 0, sec: 0, week: 0, due: 0 }]));
     for (const r of rows) {
       const st = stat[r.questions?.subject];
       if (!st) continue;
@@ -1574,18 +1645,18 @@ function planSection(p) {
       if (localDate(new Date(r.answered_at)) === today) { st.n++; st.sec += r.duration_sec || 0; }
     }
     for (const it of due) { const st = stat[it.topics?.subject]; if (st) st.due += 1 + (it.support || 0); }
-    const sum = (k) => SUBJECT_ORDER.reduce((a, s) => a + stat[s][k], 0);
+    const sum = (k) => subjects.reduce((a, s) => a + stat[s][k], 0);
     const days = new Set(rows.map((r) => localDate(new Date(r.answered_at)))).size;
 
     const inputs = {}, checks = [];
     const totalLine = h('p', { class: 'small muted num' });
     const update = () => {
       checks.forEach((c) => c());
-      const total = SUBJECT_ORDER.reduce((a, s) => a + (+inputs[s].value || 0), 0);
-      const maxSec = SUBJECT_ORDER.reduce((a, s) => a + (+inputs[s].value || 0) * maxSeconds(s), 0);
-      totalLine.textContent = `Toplam günde ${total} soru · LGS süreleriyle en fazla ${fmtMinutes(maxSec)}`;
+      const total = subjects.reduce((a, s) => a + (+inputs[s].value || 0), 0);
+      const maxSec = subjects.reduce((a, s) => a + (+inputs[s].value || 0) * maxSeconds(s), 0);
+      totalLine.textContent = `Toplam günde ${total} soru · soru sürelerine göre en fazla ${fmtMinutes(maxSec)}`;
     };
-    const rowsEl = SUBJECT_ORDER.map((s) => {
+    const rowsEl = subjects.map((s) => {
       const st = stat[s];
       const input = inputs[s] = h('input', { type: 'number', min: 0, max: 60, value: plan[s], inputmode: 'numeric',
         'aria-label': `${SUBJECTS[s].name} günlük soru sayısı`, style: 'width: 76px' });
@@ -1604,14 +1675,14 @@ function planSection(p) {
         warn);
     });
     const save = h('button', { class: 'primary block', onclick: async () => {
-      const by = Object.fromEntries(SUBJECT_ORDER.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
+      const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
       const upd = { daily_by_subject: by, daily_questions: planTotal(by) };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;
       Object.assign(p, upd);
-      SUBJECT_ORDER.forEach((s) => { inputs[s].value = by[s]; });
+      subjects.forEach((s) => { inputs[s].value = by[s]; });
       update();
       toast('Kaydedildi. Yeni sayılar bugünden geçerli.');
     } }, 'Kaydet');
@@ -1708,7 +1779,7 @@ function familySection() {
       const name = h('input', { id: `${kind}-name`, placeholder: 'Adı' });
       const email = h('input', { id: `${kind}-email`, type: 'email', inputmode: 'email', placeholder: 'Giriş e-postası' });
       const password = h('input', { id: `${kind}-password`, type: 'text', autocomplete: 'off', placeholder: 'Şifre (en az 6 karakter)' });
-      const grade = h('select', { id: `${kind}-grade` }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === 8 }, `${g}. sınıf`)));
+      const grade = h('select', { id: `${kind}-grade` }, [1, 2, 3, 4, 5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === 8 }, `${g}. sınıf`)));
       const kidBoxes = kids.map((k) => h('label', { class: 'row small' }, h('input', { type: 'checkbox', value: k.id }), k.display_name));
       const subjectBoxes = subjectChecklist(null);
       const msg = h('p', { class: 'small', hidden: true });
@@ -1872,7 +1943,7 @@ async function viewReport() {
     q(sb.from('exams').select('*').eq('student_id', s).order('exam_date')),
     q(sb.from('exam_results').select('*').eq('student_id', s)),
     q(sb.from('exam_questions').select('exam_id, subject, topic_id, styles, outcome, marked_guess, coding_error, diagnosis_cause, student_reason, misconception').eq('student_id', s)),
-    q(sb.from('topics').select('*').eq('grade', state.student.grade)),
+    q(sb.from('topics').select('*').in('grade', studentGrades(state.student))),
     q(sb.from('topic_status').select('*').eq('student_id', s)),
     q(sb.from('items').select('*').eq('student_id', s)),
     q(sb.from('reviews').select('id, item_id, question_id, track, answer, correct, understood, needs_help, together_at, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, topic_id)')
@@ -1939,7 +2010,7 @@ async function viewReport() {
   const byTopic = Object.entries(countBy(missed.filter((m) => m.topic_id), (m) => m.topic_id)).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const subjects = h('section', { class: 'card' },
     h('h2', {}, 'Derslere göre yanlış ve boş'),
-    SUBJECT_ORDER.filter((s) => bySubject[s]).map((s) => bar(SUBJECTS[s].name, bySubject[s], maxSubj, `var(--c-${s})`)),
+    studentSubjects(state.student).filter((s) => bySubject[s]).map((s) => bar(SUBJECTS[s].name, bySubject[s], maxSubj, `var(--c-${s})`)),
     byTopic.length ? [h('h3', { style: 'margin-top: 8px' }, 'En çok tekrar eden konular'),
       byTopic.map(([t, n]) => h('div', { class: 'spread small' }, h('span', {}, topicName[t]?.name || t), h('b', { class: 'num' }, n)))] : null,
     !missed.length ? h('p', { class: 'muted' }, 'Henüz veri yok.') : null);
@@ -1972,7 +2043,7 @@ async function viewReport() {
       g.tutor_note ? h('div', { class: 'note teacher' }, g.tutor_note) : h('p', { class: 'small muted' }, 'Not bir sonraki saatlik çalışmada hazırlanacak.'),
       g.lesson ? h('details', {}, h('summary', {}, 'Öğrenciye yazılan konu anlatımı'), h('div', { class: 'note small', style: 'margin-top: 8px' }, g.lesson)) : null,
       h('a', { class: 'btn', href: g.youtube_query ? 'https://www.youtube.com/results?search_query=' + encodeURIComponent(g.youtube_query)
-        : 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`LGS ${state.student.grade}. sınıf ${topicName[g.topic_id]?.name || ''} konu anlatımı`),
+        : youtubeSearch(topicName[g.topic_id]?.name),
         target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı')))) : null;
 
   // Zayıf konular: son 30 günün tekrarları ve bütün denemeler birlikte; her konuya YouTube konu anlatımı.
@@ -2032,7 +2103,7 @@ async function viewReport() {
       h('p', { class: 'small muted' }, `${reviews.length} soru, ${days} farklı günde.`),
       h('div', { class: 'scroll-x' }, h('table', {},
         h('thead', {}, h('tr', {}, h('th', {}, 'Ders'), h('th', {}, 'Soru'), h('th', {}, 'Doğru'), h('th', {}, 'Süreyi aşan'), h('th', {}, 'Emin ama yanlış'), h('th', {}, 'Tahminle doğru'))),
-        h('tbody', {}, SUBJECT_ORDER.filter((s) => bySub[s]).map((s) => h('tr', {},
+        h('tbody', {}, studentSubjects(state.student).filter((s) => bySub[s]).map((s) => h('tr', {},
           h('td', {}, SUBJECTS[s].name), h('td', {}, bySub[s].n),
           h('td', {}, `%${Math.round((bySub[s].ok / bySub[s].n) * 100)}`),
           h('td', {}, `%${Math.round((bySub[s].slow / bySub[s].n) * 100)}`),
@@ -2066,7 +2137,8 @@ async function viewReport() {
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, isTeacherView() ? 'Öğretmen görünümü' : 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
-      h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)),
+      isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
+        : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
     tiles, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
     h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
@@ -2151,7 +2223,7 @@ function dayReport(reviews, items, topicName) {
       if (r.needs_help) t.blank = (t.blank || 0) + 1;
     }
     const topicRows = Object.entries(byTopic).sort((a, b) =>
-      (SUBJECT_ORDER.indexOf(a[1].subject) - SUBJECT_ORDER.indexOf(b[1].subject)) || ((topicName[a[0]]?.sort ?? 0) - (topicName[b[0]]?.sort ?? 0)));
+      (studentSubjects(state.student).indexOf(a[1].subject) - studentSubjects(state.student).indexOf(b[1].subject)) || ((topicName[a[0]]?.sort ?? 0) - (topicName[b[0]]?.sort ?? 0)));
 
     const wrongs = rows.filter((r) => !r.correct).map((r) => ({ r, v: verdictFor(r) }));
     const tally = {};

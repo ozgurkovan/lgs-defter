@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
   const familyTeachers = [...new Set((coLinks ?? []).filter((l) => l.relation === 'teacher').map((l) => l.parent_id as string))];
   const onlyMyChildren = (ids: unknown) => (Array.isArray(ids) ? ids : []).map(String).filter((id) => myChildren.includes(id));
   // Öğretmenin görebileceği dersler: hepsi seçiliyse null (bütün dersler).
-  const ALL_SUBJECTS = ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'ingilizce'];
+  const ALL_SUBJECTS = ['turkce', 'matematik', 'fen', 'inkilap', 'din', 'ingilizce', 'hayat', 'sosyal'];
   const subjectsFrom = (v: unknown) => {
     const list = [...new Set((Array.isArray(v) ? v : []).map(String).filter((s) => ALL_SUBJECTS.includes(s)))];
     if (!list.length) throw new Error('Öğretmenin görebileceği en az bir ders seçin.');
@@ -83,9 +83,10 @@ Deno.serve(async (req) => {
     switch (body.action) {
       case 'add_child': {
         const grade = Number(body.grade);
-        if (![5, 6, 7, 8].includes(grade)) throw new Error('Sınıf 5, 6, 7 ya da 8 olmalı.');
+        if (!Number.isInteger(grade) || grade < 1 || grade > 8) throw new Error('Sınıf 1 ile 8 arasında olmalı.');
         const id = await createAccount();
-        const { error: pErr } = await admin.from('profiles').insert({ id, role: 'student', display_name: name, grade });
+        // İlkokulda günlük hedef daha hafif başlar; veli Günlük plan'dan değiştirir.
+        const { error: pErr } = await admin.from('profiles').insert({ id, role: 'student', display_name: name, grade, daily_questions: grade <= 4 ? 20 : 40 });
         if (pErr) { await admin.auth.admin.deleteUser(id); throw new Error('Profil oluşturulamadı.'); }
         await admin.from('family_links').insert(familyParents.map((parent_id) => ({ parent_id, student_id: id, relation: 'parent' })));
         // Yıllık plana göre haftası gelmiş konular hemen takibe girsin.

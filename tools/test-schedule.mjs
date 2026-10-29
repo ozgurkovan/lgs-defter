@@ -88,6 +88,16 @@ check('sınav sırasıyla gruplama', ordered === 't2 t5 k3 d1 i1 m1 f1a f1b f2',
 
 // Varsayılan günlük plan 40 soruyu LGS ağırlığıyla böler; velinin planı varsa o kullanılır.
 check('varsayılan plan 40 soru', planTotal(dailyPlan({ daily_questions: 40 })) === 40, JSON.stringify(dailyPlan({})));
-check('velinin planı', dailyPlan({ daily_by_subject: { matematik: 15 } }).matematik === 15 && dailyPlan({ daily_by_subject: { matematik: 15 } }).fen === 0);
+// Velinin yazdığı sayı geçerli; planda hiç olmayan ders (sonradan açılan) varsayılan payını alır, 0 yazılmışsa 0 kalır.
+const veli = dailyPlan({ daily_by_subject: { matematik: 15, din: 0 } });
+check('velinin planı', veli.matematik === 15 && veli.din === 0 && veli.fen === 9, JSON.stringify(veli));
+// İlkokul: LGS dersleri yok, varsayılan 20 soru Türkçe ve Matematik ağırlıklı bölünür.
+const g3 = dailyPlan({ grade: 3, daily_questions: 20 });
+check('3. sınıf dersleri', Object.keys(g3).join(',') === 'turkce,matematik,hayat,fen,ingilizce', JSON.stringify(g3));
+check('3. sınıf 20 soru', planTotal(g3) === 20 && g3.turkce > g3.ingilizce, `toplam ${planTotal(g3)}`);
+check('3+4. sınıf 40 soru tam', planTotal(dailyPlan({ grade: 3, extra_grades: [4], daily_questions: 40 })) === 40);
+// 3. sınıf + 4. sınıf konuları açık: Sosyal ve Din de plana girer.
+const g34 = dailyPlan({ grade: 3, extra_grades: [4], daily_questions: 20 });
+check('3. sınıf + 4. sınıf dersleri', Object.keys(g34).join(',') === 'turkce,matematik,hayat,fen,sosyal,ingilizce,din', JSON.stringify(g34));
 
 process.exit(fails ? 1 : 0);

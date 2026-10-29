@@ -20,6 +20,8 @@
   --c-inkilap: #7a4a1f;
   --c-din: #6b4aa8;
   --c-ingilizce: #0f7c8a;
+  --c-hayat: #8a6d0f;
+  --c-sosyal: #a8336b;
   --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --font-body: "Figtree", -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -48,6 +50,8 @@
     --c-inkilap: #d9a26b;
     --c-din: #b79bf0;
     --c-ingilizce: #5fc9d6;
+    --c-hayat: #e0c35c;
+    --c-sosyal: #f08ab8;
     color-scheme: dark;
   }
 }
