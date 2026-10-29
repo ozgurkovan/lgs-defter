@@ -108,6 +108,7 @@ Sayısal: Matematik 1–20, Fen Bilimleri 1–20. Choices are A–D.
 8. Scheduling items (`items`), due tomorrow (local date, Europe/Istanbul), all with `student_id`:
    - one `mistake` item per `yanlis` or `bos` question (`track=mistake, topic_id, exam_question_id,
      step=0, interval_days=1, due_date=tomorrow`); `state=paused` if the topic is `maybe_not_taught`.
+     Their similar questions come from section 1c (in this run if time allows, otherwise the next).
    - one `topic` item per active topic that does not have one yet for this student (`track=topic,
      step=0, interval_days=1, due_date=tomorrow`).
 9. Patch the submission: `status=done, processed_at=now`, and a short Turkish `result_note`, for
@@ -128,6 +129,31 @@ Time per question (the student's share of the real LGS session; the app enforces
 Türkçe 120 s, İnkılap 75 s, Din 60 s, İngilizce 75 s (sözel: 50 questions / 75 min);
 Matematik 150 s, Fen 90 s (sayısal: 40 questions / 80 min). Write questions that a well-prepared
 student can solve within that time; LGS questions are long to read, not long to compute.
+
+## 1c. Similar questions for mistakes (every run, before section 2)
+
+Every wrong answer becomes a `mistake` item: deneme mistakes carry `exam_question_id`, and wrong answers
+(or "Bunu birlikte bakalım" skips) in topic reviews and extra practice carry `question_id`. Its reviews
+(next day, then 2, 4, 14, 30 days) should show changed versions of that very question, never the
+question itself. Find the items that need them:
+```
+node tools/sb.mjs get "mistake_variant_needs?select=*&order=due_date"
+```
+Each row is one mistake item with fewer than 2 unseen variants for that student; `need` is how many to
+write. `student_answer` is the wrong choice she picked. Read the source question
+(`questions?id=eq.<question_id>` or `exam_questions?id=eq.<exam_question_id>`, including its crop
+image and diagnosis) and write `need` variants, a mix of:
+1. The same question with new numbers, names, words or context (same steps to solve).
+2. The same idea asked from another side: reversed question, a "değildir" / "yanlıştır" form, or a
+   different choice being correct, so memorising the old answer does not help.
+3. A similar question aimed at the misconception behind her wrong choice (what made `student_answer`
+   attractive?).
+Set `variant_of` = the source `question_id` (or `variant_of_exam` = the `exam_question_id`), the same
+`topic_id` and `subject`, `source=claude`, `source_note='Hata tekrarı benzeri'`, and fill `styles`, `stem`,
+`choices`, `answer`, `hint`, `solution`, `target_seconds` and `verified=true` as for any question. The
+grade rules apply (primary school: short sentences, three choices A–C up to grade 3). Matematik and
+Fen: solve each variant twice. Spread correct answers over the letters. Write up to 40 variants per
+run, nearest `due_date` first; they do not count against the limit in section 2.
 
 ## 2. Keep the question pool stocked (every run)
 

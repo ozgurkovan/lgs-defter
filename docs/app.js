@@ -183,6 +183,28 @@ function authErrorText(error, wrongText = 'Bilgiler hatalı.') {
   return 'Giriş yapılamadı, biraz sonra tekrar dene.';
 }
 
+// Türkçe eklerde son ünlü: ince (e, i, ö, ü) mi, kalın mı; yuvarlak mı.
+const lastVowel = (s) => [...s.toLocaleLowerCase('tr')].filter((ch) => 'aeıioöuü'.includes(ch)).pop() || 'e';
+// Sevgi hitabı: Ömer → Ömerciğim, İrfan → İrfancığım, Isla → Islacığım, Umut → Umutçuğum.
+function endearing(name) {
+  const last = name.toLocaleLowerCase('tr').slice(-1);
+  const c = 'çfhkpsşt'.includes(last) ? 'ç' : 'c';
+  return name + c + { a: 'ığım', ı: 'ığım', e: 'iğim', i: 'iğim', o: 'uğum', u: 'uğum', ö: 'üğüm', ü: 'üğüm' }[lastVowel(name)];
+}
+// Yönelme eki: Ömer'e, İrfan'a, Isla'ya.
+function toName(name) {
+  const endsVowel = 'aeıioöuü'.includes(name.toLocaleLowerCase('tr').slice(-1));
+  return `${name}'${endsVowel ? 'y' : ''}${'eiöü'.includes(lastVowel(name)) ? 'e' : 'a'}`;
+}
+// Ana sayfada bazen (aşağı yukarı üç girişte bir) saate göre selam yerine şakacı bir selam.
+function playfulGreeting(name) {
+  const n = (name || '').split(' ')[0];
+  if (!n || Math.random() > 0.35) return null;
+  const list = [`${endearing(n)}, napıyon?`, `Selam ${n}! Bugün de döktürüyoruz.`, 'Hoş geldin şampiyon!',
+    `${endearing(n)}, hazır mısın?`, `Merhaba ${n}, beyin ısındı mı?`];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 function youtubeSearch(topic) {
   const grade = state.student?.grade || 8;
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${grade >= 8 ? 'LGS ' : ''}${grade}. sınıf ${topic || ''} konu anlatımı`);
@@ -576,11 +598,12 @@ async function buildSession(track, remaining) {
   if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0, deferred: 0 };
 
   const topicIds = [...new Set(items.map((i) => i.topic_id))];
-  const [pool, seenRows, missRows] = await Promise.all([
-    q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution')
+  const [pool, seenRows, missRows, reserved] = await Promise.all([
+    q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
       .in('topic_id', topicIds).eq('active', true)),
     q(sb.from('reviews').select('question_id').eq('student_id', sid())),
     q(sb.from('exam_questions').select('topic_id, styles').eq('student_id', sid()).neq('outcome', 'dogru').in('topic_id', topicIds)),
+    reservedVariants(),
   ]);
   const seen = new Set(seenRows.map((r) => r.question_id));
   const missedStyles = {};
@@ -610,10 +633,16 @@ async function buildSession(track, remaining) {
     const room = remaining[subject] || 0;
     if (room < want && !(room > 0 && !started.has(subject))) { deferred += want; continue; }
     const styles = missedStyles[it.topic_id] || new Set();
-    const candidates = shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id) && !used.has(p.id)))
+    const fresh = shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id) && !used.has(p.id)));
+    // Hata maddesi önce yanlış yaptığı sorunun benzerlerini alır; başka hata maddelerine ayrılmış benzerlere
+    // (konu tekrarında da) dokunulmaz. Benzer yoksa konudan, kaçırdığı tarzlara yakın bir soru gelir.
+    const own = { q: new Set([it.question_id].filter(Boolean)), e: new Set([it.exam_question_id].filter(Boolean)) };
+    const variants = fresh.filter((p) => isVariantOf(p, own));
+    const candidates = fresh.filter((p) => !isVariantOf(p, reserved))
       .sort((a, b) => overlap(b.styles, styles) - overlap(a.styles, styles));
-    if (!candidates.length) { shortage++; continue; }
-    const picked = pickVaried(candidates, want);
+    if (!variants.length && !candidates.length) { shortage++; continue; }
+    let picked = pickVaried(variants, want);
+    if (picked.length < want) picked = [...picked, ...pickVaried(candidates, want - picked.length)];
     remaining[subject] -= picked.length;
     started.add(subject);
     picked.forEach((p, i) => { used.add(p.id); entries.push({ item: it, question: p, last: i === picked.length - 1 }); });
@@ -630,14 +659,15 @@ async function buildExtra(remaining, exclude) {
   const items = await q(sb.from('items').select('*, topics(subject, name, sort)')
     .eq('student_id', sid()).eq('track', 'topic').eq('state', 'active').gt('due_date', today));
   if (!items.length) return { entries: [], seconds: 0 };
-  const [pool, seenRows] = await Promise.all([
-    q(sb.from('questions').select('id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution')
+  const [pool, seenRows, reserved] = await Promise.all([
+    q(sb.from('questions').select('id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
       .in('topic_id', [...new Set(items.map((i) => i.topic_id))]).eq('active', true)),
     q(sb.from('reviews').select('question_id').eq('student_id', sid())),
+    reservedVariants(),
   ]);
   const seen = new Set([...seenRows.map((r) => r.question_id), ...exclude]);
   items.sort((a, b) => (b.consecutive_wrong - a.consecutive_wrong) || (a.step - b.step) || (a.due_date < b.due_date ? -1 : 1));
-  const queues = items.map((it) => ({ it, cands: shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id))) }));
+  const queues = items.map((it) => ({ it, cands: shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id) && !isVariantOf(p, reserved))) }));
   const entries = [];
   let seconds = 0;
   const open = (x) => x.cands.length && remaining[x.it.topics?.subject] > 0;
@@ -654,6 +684,13 @@ async function buildExtra(remaining, exclude) {
 }
 
 function overlap(a, set) { return (a || []).filter((s) => set.has(s)).length; }
+// Açık hata maddelerinin kaynak soruları: bunların benzerleri o maddeye ayrılmıştır.
+async function reservedVariants() {
+  const rows = await q(sb.from('items').select('question_id, exam_question_id')
+    .eq('student_id', sid()).eq('track', 'mistake').eq('state', 'active'));
+  return { q: new Set(rows.map((r) => r.question_id).filter(Boolean)), e: new Set(rows.map((r) => r.exam_question_id).filter(Boolean)) };
+}
+const isVariantOf = (p, src) => (!!p.variant_of && src.q.has(p.variant_of)) || (!!p.variant_of_exam && src.e.has(p.variant_of_exam));
 function pickVaried(candidates, n) {
   const picked = [], shown = new Set(), rest = [...candidates];
   while (picked.length < n && rest.length) {
@@ -683,7 +720,7 @@ function examOrder(entries, order = SUBJECT_ORDER) {
 
 async function viewHome() {
   loading();
-  const [todayCount, reasons, subs, replies, togetherRows] = await Promise.all([
+  const [todayCount, reasons, subs, replies, togetherRows, messages] = await Promise.all([
     q(sb.from('reviews').select('id, track, correct, questions(subject)').eq('student_id', sid()).eq('voided', false).gte('answered_at', localDate() + 'T00:00:00')),
     q(sb.from('exam_questions').select('id').eq('student_id', sid()).neq('outcome', 'dogru')
       .is('student_reason', null).not('diagnosis_cause', 'is', null)),
@@ -692,6 +729,8 @@ async function viewHome() {
     q(sb.from('question_feedback').select('id, kind, verdict, response, questions(stem, subject)')
       .eq('student_id', sid()).not('response', 'is', null).eq('response_seen', false).order('checked_at')),
     loadTogether(),
+    // Veliden gelen, henüz okunmamış mesajlar (tatlı bir söz ya da şaka).
+    q(sb.from('family_messages').select('id, body, signature, created_at').eq('student_id', sid()).is('seen_at', null).order('created_at')),
   ]);
   // Günlük plan derse göre soru sayısıdır. Önce hata tekrarları, sonra konu tekrarları hakkı kullanır;
   // kalan hak ek çalışmayla dolar.
@@ -726,8 +765,18 @@ async function viewHome() {
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })),
-      h('h1', {}, name ? `${hello}, ${name}` : hello),
+      h('h1', {}, playfulGreeting(name) || (name ? `${hello}, ${name}` : hello)),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null),
+    messages.map((m) => {
+      const card = h('section', { class: 'card msg-card' },
+        h('p', { class: 'label' }, m.signature ? `${m.signature} yazdı` : 'Sana bir mesaj var'),
+        h('p', { class: 'msg' }, m.body),
+        h('button', { class: 'ghost small', onclick: async () => {
+          card.remove();
+          await sb.from('family_messages').update({ seen_at: new Date().toISOString() }).eq('id', m.id);
+        } }, 'Okudum ❤'));
+      return card;
+    }),
     reasons.length
       ? h('section', { class: 'card', style: 'border-color: var(--red)' },
           h('p', { class: 'label', style: 'color: var(--red)' }, 'Önce bu'),
@@ -841,7 +890,7 @@ function showQuestion() {
   } }, 'İpucu göster') : null;
 
   // Geri bildirim için: bu sorunun kaydı ve takvim değişmeden önceki hali.
-  let answered = false, reviewId = null, reviewSaved = null, gradePromise = null, prevItem = null, myResult = null;
+  let answered = false, reviewId = null, reviewSaved = null, gradePromise = null, prevItem = null, myResult = null, mistakeItemId = null;
   const itemSnapshot = () => ({
     step: item.step, ease: item.ease, consecutive_wrong: item.consecutive_wrong, interval_days: item.interval_days,
     due_date: item.due_date, state: item.state, last_reviewed_at: item.last_reviewed_at, note: item.note,
@@ -924,6 +973,16 @@ function showQuestion() {
       }).select('id').single());
       const rv = await reviewSaved;
       reviewId = rv.id;
+      // Konu tekrarında ya da ek çalışmada yanlış (ya da "birlikte bakalım"): o soru hata tekrarına girer.
+      // Yarın o sorunun değiştirilmiş hâli ya da benzeri gelir (saatlik görev yazar), sonra 2, 4, 14, 30 gün.
+      if (!correct && (entry.extra || item.track === 'topic')) {
+        const mi = await q(sb.from('items').insert({
+          student_id: sid(), track: 'mistake', topic_id: item.topic_id, question_id: question.id,
+          step: 0, interval_days: 1, due_date: addDays(localDate(), 1),
+          note: help ? 'Birlikte bakalım dedi' : entry.extra ? 'Ek çalışmada yanlış' : 'Konu tekrarında yanlış',
+        }).select('id').single());
+        mistakeItemId = mi.id;
+      }
       if (entry.extra) {
         // Ek çalışmada yanlış: konunun tekrarı yarına çekilir ve destek sorusu eklenir.
         if (!correct || confidence <= 50) {
@@ -978,6 +1037,8 @@ function showQuestion() {
         reviewId = rv.id;
       } else if (dispute && reviewId) {
         await q(sb.from('reviews').update({ voided: true }).eq('id', reviewId));
+        // Soru hatalıysa yanlışı sayılmaz: bu yanlıştan açılan hata tekrarı da kapanır.
+        if (mistakeItemId) await q(sb.from('items').update({ state: 'done', note: 'Soru hatalı bildirildi' }).eq('id', mistakeItemId));
         const i = list.indexOf(myResult);
         if (i >= 0) list.splice(i, 1);
         ss.stats.total--; if (myResult?.correct) ss.stats.correct--;
@@ -1028,7 +1089,9 @@ function showQuestion() {
         h('i', { style: `width: ${(ss.index / ss.entries.length) * 100}%` }))),
     h('section', { class: 'card' },
       h('div', { class: 'spread' },
-        h('div', { class: 'row' }, subjTag(subject), h('span', { class: 'small muted' }, item.topics?.name || '')),
+        h('div', { class: 'row' }, subjTag(subject), h('span', { class: 'small muted' }, item.topics?.name || ''),
+          // Hata tekrarında, daha önce yanlış yaptığı sorunun değiştirilmiş hâli ya da benzeri.
+          item.track === 'mistake' && (question.variant_of || question.variant_of_exam) ? h('span', { class: 'tag amber' }, 'Benzer soru') : null),
         h('span', { class: 'small muted num', style: 'white-space: nowrap', title: 'Bu dersteki sıra · toplam sıra' },
           `${sectionNo}/${sectionLen} · ${ss.index + 1}/${ss.entries.length}`)),
       question.image_path ? lazyImg('questions', question.image_path) : null,
@@ -1106,6 +1169,67 @@ function loadTogether() {
     .or('needs_help.eq.true,understood.eq.false,confidence.eq.25')
     .gte('answered_at', addDays(localDate(), -60))
     .order('answered_at', { ascending: false }).limit(60));
+}
+
+/* Veliden çocuğa mesaj: çocuk uygulamayı açınca ana sayfasında görür, "Okudum" deyince kapanır.
+   Akla gelmezse tek dokunuşla tatlı bir söz ya da şaka önerilir (değiştirilebilir). */
+const SWEET_LINES = ['Seninle çok gurur duyuyorum!', 'Bugün de harikasın, kolay gelsin.', 'Akşam dondurma benden, söz!',
+  'Yanlış yapmaktan korkma, öyle öğreniyoruz.', 'Seni çok seviyorum.'];
+const JOKES = ['Sıfır sekize ne demiş? "Kemerin çok yakışmış!"', 'Kalem silgiye ne demiş? "Sen olmasan hatalarımla ne yapardım!"',
+  'Matematik kitabı neden üzgünmüş? Çünkü çok problemi varmış.', 'Temel neden merdivenle okula gitmiş? Sınıf atlamak için!',
+  'Bilgisayar neden üşümüş? Pencereleri açık kalmış!', 'Ödev neden kaçmış? Yapılmak istememiş… ama sen onu yakaladın!'];
+function messageBox() {
+  const kid = state.student;
+  const others = (state.students || []).filter((s) => s.id !== kid.id);
+  let sig = '';
+  try { sig = localStorage.getItem('defter.signature') || ''; } catch (e) { /* önemli değil */ }
+  const body = h('textarea', { id: 'msg-body', rows: 3, maxlength: 500, placeholder: `${kid.display_name} uygulamayı açınca görecek. Tatlı bir söz ya da bir şaka…` });
+  const signature = h('input', { id: 'msg-sign', maxlength: 40, value: sig, placeholder: 'Ör. Baban, Annen' });
+  const all = others.length ? h('input', { type: 'checkbox', id: 'msg-all' }) : null;
+  const list = h('div', { class: 'stack', style: 'gap: 6px' });
+  const idea = (arr) => { body.value = arr[Math.floor(Math.random() * arr.length)]; body.focus(); };
+
+  const loadList = async () => {
+    const rows = await q(sb.from('family_messages').select('id, body, signature, created_at, seen_at, from_id')
+      .eq('student_id', kid.id).order('created_at', { ascending: false }).limit(5));
+    fill(list, rows.length ? h('p', { class: 'label', style: 'margin-top: 6px' }, 'Son mesajlar') : null, rows.map((m) => h('div', { class: 'note small' },
+      h('div', { class: 'spread' },
+        h('span', { class: 'muted' }, new Date(m.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+          + (m.signature ? ` · ${m.signature}` : '')),
+        h('span', { class: 'tag ' + (m.seen_at ? 'green' : '') }, m.seen_at ? 'Okudu' : 'Henüz okumadı')),
+      h('p', { style: 'margin-top: 4px; white-space: pre-wrap' }, m.body),
+      !m.seen_at && m.from_id === state.profile.id ? h('button', { class: 'ghost small', onclick: async () => {
+        try { await q(sb.from('family_messages').delete().eq('id', m.id)); } catch (e) { return toast('Geri alınamadı.'); }
+        loadList();
+      } }, 'Geri al') : null)));
+  };
+
+  const send = h('button', { class: 'primary block', onclick: async () => {
+    const text = body.value.trim();
+    if (!text) return toast('Önce bir mesaj yaz.');
+    const targets = all?.checked ? [kid, ...others] : [kid];
+    send.disabled = true;
+    try {
+      await q(sb.from('family_messages').insert(targets.map((s) => ({ student_id: s.id, from_id: state.profile.id, signature: signature.value.trim(), body: text }))));
+    } catch (e) { send.disabled = false; return toast('Gönderilemedi, tekrar dene.'); }
+    try { localStorage.setItem('defter.signature', signature.value.trim()); } catch (e) { /* önemli değil */ }
+    send.disabled = false;
+    body.value = '';
+    toast(targets.length > 1 ? 'Hepsine gönderildi.' : 'Gönderildi.');
+    loadList();
+  } }, 'Gönder');
+
+  loadList().catch(() => {});
+  return h('section', { class: 'card stack', style: 'gap: 8px' },
+    h('h2', {}, `${toName(kid.display_name)} mesaj bırak`),
+    h('p', { class: 'small muted' }, 'Uygulamayı açınca ana sayfasında görür; "Okudum" deyince kapanır.'),
+    body,
+    h('div', { class: 'chips' },
+      h('button', { class: 'chip', onclick: () => idea(SWEET_LINES) }, 'Tatlı bir söz'),
+      h('button', { class: 'chip', onclick: () => idea(JOKES) }, 'Bir şaka')),
+    h('label', { class: 'field' }, 'İmza', signature),
+    all ? h('label', { class: 'row small', for: 'msg-all' }, all, 'Bütün çocuklara gönder') : null,
+    send, list);
 }
 
 // Rapordaki ve öğrenci ana sayfasındaki özet kartı; liste ayrı sayfada açılır.
@@ -2144,7 +2268,7 @@ async function viewReport() {
       h('p', { class: 'label' }, isTeacherView() ? 'Öğretmen görünümü' : 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
-    tiles, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
+    tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
     h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
 }
