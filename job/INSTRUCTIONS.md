@@ -48,8 +48,9 @@ Standard LGS order (a branş or school exam may differ; follow the booklet):
 Sözel: Türkçe 1–20, İnkılap Tarihi 1–10, Din Kültürü 1–10, İngilizce 1–10.
 Sayısal: Matematik 1–20, Fen Bilimleri 1–20. Choices are A–D.
 
-1. Read the answer key (`cevap_anahtari` photos). The key is optional in the app. If there is no
-   key photo, look for it on the last booklet pages first. If there is none, solve every question
+1. Find the answer key. The app no longer asks for an answer key photo (older uploads may still
+   have `cevap_anahtari` photos; use them when present). Look for the key on the last booklet pages
+   first. If there is none, solve every question
    yourself, twice by independent routes; where the two disagree or you are not sure, do not mark
    the student wrong (record `outcome` from your best answer only when confident, otherwise skip
    the question) and say in `result_note` that the deneme was graded without an answer key.
@@ -155,6 +156,10 @@ Each row is one student's gap. Using everything known about that student's mista
 - `tutor_note`: for the private tutor: what exactly the student gets wrong (with evidence), which
   sub-skills to rebuild, two or three concrete exercise types. Reviews answered wrong with
   `confidence` 75 or 100 are the strongest evidence of a misconception; name them first.
+  Reviews with `needs_help = true` (she skipped with "Bunu birlikte bakalım": `answer` is null) or
+  `understood = false` (wrong, then said she didn't understand the solution) show where she is lost.
+  List those questions for the tutor as "birlikte çözülecek" and say what step she likely misses.
+  `confidence` 25 means she guessed, even when `correct` is true.
 - `youtube_query`: a search phrase like `LGS 8. sınıf <konu adı> konu anlatımı` (use the grade).
 
 Then clear gaps that have recovered:

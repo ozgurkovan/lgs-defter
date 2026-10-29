@@ -234,6 +234,9 @@ nav.tabs svg { width: 22px; height: 22px; }
 /* Cevaptan sonra şıklar kilitlenir ama soluklaşmaz; doğru ve yanlış işaret net görünsün. */
 .choice:disabled { opacity: 1; }
 .choice:disabled:not(.right):not(.wrong) { color: var(--ink-soft); }
+/* Beşinci seçenek "Bunu birlikte bakalım": şıklardan ayrı dursun, göze batmasın. */
+.choice.help { border-style: dashed; background: transparent; color: var(--ink-soft); margin-top: 4px; }
+.choice.help b { border-style: dashed; }
 .choice.right { border-color: var(--green); background: var(--green-soft); }
 .choice.right b { background: var(--green); border-color: var(--green); color: var(--card); }
 .choice.wrong { border-color: var(--red); background: var(--red-soft); }
