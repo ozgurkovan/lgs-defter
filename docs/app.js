@@ -280,8 +280,41 @@ window.addEventListener('beforeunload', (e) => {
   if (leaveGuard?.()) { e.preventDefault(); e.returnValue = ''; }
 });
 
+/* Kendini güncelleme: yeni sürüm yayınlanınca Ctrl+F5 gerekmesin. Uygulama version.json'u ara ara okur;
+   daha yeni bir sürüm varsa, kaybolacak bir şey yokken (soru çözerken, fotoğraf gönderilmemişken,
+   şifre yenilerken değil) sayfayı yeni sürüm adresiyle yeniden açar. Adresteki ?v= önbelleği atlatır.
+   Sürüm, index.html'deki app.js?v= numarasıdır; ikisini tools/bump-version.mjs birlikte artırır. */
+const APP_VERSION = +new URL(document.currentScript?.src || location.href).searchParams.get('v') || 0;
+async function checkForUpdate() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const { v } = await res.json();
+    if (+v > APP_VERSION) state.updateReady = +v;
+  } catch (e) { /* çevrimdışı ya da dosya yok: sonra tekrar bakılır */ }
+}
+function applyUpdate(nextTab) {
+  const v = state.updateReady;
+  if (!v || state.session || state.inRecovery || leaveGuard?.()) return false;
+  // Aynı sürüm için bir kez dener: önbellek yine eskiyi verirse döngüye girmesin.
+  try {
+    if (sessionStorage.getItem('defter.updateTried') === String(v)) return false;
+    sessionStorage.setItem('defter.updateTried', String(v));
+    if (nextTab) sessionStorage.setItem('defter.resumeTab', nextTab);
+  } catch (e) { return false; }
+  location.replace(`${location.pathname}?v=${v}`);
+  return true;
+}
+// Uygulamaya geri dönünce, salt okunur bir sayfadaysa hemen yenilenir; diğer sayfalarda bir sonraki geçişte.
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible') return;
+  await checkForUpdate();
+  if (['home', 'report', 'questions', 'together', 'topics'].includes(state.tab)) applyUpdate(state.tab);
+});
+setInterval(checkForUpdate, 5 * 60 * 1000);
+
 function go(tab) {
   if (!confirmLeave()) return;
+  if (applyUpdate(tab)) return;
   state.tab = tab;
   state.session = null;
   window.scrollTo(0, 0);
@@ -320,7 +353,12 @@ async function start() {
         : 'Hesabınız henüz bir öğrenciye bağlanmamış.'),
       h('button', { onclick: signOut }, 'Çıkış yap')));
   }
-  go(profile.role === 'student' ? 'home' : 'report');
+  // Kendini güncellemeden sonra, kullanıcının gitmek istediği sayfaya devam edilir.
+  let resume = null;
+  try { resume = sessionStorage.getItem('defter.resumeTab'); sessionStorage.removeItem('defter.resumeTab'); } catch (e) { /* önemli değil */ }
+  const allowed = profile.role === 'student' ? ['home', 'upload', 'topics', 'settings', 'reasons', 'together']
+    : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together'];
+  go(allowed.includes(resume) ? resume : profile.role === 'student' ? 'home' : 'report');
 }
 
 async function loadStudents() {
@@ -2181,6 +2219,10 @@ function splitBar(label, counts) {
 }
 
 // ---------------------------------------------------------------- başlat
+
+// Kendini güncellemeden gelinmişse adresteki ?v= temizlenir (giriş bağlantılarının #... kısmına dokunulmaz).
+if (/[?&]v=\d+/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
+checkForUpdate();
 
 // Süresi dolmuş ya da kullanılmış bir giriş/sıfırlama bağlantısı açılırsa adres hatayla gelir.
 const linkError = new URLSearchParams(location.hash.slice(1)).get('error_code');
