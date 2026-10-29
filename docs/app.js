@@ -599,18 +599,23 @@ async function buildSession(track, remaining) {
   const entries = [];
   let seconds = 0, shortage = 0, deferred = 0;
   const basePerItem = track === 'mistake' ? 1 : TOPIC_QUESTIONS_PER_REVIEW;
+  const started = new Set(); // bu oturumda en az bir maddesi alınan dersler
   for (const it of items) {
     // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur.
     const want = basePerItem + (it.support || 0);
     // Tekrar yarım kalmasın: maddenin soruları dersin kalan hakkına sığmıyorsa madde ertesi güne kalır.
-    const room = remaining[it.topics?.subject] || 0;
-    if (room < want) { deferred += want; continue; }
+    // Ama dersin hakkı bir konu tekrarından küçükse (ilkokulda Hayat Bilgisi'ne günde 4 soru gibi) o dersin
+    // günün ilk tekrarı yine tam yapılır; yoksa o dersten hiç tekrar gelmezdi.
+    const subject = it.topics?.subject;
+    const room = remaining[subject] || 0;
+    if (room < want && !(room > 0 && !started.has(subject))) { deferred += want; continue; }
     const styles = missedStyles[it.topic_id] || new Set();
     const candidates = shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id) && !used.has(p.id)))
       .sort((a, b) => overlap(b.styles, styles) - overlap(a.styles, styles));
     if (!candidates.length) { shortage++; continue; }
     const picked = pickVaried(candidates, want);
-    remaining[it.topics.subject] -= picked.length;
+    remaining[subject] -= picked.length;
+    started.add(subject);
     picked.forEach((p, i) => { used.add(p.id); entries.push({ item: it, question: p, last: i === picked.length - 1 }); });
     seconds += picked.reduce((s, p) => s + maxSeconds(p.subject) + 15, 0);
   }
