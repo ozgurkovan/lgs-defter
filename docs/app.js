@@ -977,7 +977,8 @@ function showSessionEnd() {
 }
 
 /* Birlikte bakılacaklar: "Bunu birlikte bakalım" deyip boş geçtiği, tahmin ettiği (%25) ve yanlıştan sonra
-   "anlamadım" dediği sorular. Veli birlikte baktıktan sonra işaretler (together_at); öğretmen sadece görür. */
+   "anlamadım" dediği sorular. Veli ya da o dersin öğretmeni birlikte baktıktan sonra işaretler
+   (rpc mark_together → together_at, together_by). */
 const TOGETHER_KIND = {
   help: ['Birlikte bakalım dedi', 'red'],
   notUnderstood: ['Yanlış, anlamadım dedi', 'red'],
@@ -1028,7 +1029,8 @@ function togetherBox(rows) {
 async function viewTogether() {
   loading();
   const rows = await loadTogether();
-  const canMark = state.profile.role === 'parent';
+  // Veli ve öğretmen işaretler (öğretmen sadece kendi derslerini görür ve işaretler); öğrenci işaretlemez.
+  const canMark = state.profile.role !== 'student';
   const name = state.student?.display_name || 'Öğrenci';
   const trackName = { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma' };
   render(
@@ -1037,7 +1039,7 @@ async function viewTogether() {
       h('h1', {}, 'Birlikte bakılacaklar'),
       h('p', { class: 'muted' }, isParentView()
         ? `${name} bu soruları anlamadığını söyledi ya da tahmin etti. Yanına oturup birlikte çözün, iyice anladığından emin olun.` +
-          (canMark ? ' Baktığınız soruyu "Birlikte baktık" ile listeden çıkarın.' : ' Veli birlikte baktıktan sonra listeden çıkarır.')
+          ' Baktığınız soruyu "Birlikte baktık" ile listeden çıkarın.'
         : 'Anlamadığın ya da tahmin ettiğin sorular. Velin ya da öğretmeninle birlikte üstünden geçin.')),
     rows.length ? rows.map((r) => {
       const when = h('p', { class: 'small muted' }, [trackName[r.track],
@@ -1046,7 +1048,7 @@ async function viewTogether() {
       if (canMark) {
         const btn = h('button', { class: 'block', onclick: async () => {
           btn.disabled = true;
-          try { await q(sb.from('reviews').update({ together_at: new Date().toISOString() }).eq('id', r.id)); }
+          try { await q(sb.rpc('mark_together', { rid: r.id })); }
           catch (e) { btn.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
           card.remove();
           toast('Listeden çıkarıldı.');
