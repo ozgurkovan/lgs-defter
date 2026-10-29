@@ -129,6 +129,22 @@ function fmtDuration(sec) {
   const m = Math.floor(sec / 60), s = sec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
+/* Giriş hatalarını ayırt eder: internet kopunca ekranda "şifre yanlış" yazmasın.
+   Bağlantı hatası supabase-js'te AuthRetryableFetchError olarak gelir (status 0; sunucu hatasında 5xx). */
+function isNetworkError(error) {
+  return !navigator.onLine || error?.name === 'AuthRetryableFetchError' || /failed to fetch|network|load failed/i.test(error?.message || '');
+}
+function authErrorText(error, wrongText = 'Bilgiler hatalı.') {
+  if (isNetworkError(error)) {
+    return !navigator.onLine || !error?.status
+      ? 'İnternet bağlantısı yok gibi görünüyor. Bağlantını kontrol edip tekrar dene.'
+      : 'Sunucuya şu an ulaşılamıyor. Biraz sonra tekrar dene.';
+  }
+  if (error?.status === 429) return 'Çok fazla deneme oldu. Birkaç dakika bekleyip tekrar dene.';
+  if (error?.code === 'invalid_credentials' || /invalid login credentials/i.test(error?.message || '')) return wrongText;
+  return 'Giriş yapılamadı, biraz sonra tekrar dene.';
+}
+
 function youtubeSearch(topic) {
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`LGS ${state.student?.grade || 8}. sınıf ${topic || ''} konu anlatımı`);
 }
@@ -333,7 +349,7 @@ function viewLogin() {
     e.preventDefault();
     msg.hidden = true;
     const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pass.value });
-    if (error) { msg.className = 'error'; msg.textContent = 'E-posta veya şifre yanlış.'; msg.hidden = false; return; }
+    if (error) { msg.className = 'error'; msg.textContent = authErrorText(error, 'E-posta veya şifre yanlış.'); msg.hidden = false; return; }
     start().catch((err) => render(failBox(err)));
   } },
     h('label', { class: 'field' }, 'E-posta', email),
@@ -348,8 +364,8 @@ function viewLogin() {
       forgot.disabled = true;
       const { error } = await sb.auth.resetPasswordForEmail(mail, { redirectTo: location.origin + location.pathname });
       msg.className = error ? 'error' : 'small';
-      msg.textContent = error
-        ? 'Şu an gönderilemedi (saatte en fazla 2 sıfırlama e-postası gidebiliyor). Biraz sonra tekrar dene ya da velinden yardım iste.'
+      msg.textContent = error && isNetworkError(error) ? authErrorText(error)
+        : error ? 'Şu an gönderilemedi (saatte en fazla 2 sıfırlama e-postası gidebiliyor). Biraz sonra tekrar dene ya da velinden yardım iste.'
         : 'Bu adres kayıtlıysa şifre sıfırlama bağlantısı gönderildi. E-postadaki bağlantıya dokun.';
       forgot.disabled = false;
     } }, 'Şifremi unuttum'));
@@ -371,7 +387,7 @@ function newPasswordForm(onDone) {
     if (p1.value.length < 6) { msg.textContent = 'Şifre en az 6 karakter olmalı.'; msg.hidden = false; return; }
     if (p1.value !== p2.value) { msg.textContent = 'İki şifre aynı değil.'; msg.hidden = false; return; }
     const { error } = await sb.auth.updateUser({ password: p1.value });
-    if (error) { msg.textContent = 'Şifre değiştirilemedi: ' + error.message; msg.hidden = false; return; }
+    if (error) { msg.textContent = isNetworkError(error) ? authErrorText(error) : 'Şifre değiştirilemedi: ' + error.message; msg.hidden = false; return; }
     p1.value = ''; p2.value = '';
     toast('Şifren değişti.');
     onDone();
