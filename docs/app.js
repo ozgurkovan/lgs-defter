@@ -27,6 +27,16 @@ const maxSeconds = (subject) => SUBJECTS[subject]?.sec || 90;
 // LGS kitapçık sırası: sözel oturum Türkçe, İnkılap, Din, İngilizce; sayısal oturum Matematik, Fen.
 const SUBJECT_ORDER = ['turkce', 'inkilap', 'din', 'ingilizce', 'matematik', 'fen'];
 
+// Günlük plan: derse göre günde en fazla kaç soru. Veli ayarlamadıysa günlük hedef LGS'deki
+// soru ağırlığıyla bölünür (40 → Türkçe 9, İnkılap 4, Din 4, İngilizce 4, Matematik 10, Fen 9).
+const DEFAULT_PLAN = { turkce: 9, inkilap: 4, din: 4, ingilizce: 4, matematik: 10, fen: 9 };
+function dailyPlan(p) {
+  if (p?.daily_by_subject) return Object.fromEntries(SUBJECT_ORDER.map((s) => [s, Math.max(0, +p.daily_by_subject[s] || 0)]));
+  const k = (p?.daily_questions || 40) / 40;
+  return Object.fromEntries(SUBJECT_ORDER.map((s) => [s, Math.round(DEFAULT_PLAN[s] * k)]));
+}
+const planTotal = (plan) => SUBJECT_ORDER.reduce((n, s) => n + (plan[s] || 0), 0);
+
 // Hata takibi: 1 → 2 → 4 → 14 → 30 gün. Konu tekrarı: Fibonacci, 55'te sabitlenir.
 const MISTAKE_LADDER = [1, 2, 4, 14, 30];
 const TOPIC_LADDER = [1, 3, 5, 8, 13, 21, 34, 55];
@@ -444,13 +454,13 @@ function gradeItem(item, results, lgsDate) {
 }
 
 /* Bugünün oturumunu kurar: günü gelmiş maddeler, katsayı ve gecikmeye göre sıralanır,
-   her birine daha önce hiç görülmemiş bir soru seçilir, süre bütçesine sığdırılır. */
-async function buildSession(track) {
+   her birine daha önce hiç görülmemiş bir soru seçilir. remaining derse göre bugün kalan soru
+   hakkıdır ve azaltılır; hakkı biten dersin maddeleri ertesi güne kalır (deferred). */
+async function buildSession(track, remaining) {
   const today = localDate();
-  const budgetSec = (track === 'mistake' ? state.student.mistake_minutes : state.student.topic_minutes) * 60;
   const items = await q(sb.from('items').select('*, topics(subject, name, sort)')
     .eq('student_id', sid()).eq('track', track).eq('state', 'active').lte('due_date', today));
-  if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0 };
+  if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0, deferred: 0 };
 
   const topicIds = [...new Set(items.map((i) => i.topic_id))];
   const [pool, seenRows, missRows] = await Promise.all([
@@ -474,27 +484,30 @@ async function buildSession(track) {
 
   const used = new Set();
   const entries = [];
-  let seconds = 0, shortage = 0;
+  let seconds = 0, shortage = 0, deferred = 0;
   const basePerItem = track === 'mistake' ? 1 : TOPIC_QUESTIONS_PER_REVIEW;
   for (const it of items) {
+    // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur.
+    const want = basePerItem + (it.support || 0);
+    const room = remaining[it.topics?.subject] || 0;
+    if (room <= 0) { deferred += want; continue; }
     const styles = missedStyles[it.topic_id] || new Set();
     const candidates = shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id) && !used.has(p.id)))
       .sort((a, b) => overlap(b.styles, styles) - overlap(a.styles, styles));
     if (!candidates.length) { shortage++; continue; }
-    // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur.
-    const picked = pickVaried(candidates, basePerItem + (it.support || 0));
-    const cost = picked.reduce((s, p) => s + maxSeconds(p.subject) + 15, 0);
-    if (entries.length && seconds + cost > budgetSec) break;
+    const picked = pickVaried(candidates, Math.min(want, room));
+    remaining[it.topics.subject] -= picked.length;
+    if (picked.length < want && picked.length === room) deferred += want - picked.length;
     picked.forEach((p, i) => { used.add(p.id); entries.push({ item: it, question: p, last: i === picked.length - 1 }); });
-    seconds += cost;
+    seconds += picked.reduce((s, p) => s + maxSeconds(p.subject) + 15, 0);
   }
-  return { entries, shortage, seconds, dueCount: items.length };
+  return { entries, shortage, seconds, dueCount: items.length, deferred };
 }
-/* Ek çalışma: günü gelen tekrarlar günlük hedef soru sayısını doldurmuyorsa açığı kapatır.
+/* Ek çalışma: günü gelen tekrarlar bir dersin günlük sayısını doldurmuyorsa açığı kapatır.
    Takipteki konulardan en zayıf olanlardan başlar, her konudan sırayla görülmemiş bir soru alır.
    Takvimi bozmaz: sadece yanlış yapılan konunun tekrarı yarına çekilir. */
-async function buildExtra(n, exclude) {
-  if (n <= 0) return { entries: [], seconds: 0 };
+async function buildExtra(remaining, exclude) {
+  if (!SUBJECT_ORDER.some((s) => remaining[s] > 0)) return { entries: [], seconds: 0 };
   const today = localDate();
   const items = await q(sb.from('items').select('*, topics(subject, name, sort)')
     .eq('student_id', sid()).eq('track', 'topic').eq('state', 'active').gt('due_date', today));
@@ -509,11 +522,12 @@ async function buildExtra(n, exclude) {
   const queues = items.map((it) => ({ it, cands: shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id))) }));
   const entries = [];
   let seconds = 0;
-  while (entries.length < n && queues.some((x) => x.cands.length)) {
+  const open = (x) => x.cands.length && remaining[x.it.topics?.subject] > 0;
+  while (queues.some(open)) {
     for (const x of queues) {
-      if (entries.length >= n) break;
+      if (!open(x)) continue;
       const p = x.cands.shift();
-      if (!p) continue;
+      remaining[x.it.topics.subject]--;
       entries.push({ item: x.it, question: p, last: false, extra: true });
       seconds += maxSeconds(p.subject) + 15;
     }
@@ -551,24 +565,25 @@ function examOrder(entries) {
 
 async function viewHome() {
   loading();
-  const [mistake, topic, reasons, subs] = await Promise.all([
-    buildSession('mistake'),
-    buildSession('topic'),
+  const [todayCount, reasons, subs, replies] = await Promise.all([
+    q(sb.from('reviews').select('id, track, correct, questions(subject)').eq('student_id', sid()).eq('voided', false).gte('answered_at', localDate() + 'T00:00:00')),
     q(sb.from('exam_questions').select('id').eq('student_id', sid()).neq('outcome', 'dogru')
       .is('student_reason', null).not('diagnosis_cause', 'is', null)),
     q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name)')
       .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(4)),
-  ]);
-  const [todayCount, replies] = await Promise.all([
-    q(sb.from('reviews').select('id, track, correct').eq('student_id', sid()).eq('voided', false).gte('answered_at', localDate() + 'T00:00:00')),
     q(sb.from('question_feedback').select('id, kind, verdict, response, questions(stem, subject)')
       .eq('student_id', sid()).not('response', 'is', null).eq('response_seen', false).order('checked_at')),
   ]);
-  // Günlük hedef: tekrarlar hedefi doldurmuyorsa açık ek çalışmayla kapatılır.
-  const dailyTarget = state.student.daily_questions || 40;
+  // Günlük plan derse göre soru sayısıdır. Önce hata tekrarları, sonra konu tekrarları hakkı kullanır;
+  // kalan hak ek çalışmayla dolar.
+  const plan = dailyPlan(state.student);
+  const dailyTarget = planTotal(plan);
+  const remaining = { ...plan };
+  todayCount.forEach((r) => { const s = r.questions?.subject; if (s in remaining) remaining[s]--; });
+  const mistake = await buildSession('mistake', remaining);
+  const topic = await buildSession('topic', remaining);
   const dueNow = mistake.entries.length + topic.entries.length;
-  const extra = await buildExtra(dailyTarget - todayCount.length - dueNow,
-    [...mistake.entries, ...topic.entries].map((e) => e.question.id));
+  const extra = await buildExtra(remaining, [...mistake.entries, ...topic.entries].map((e) => e.question.id));
   state.cache = { mistake, topic, extra };
 
   const hour = new Date().getHours();
@@ -585,7 +600,8 @@ async function viewHome() {
         ? [h('div', { class: 'row' }, h('span', { class: 'big num' }, n), h('span', { class: 'muted' }, `soru · yaklaşık ${Math.max(1, Math.round(s.seconds / 60))} dakika`)),
            h('button', { class: 'primary block', onclick: () => runSession(track, s) }, 'Başla')]
         : h('p', { class: 'muted' }, doneToday ? 'Bugünlük bu kadar. Aferin.' : 'Bugün tekrar edilecek soru yok.'),
-      s.shortage ? h('p', { class: 'small muted' }, `${s.shortage} konu için yeni soru hazırlanıyor, yarın gelecek.`) : null);
+      s.shortage ? h('p', { class: 'small muted' }, `${s.shortage} konu için yeni soru hazırlanıyor, yarın gelecek.`) : null,
+      s.deferred ? h('p', { class: 'small muted' }, `${s.deferred} soru günlük sınıra takıldı, yarın gelecek.`) : null);
   };
 
   render(
@@ -1302,28 +1318,24 @@ function viewSettings() {
   const role = state.profile.role;
   const isParent = role === 'parent';
   const showStudent = p && role !== 'teacher';
-  const mm = p && h('input', { id: 'mistake-min', type: 'number', min: 5, max: 120, step: 5, value: p.mistake_minutes, inputmode: 'numeric' });
-  const tm = p && h('input', { id: 'topic-min', type: 'number', min: 5, max: 180, step: 5, value: p.topic_minutes, inputmode: 'numeric' });
   const lgs = p && h('input', { id: 'lgs-date', type: 'date', value: p.lgs_date });
-  const daily = p && h('input', { id: 'daily-questions', type: 'number', min: 5, max: 200, step: 5, value: p.daily_questions || 40, inputmode: 'numeric' });
   const grade = p && h('select', { id: 'grade' }, [5, 6, 7, 8].map((g) => h('option', { value: g, selected: g === p.grade }, `${g}. sınıf`)));
+  const plan = p && dailyPlan(p);
   render(
     h('header', {}, h('h1', {}, isParent && p ? `Ayarlar · ${p.display_name}` : 'Ayarlar')),
+    isParent && p ? planSection(p) : null,
     isParent ? familySection() : null,
     showStudent && h('section', { class: 'card' },
       isParent ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
-      h('label', { class: 'field' }, 'Günlük hedef soru sayısı', daily),
-      h('p', { class: 'small muted' }, 'Tekrarlar bu sayıya ulaşmazsa açık, en zayıf konulardan ek çalışmayla tamamlanır.'),
-      h('label', { class: 'field' }, 'Hata tekrarı için günlük süre (dakika)', mm),
-      h('label', { class: 'field' }, 'Konu tekrarı için günlük üst sınır (dakika)', tm),
       h('label', { class: 'field' }, 'LGS tarihi', lgs),
+      // Günlük plan veli ayarıdır; öğrenci sadece görür (veritabanı da öğrencinin değiştirmesine izin vermez).
+      !isParent ? h('div', { class: 'stack', style: 'gap: 4px' },
+        h('p', { class: 'label' }, `Günlük plan · ${planTotal(plan)} soru`),
+        h('p', { class: 'small muted' }, SUBJECT_ORDER.filter((s) => plan[s]).map((s) => `${SUBJECTS[s].name} ${plan[s]}`).join(' · ')),
+        h('p', { class: 'small muted' }, 'Bu sayıları velin ayarlıyor.')) : null,
       h('button', { class: 'primary block', onclick: async () => {
-        const upd = {
-          mistake_minutes: +mm.value || 30, topic_minutes: +tm.value || 60, lgs_date: lgs.value || p.lgs_date,
-          daily_questions: Math.min(200, Math.max(5, +daily.value || 40)),
-        };
+        const upd = { lgs_date: lgs.value || p.lgs_date };
         if (isParent) upd.grade = +grade.value;
-        // Süreler öğrencinin profilinde tutulur; veli de oradan değiştirir.
         await q(sb.from('profiles').update(upd).eq('id', p.id));
         Object.assign(p, upd);
         toast('Kaydedildi.');
@@ -1335,6 +1347,85 @@ function viewSettings() {
     h('section', { class: 'card' },
       h('p', { class: 'small muted' }, 'Ana ekrana eklemek için: Safari’de paylaş düğmesi → “Ana Ekrana Ekle”.'),
       h('button', { class: 'block', onclick: signOut }, 'Çıkış yap')));
+}
+
+// Süreyi "52 dk" ya da "4 sa 10 dk" yazar.
+function fmtMinutes(sec) {
+  const m = Math.round(sec / 60);
+  return m < 60 ? `${m} dk` : `${Math.floor(m / 60)} sa${m % 60 ? ` ${m % 60} dk` : ''}`;
+}
+
+/* Velinin günlük plan kartı: derse göre günlük soru sayısı, öğrencinin harcadığı süre (bugün ve son 7 gün)
+   ve bugün biriken hata tekrarları. Bir dersin hata tekrarı sayısı sınırı aşarsa uyarır: aşan kısım
+   ertesi güne kalır, sınır en az o kadar olmalı. */
+function planSection(p) {
+  const plan = dailyPlan(p);
+  const box = h('section', { class: 'card stack' }, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yükleniyor…'));
+  (async () => {
+    const today = localDate();
+    const [rows, due] = await Promise.all([
+      q(sb.from('reviews').select('duration_sec, answered_at, questions(subject)').eq('student_id', p.id).eq('voided', false)
+        .gte('answered_at', addDays(today, -6) + 'T00:00:00')),
+      q(sb.from('items').select('support, topics(subject)').eq('student_id', p.id).eq('track', 'mistake').eq('state', 'active').lte('due_date', today)),
+    ]);
+    const stat = Object.fromEntries(SUBJECT_ORDER.map((s) => [s, { n: 0, sec: 0, week: 0, due: 0 }]));
+    for (const r of rows) {
+      const st = stat[r.questions?.subject];
+      if (!st) continue;
+      st.week += r.duration_sec || 0;
+      if (localDate(new Date(r.answered_at)) === today) { st.n++; st.sec += r.duration_sec || 0; }
+    }
+    for (const it of due) { const st = stat[it.topics?.subject]; if (st) st.due += 1 + (it.support || 0); }
+    const sum = (k) => SUBJECT_ORDER.reduce((a, s) => a + stat[s][k], 0);
+    const days = new Set(rows.map((r) => localDate(new Date(r.answered_at)))).size;
+
+    const inputs = {}, checks = [];
+    const totalLine = h('p', { class: 'small muted num' });
+    const update = () => {
+      checks.forEach((c) => c());
+      const total = SUBJECT_ORDER.reduce((a, s) => a + (+inputs[s].value || 0), 0);
+      const maxSec = SUBJECT_ORDER.reduce((a, s) => a + (+inputs[s].value || 0) * maxSeconds(s), 0);
+      totalLine.textContent = `Toplam günde ${total} soru · LGS süreleriyle en fazla ${fmtMinutes(maxSec)}`;
+    };
+    const rowsEl = SUBJECT_ORDER.map((s) => {
+      const st = stat[s];
+      const input = inputs[s] = h('input', { type: 'number', min: 0, max: 60, value: plan[s], inputmode: 'numeric',
+        'aria-label': `${SUBJECTS[s].name} günlük soru sayısı`, style: 'width: 76px' });
+      input.addEventListener('input', update);
+      const warn = h('p', { class: 'small', style: 'color: var(--red)' });
+      checks.push(() => {
+        const limit = +input.value || 0;
+        warn.hidden = st.due <= limit;
+        fill(warn, st.due > limit ? [`Bugün ${st.due} hata tekrarı sorusu birikti, sınır ${limit}. Fazlası yarına kalır. `,
+          h('button', { class: 'ghost small', onclick: () => { input.value = st.due; update(); } }, `${st.due} yap`)] : null);
+      });
+      return h('div', { class: 'stack', style: 'gap: 4px; padding: 8px 0; border-top: 1px solid var(--rule)' },
+        h('div', { class: 'spread' }, subjTag(s), input),
+        h('p', { class: 'small muted num' }, `Bugün ${st.n} soru · ${fmtMinutes(st.sec)} · son 7 gün ${fmtMinutes(st.week)}`
+          + (st.due ? ` · bugün ${st.due} hata tekrarı` : '')),
+        warn);
+    });
+    const save = h('button', { class: 'primary block', onclick: async () => {
+      const by = Object.fromEntries(SUBJECT_ORDER.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
+      if (!planTotal(by)) return toast('En az bir derse soru ver.');
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by) };
+      save.disabled = true;
+      try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
+      save.disabled = false;
+      Object.assign(p, upd);
+      SUBJECT_ORDER.forEach((s) => { inputs[s].value = by[s]; });
+      update();
+      toast('Kaydedildi. Yeni sayılar bugünden geçerli.');
+    } }, 'Kaydet');
+    update();
+    fill(box,
+      h('p', { class: 'label' }, 'Günlük plan'),
+      h('p', {}, `Bugün ${sum('n')} soru çözdü, ${fmtMinutes(sum('sec'))}. Son 7 günde ${fmtMinutes(sum('week'))}`
+        + (days ? `, çalıştığı ${days} günde ortalama ${fmtMinutes(sum('week') / days)}.` : '.')),
+      h('p', { class: 'small muted' }, 'Her dersten günde en fazla kaç soru gelsin? Önce hata tekrarları, sonra konu tekrarları gelir; kalan sayı en zayıf konulardan ek çalışmayla dolar. Süre, soruyu açtığı andan şıkkı seçtiği ana kadar ölçülür.'),
+      rowsEl, totalLine, save);
+  })().catch(() => fill(box, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yüklenemedi, sayfayı yenile.')));
+  return box;
 }
 
 // ---------------------------------------------------------------- aile yönetimi (veli)

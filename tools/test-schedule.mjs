@@ -12,9 +12,9 @@ const code = [
   pick('function localDate', 'function fmtDate'),
   pick('function gradeItem', '/* Bugünün oturumunu'),
   pick('/* Sorular sınavdaki gibi', '// ---------------------------------------------------------------- öğrenci: bugün'),
-  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder };',
+  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal };',
 ].join('\n');
-const { gradeItem, localDate, addDays, SUBJECTS, examOrder } = new Function(code)();
+const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal } = new Function(code)();
 
 // Soru süreleri LGS oturum sürelerine eşit olmalı: sözel 50 soru / 75 dk, sayısal 40 soru / 80 dk.
 const counts = { turkce: 20, inkilap: 10, din: 10, ingilizce: 10, matematik: 20, fen: 20 };
@@ -85,5 +85,9 @@ const mixed = [e('fen', 2, 'f2'), e('turkce', 5, 't5'), e('matematik', 1, 'm1'),
   e('ingilizce', 1, 'i1'), e('turkce', 2, 't2'), e('din', 1, 'd1'), e('inkilap', 3, 'k3')];
 const ordered = examOrder(mixed).map((x) => x.question.id).join(' ');
 check('sınav sırasıyla gruplama', ordered === 't2 t5 k3 d1 i1 m1 f1a f1b f2', ordered);
+
+// Varsayılan günlük plan 40 soruyu LGS ağırlığıyla böler; velinin planı varsa o kullanılır.
+check('varsayılan plan 40 soru', planTotal(dailyPlan({ daily_questions: 40 })) === 40, JSON.stringify(dailyPlan({})));
+check('velinin planı', dailyPlan({ daily_by_subject: { matematik: 15 } }).matematik === 15 && dailyPlan({ daily_by_subject: { matematik: 15 } }).fen === 0);
 
 process.exit(fails ? 1 : 0);
