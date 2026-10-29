@@ -133,6 +133,18 @@ Türkçe 120 s, İnkılap 75 s, Din 60 s, İngilizce 75 s (sözel: 50 questions 
 Matematik 150 s, Fen 90 s (sayısal: 40 questions / 80 min). Write questions that a well-prepared
 student can solve within that time; LGS questions are long to read, not long to compute.
 
+## 1b2. Mock exams taken in the app (every run)
+
+Students can now take timed mock exams inside the app (`exams.kind = 'uygulama'`: a real LGS paper
+from `booklet`, or a mixed exam from the pool). The app already wrote `exam_results`, one
+`exam_questions` row per question (with `question_id`, `student_answer`, `outcome`, `marked_guess`,
+`time_sec`), the `reviews` and the `mistake` items. What is left for you: every `yanlis` or `bos` row
+with `diagnosis_cause` still empty
+(`exam_questions?select=*,exams!inner(kind),questions!exam_questions_question_id_fkey(*)&exams.kind=eq.uygulama&outcome=neq.dogru&diagnosis_cause=is.null`)
+gets `diagnosis_cause`, `diagnosis_text` and `misconception` exactly as in 1a (no scratch work here,
+but you have the chosen distractor, the T mark and the time spent against the subject's time).
+That is what puts the "nedenlerini seç" task on the student's home screen. Update topic gaps the same way.
+
 ## 1c. Similar questions for mistakes (every run, before section 2)
 
 Every wrong answer becomes a `mistake` item: deneme mistakes carry `exam_question_id`, and wrong answers
