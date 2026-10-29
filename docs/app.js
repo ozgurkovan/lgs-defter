@@ -129,6 +129,9 @@ function fmtDuration(sec) {
   const m = Math.floor(sec / 60), s = sec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
+function youtubeSearch(topic) {
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`LGS ${state.student?.grade || 8}. sınıf ${topic || ''} konu anlatımı`);
+}
 function subjTag(subject, text) {
   return h('span', { class: 'tag', style: `--subj: var(--c-${subject})` }, text || SUBJECTS[subject]?.name || subject);
 }
@@ -721,7 +724,7 @@ function showQuestion() {
   } }, 'İpucu göster') : null;
 
   // Geri bildirim için: bu sorunun kaydı ve takvim değişmeden önceki hali.
-  let answered = false, reviewId = null, gradePromise = null, prevItem = null, myResult = null;
+  let answered = false, reviewId = null, reviewSaved = null, gradePromise = null, prevItem = null, myResult = null;
   const itemSnapshot = () => ({
     step: item.step, ease: item.ease, consecutive_wrong: item.consecutive_wrong, interval_days: item.interval_days,
     due_date: item.due_date, state: item.state, last_reviewed_at: item.last_reviewed_at, note: item.note,
@@ -754,20 +757,37 @@ function showQuestion() {
       : correct && confidence <= 50 ? 'Doğru, ama tahmine yakındı. Bu konuyu farklı sorularla biraz daha göreceğiz.'
       : correct && overTime ? `Doğru, ama ${fmtDuration(duration)} sürdü. LGS'de ${SUBJECTS[subject].name} sorusuna en fazla ${fmtDuration(target)} ayırabilirsin; bu konuyu biraz daha hızlandıracağız.`
       : null;
+    // Yanlışta kendi beyanı istenir (isteğe bağlı): veli raporunda "yanlışı anladı mı?" sorusunu cevaplar.
+    // "Anlamadım" derse konu anlatımı bağlantısı açılır.
+    let understoodRow = null;
+    if (!correct) {
+      const yt = h('a', { class: 'btn', hidden: true, href: youtubeSearch(item.topics?.name || SUBJECTS[subject]?.name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı');
+      const btns = [[true, 'Anladım'], [false, 'Anlamadım']].map(([v, label]) => h('button', { class: 'chip', 'aria-pressed': 'false', onclick: async (e) => {
+        btns.forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
+        yt.hidden = v;
+        try {
+          await reviewSaved;
+          await q(sb.from('reviews').update({ understood: v }).eq('id', reviewId));
+        } catch (err) { toast('Kaydedilemedi, tekrar dene.'); }
+      } }, label));
+      understoodRow = h('div', { class: 'stack', style: 'gap: 6px' }, h('p', { class: 'small muted' }, 'Çözümü anladın mı?'), h('div', { class: 'chips' }, btns), yt);
+    }
     fill(feedback,
       h('p', { class: 'verdict ' + (correct ? 'ok' : 'no') }, correct ? 'Doğru' : `Yanlış. Doğru cevap ${question.answer}.`),
       coachNote ? h('p', { class: 'small' }, coachNote) : null,
       question.solution ? h('div', { class: 'note teacher' }, question.solution) : null,
+      understoodRow,
       h('button', { class: 'primary block', onclick: () => { ss.index++; showQuestion(); } },
         ss.index + 1 < ss.entries.length ? 'Sonraki soru' : 'Bitir'));
     feedback.hidden = false;
     feedback.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     try {
-      const rv = await q(sb.from('reviews').insert({
+      reviewSaved = q(sb.from('reviews').insert({
         student_id: sid(), item_id: item.id, question_id: question.id, track: entry.extra ? 'extra' : item.track, answer: selected,
         correct, duration_sec: duration, confident, confidence, hint_used: hintUsed,
       }).select('id').single());
+      const rv = await reviewSaved;
       reviewId = rv.id;
       if (entry.extra) {
         // Ek çalışmada yanlış: konunun tekrarı yarına çekilir ve destek sorusu eklenir.
@@ -1677,7 +1697,8 @@ async function viewReport() {
     q(sb.from('topics').select('*').eq('grade', state.student.grade)),
     q(sb.from('topic_status').select('*').eq('student_id', s)),
     q(sb.from('items').select('*').eq('student_id', s)),
-    q(sb.from('reviews').select('track, correct, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, topic_id)').eq('student_id', s).eq('voided', false).gte('answered_at', addDays(localDate(), -30))),
+    q(sb.from('reviews').select('id, item_id, question_id, track, answer, correct, understood, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, topic_id)')
+      .eq('student_id', s).eq('voided', false).gte('answered_at', addDays(localDate(), -30))),
     q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name)').or(`student_id.eq.${s},student_id.is.null`).neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
     q(sb.from('job_runs').select('*').order('started_at', { ascending: false }).limit(1)),
   ]);
@@ -1695,7 +1716,7 @@ async function viewReport() {
   const gaps = statuses.filter((s) => s.status === 'gap');
   const settled = items.filter((i) => i.track === 'topic' && i.step >= 4).length;
   const today = localDate();
-  const reviewedToday = reviews.filter((r) => r.answered_at.slice(0, 10) === today).length;
+  const reviewedToday = reviews.filter((r) => localDate(new Date(r.answered_at)) === today).length;
 
   const tiles = h('div', { class: 'tiles' },
     tile('Son deneme neti', last ? net(lastRes).toFixed(2).replace('.', ',') : '–', last ? last.name : 'Henüz deneme yok'),
@@ -1794,8 +1815,7 @@ async function viewReport() {
     .filter(([id, t]) => topicName[id] && !gapIds.has(id) && t.n >= 3 && (t.ok / t.n < 0.75 || t.sureWrong > 0))
     .sort((a, b) => a[1].ok / a[1].n - b[1].ok / b[1].n)
     .slice(0, 10);
-  const youtube = (name) => 'https://www.youtube.com/results?search_query=' +
-    encodeURIComponent(`LGS ${state.student.grade}. sınıf ${name} konu anlatımı`);
+  const youtube = youtubeSearch;
   const weakCards = h('section', { class: 'stack' },
     h('h2', {}, 'Zayıf konular'),
     h('p', { class: 'small muted' }, 'Son 30 günün tekrarları ve denemeler. Başarısı %75’in altında olan ya da emin olduğu hâlde yanlış yaptığı konular.'),
@@ -1866,8 +1886,132 @@ async function viewReport() {
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, isTeacherView() ? 'Öğretmen görünümü' : 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
       h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)),
-    tiles, h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
+    tiles, dayReport(reviews30, items, topicName),
+    h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
+}
+
+/* Gün gün çalışma (son 30 gün): seçili günde konu konu kaç soru, kaçı doğru, kaçı yanlış, ne kadar sürdü.
+   Her yanlış için "anladı mı?": kendi beyanı ve aynı konudan sonra çözdüğü sorulardaki sonuç.
+   Tahminle (emin değilken) doğru cevap anlamış sayılmaz. */
+function dayReport(reviews, items, topicName) {
+  const box = h('section', { class: 'card stack' });
+  const today = localDate();
+  const dayOf = (r) => localDate(new Date(r.answered_at));
+  const byTime = (a, b) => (a.answered_at < b.answered_at ? -1 : 1);
+  const itemById = Object.fromEntries(items.map((i) => [i.id, i]));
+  const solid = (r) => r.correct && !(r.confidence && r.confidence <= 50);
+  const trackName = { mistake: 'hata tekrarı', topic: 'konu tekrarı', extra: 'ek çalışma' };
+  let day = today;
+
+  const verdictFor = (r) => {
+    const later = reviews.filter((x) => x.questions?.topic_id === r.questions?.topic_id && x.answered_at > r.answered_at);
+    const ok = later.filter(solid).length;
+    if (!later.length) return r.understood === false ? ['Anlamadım dedi', 'red', 'Bu konudan henüz yeni soru çözmedi.']
+      : [r.understood ? 'Anladım dedi, henüz sınanmadı' : 'Henüz belli değil', 'amber', 'Bu konudan henüz yeni soru çözmedi.'];
+    const detail = `Sonra bu konudan ${later.length} soru çözdü: ${ok} doğru` + (later.length - ok ? `, ${later.length - ok} yanlış ya da tahmin.` : '.');
+    if (ok === later.length) return ['Anlamış görünüyor', 'green', detail];
+    return ok ? ['Kısmen oturdu', 'amber', detail] : ['Hâlâ zorlanıyor', 'red', detail];
+  };
+
+  // Soru metni sadece açılınca yüklenir.
+  const questionDetails = (r) => {
+    const body = h('div', { class: 'stack', style: 'gap: 4px; margin-top: 6px' }, h('p', { class: 'small muted' }, 'Yükleniyor…'));
+    const d = h('details', {}, h('summary', { class: 'small' }, 'Soruyu göster'), body);
+    d.addEventListener('toggle', async () => {
+      if (!d.open || d.dataset.loaded) return;
+      d.dataset.loaded = '1';
+      try {
+        const qn = await q(sb.from('questions').select('stem, choices, answer, solution, image_path').eq('id', r.question_id).single());
+        fill(body,
+          qn.image_path ? lazyImg('questions', qn.image_path) : null,
+          qn.stem ? h('p', { class: 'stem small' }, qn.stem) : null,
+          ['A', 'B', 'C', 'D'].filter((k) => qn.choices?.[k] !== undefined).map((k) =>
+            h('div', { class: 'opt small' + (k === qn.answer ? ' right' : k === r.answer ? ' wrong' : '') },
+              h('b', {}, k), h('span', {}, qn.choices[k]), k === r.answer ? h('span', { class: 'muted' }, ' ← seçimi') : null)),
+          qn.solution ? h('div', { class: 'note small' }, qn.solution) : null);
+      } catch (e) {
+        delete d.dataset.loaded;
+        fill(body, h('p', { class: 'small muted' }, 'Soru yüklenemedi.'));
+      }
+    });
+    return d;
+  };
+
+  const draw = () => {
+    const rows = reviews.filter((r) => dayOf(r) === day).sort(byTime);
+    const days = [...new Set(reviews.map(dayOf))].sort();
+    const prev = days.filter((d) => d < day).pop();
+    const next = days.find((d) => d > day) || today;
+    const label = day === today ? 'Bugün' : day === addDays(today, -1) ? 'Dün'
+      : parseDay(day).toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const nav = h('div', { class: 'spread' },
+      h('button', { class: 'ghost small', disabled: !prev || null, onclick: () => { day = prev; draw(); } }, '‹ Önceki'),
+      h('b', {}, label),
+      h('button', { class: 'ghost small', disabled: day === today || null, onclick: () => { day = next; draw(); } }, 'Sonraki ›'));
+    if (!rows.length) {
+      return fill(box, h('h2', {}, 'Gün gün çalışma'), nav,
+        h('p', { class: 'muted small' }, day === today ? 'Bugün henüz soru çözmedi.' : 'Bu gün soru çözmemiş.'));
+    }
+
+    const ok = rows.filter((r) => r.correct).length;
+    const sec = rows.reduce((a, r) => a + (r.duration_sec || 0), 0);
+    const tracks = {};
+    rows.forEach((r) => { tracks[r.track] = (tracks[r.track] || 0) + 1; });
+    const oldMistakes = rows.filter((r) => r.track === 'mistake');
+
+    const byTopic = {};
+    for (const r of rows) {
+      const t = byTopic[r.questions?.topic_id || '?'] ||= { subject: r.questions?.subject, n: 0, ok: 0, sec: 0 };
+      t.n++; if (r.correct) t.ok++; t.sec += r.duration_sec || 0;
+    }
+    const topicRows = Object.entries(byTopic).sort((a, b) =>
+      (SUBJECT_ORDER.indexOf(a[1].subject) - SUBJECT_ORDER.indexOf(b[1].subject)) || ((topicName[a[0]]?.sort ?? 0) - (topicName[b[0]]?.sort ?? 0)));
+
+    const wrongs = rows.filter((r) => !r.correct).map((r) => ({ r, v: verdictFor(r) }));
+    const tally = {};
+    wrongs.forEach(({ v }) => { tally[v[1]] = (tally[v[1]] || 0) + 1; });
+
+    fill(box,
+      h('h2', {}, 'Gün gün çalışma'),
+      nav,
+      h('p', {}, `${rows.length} soru · ${ok} doğru · ${rows.length - ok} yanlış · ${fmtMinutes(sec)}`),
+      h('p', { class: 'small muted' }, Object.keys(trackName).filter((k) => tracks[k]).map((k) => `${tracks[k]} ${trackName[k]}`).join(' · ')
+        + (oldMistakes.length ? `. Eski yanlışlarından gelen ${oldMistakes.length} sorunun ${oldMistakes.filter(solid).length} tanesini emin olarak doğru yaptı.` : '')),
+      h('div', { class: 'scroll-x' }, h('table', {},
+        h('thead', {}, h('tr', {}, h('th', {}, 'Konu'), h('th', {}, 'Soru'), h('th', {}, 'Doğru'), h('th', {}, 'Yanlış'), h('th', {}, 'Süre'))),
+        h('tbody', {}, topicRows.map(([id, t]) => h('tr', {},
+          h('td', {}, h('div', {}, topicName[id]?.name || '—'), h('div', { class: 'small muted' }, SUBJECTS[t.subject]?.name || '')),
+          h('td', {}, t.n), h('td', {}, t.ok),
+          h('td', { style: t.n - t.ok ? 'color: var(--red); font-weight: 600' : null }, t.n - t.ok),
+          h('td', { class: 'num' }, fmtMinutes(t.sec))))))),
+      wrongs.length ? [
+        h('h3', { style: 'margin-top: 8px' }, 'Yanlışlarını anladı mı?'),
+        h('p', { class: 'small muted' }, [
+          tally.green ? `${tally.green} tanesinde sonra doğru yaptı` : null,
+          tally.amber ? `${tally.amber} tanesi henüz belli değil ya da kısmen oturdu` : null,
+          tally.red ? `${tally.red} tanesinde hâlâ zorlanıyor` : null,
+        ].filter(Boolean).join(', ') + '. Kendi "anladım / anlamadım" cevabı ve aynı konudan sonraki sorulara bakılır.'),
+        wrongs.map(({ r, v }) => {
+          const it = itemById[r.item_id];
+          const conf = CONFIDENCE_LEVELS.find(([c]) => c === r.confidence)?.[1];
+          return h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0; border-top: 1px solid var(--rule)' },
+            h('div', { class: 'spread' },
+              h('div', { class: 'row' }, subjTag(r.questions?.subject), h('span', { class: 'small' }, topicName[r.questions?.topic_id]?.name || '')),
+              h('span', { class: 'tag ' + v[1] }, v[0])),
+            h('p', { class: 'small muted' }, [
+              new Date(r.answered_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+              trackName[r.track], conf, fmtDuration(r.duration_sec || 0) + (r.hint_used ? ', ipucuyla' : ''),
+            ].filter(Boolean).join(' · ')),
+            h('p', { class: 'small' }, v[2]
+              + (r.understood === true ? ' Kendisi "anladım" dedi.' : r.understood === false ? ' Kendisi "anlamadım" dedi.' : '')
+              + (r.confidence >= 75 ? ' Emin olduğu hâlde yanlış: kavram yanılgısı olabilir.' : '')),
+            it && it.state === 'active' && it.due_date > day ? h('p', { class: 'small muted' }, `Bu konu tekrar soruları ${fmtDate(it.due_date)} günü gelecek.`) : null,
+            questionDetails(r));
+        })] : h('p', { class: 'small', style: 'color: var(--green)' }, 'Bu gün hiç yanlışı yok.'));
+  };
+  draw();
+  return box;
 }
 
 function tile(label, value, sub) {
