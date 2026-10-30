@@ -14,9 +14,9 @@ const code = [
   pick('/* Sorular sınavdaki gibi', '// ---------------------------------------------------------------- öğrenci: bugün'),
   pick('/* Tekrar zamanı: FSRS', 'const wordsPerDay'),
   pick('/* Kelime kahramanı', '// Mağaza:'),
-  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins };',
+  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins, heroBest, heroPower, heroCap };',
 ].join('\n');
-const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins } = new Function(code)();
+const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins, heroBest, heroPower, heroCap } = new Function(code)();
 
 // Soru süreleri LGS oturum sürelerine eşit olmalı: sözel 50 soru / 75 dk, sayısal 40 soru / 80 dk.
 const counts = { turkce: 20, inkilap: 10, din: 10, ingilizce: 10, matematik: 20, fen: 20 };
@@ -144,9 +144,23 @@ check('kelime: hafıza katsayısı', kForget < 0.8 && kGood > 1.2 && kFew === 1,
   `çabuk unutan ×${kForget.toFixed(2)}, iyi hatırlayan ×${kGood.toFixed(2)}, az veri ×${kFew}`);
 check('kelime: seviye (kart türü için)', nextWordBox(0, true, 100) === 2 && nextWordBox(5, true, 50) === 4 && nextWordBox(9, false, 100) === 1);
 
-// Kelime kahramanı: güç bildiği kelimeyle artar (0–10); altın ilk denemede doğru kartlardan ve günün kartlarını
-// bitirmekten gelir, emin olma ölçeğinden bağımsız; oturum sonu tekrarı altın vermez; harcadığı düşülür.
+// Kelime kahramanı: güç kelime gücüyle artar (0–10). Köyden sonrasına araç götürür (araba, denizaltı, hovercraft, uçak,
+// roket; sırayla): aracı yoksa güç bir öncekinde durur, aracı alınca yetiştiği yere çıkar; sırayı atlayan araç işe yaramaz.
+// Kelime gücü: her kelime en yüksek kararlılığının 7'de biri, en çok 1; unutulan kelime gücü düşürmez.
+// Altın ilk denemede doğru kartlardan ve günün kartlarını bitirmekten gelir, emin olma ölçeğinden bağımsız; oturum sonu
+// tekrarı altın vermez; harcadığı düşülür.
 check('kahraman: güç seviyeleri', heroLevel(0) === 0 && heroLevel(4) === 0 && heroLevel(5) === 1 && heroLevel(29) === 2 && heroLevel(290) === 10 && heroLevel(2000) === 10);
+const rides = (...ids) => heroCap(new Set(ids));
+check('kahraman: araçlar sırayla götürür', rides() === 3 && rides('araba') === 5 && rides('araba', 'ucak') === 5 && rides('araba', 'denizalti') === 7
+  && rides('araba', 'denizalti', 'hovercraft', 'ucak') === 9 && rides('araba', 'denizalti', 'hovercraft', 'ucak', 'roket') === 10,
+  [rides(), rides('araba'), rides('araba', 'ucak'), rides('araba', 'denizalti')].join(' '));
+check('kahraman: aracı yoksa güç durur, alınca yetişir', heroLevel(29, rides()) === 2 && heroLevel(290, rides()) === 3 && heroLevel(105, rides('araba')) === 5
+  && heroLevel(140, rides('araba')) === 5 && heroLevel(140, rides('araba', 'denizalti')) === 7);
+const best = heroBest(
+  [{ word: 'yeni', stability: 3.5 }, { word: 'unuttu', stability: 1.2 }, { word: 'eski', stability: null, box: 2 }, { word: 'bilir', stability: 40 }],
+  [{ word: 'unuttu', stability_before: 15 }, { word: 'unuttu', stability_before: 4 }, { word: 'yeni', stability_before: null }]);
+const power = heroPower(best);
+check('kahraman: kelime gücü', Math.abs(power - 3.5) < 1e-9 && best.get('unuttu') === 15, `güç ${power}`);
 const at = (h) => `2026-10-${h}T10:00:00`;
 const ans = [
   { word: 'a', correct: true, again: false, answered_at: at(28) }, { word: 'b', correct: true, again: false, answered_at: at(28) },

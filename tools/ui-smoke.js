@@ -30,7 +30,7 @@
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
     if (role === 'student' && wordsPerDay(state.student) > 0) {
       pages.words = ['kelime kartları', 'güç', 'mağaza'];
-      pages.shop = ['mağaza', 'kelime altını'];
+      pages.shop = ['mağaza', 'kelime altını', 'yolculuk araçları', 'dünyanı süsle'];
     }
     // İlkokul: okuduğu kitabın sayfaları Yükle sekmesinden gönderilir.
     if (role === 'student' && (state.student?.grade || 8) <= 4) {
@@ -60,10 +60,19 @@
       check('İlkokul dışında "Okuduğum kitap" görünmez', !pageText().includes('okuduğum kitap'));
     }
 
-    // Kelime kahramanı İngilizce sayfasında çizilir.
+    // Kelime kahramanı İngilizce sayfasında çizilir, altında yolculuk çubuğu. Araçların pencereleri sayfaya eklenmeden
+    // çizilir; aracı yoksa pencere yok. Büyük ödül kutlaması açılır, "Yola çık!" kapatır. Hiçbir şey yazılmaz.
     if (role === 'student' && wordsPerDay(state.student) > 0) {
       go('words'); await settle();
-      check('Kelime kahramanı çizilir', !!document.querySelector('.hero-scene svg.hero'));
+      check('Kelime kahramanı ve yolculuk çubuğu çizilir', !!document.querySelector('.hero-scene svg.hero') && !!document.querySelector('.trip .trip-road'));
+      const all = new Set(HERO_RIDES.map(([id]) => id));
+      const seen = [[2, new Set(['araba'])], [5, new Set(['araba', 'denizalti'])], [7, new Set(['araba', 'denizalti', 'hovercraft'])], [8, all], [9, all], [10, all]]
+        .map(([lv, own]) => rideWindow(lv, own)?.className.replace('ride-window ride-', '') || 'yok');
+      check('Araç pencereleri sırayla', seen.join() === 'araba,denizalti,hovercraft,ucak,roket,roket' && rideWindow(2, new Set()) === null, seen.join(', '));
+      rideParty(HERO_SHOP[0], 3, 4); await wait(50);
+      const party = !!document.querySelector('.party .party-ride');
+      document.querySelector('.party button')?.click(); await settle();
+      check('Büyük ödül kutlaması açılır ve kapanır', party && !document.querySelector('.party') && state.tab === 'words');
     }
 
     // Kelime kartlarının sekmesi "İngilizce" adıyla Ayarlar'ın hemen solunda (velinin isteği).
@@ -71,6 +80,24 @@
       go(root); await settle();
       const labels = [...document.querySelectorAll('nav.tabs button')].map((x) => x.textContent.trim());
       check('İngilizce sekmesi Ayarlar\'ın solunda', labels.at(-2) === 'İngilizce' && labels.at(-1) === 'Ayarlar', labels.join(', '));
+    }
+
+    // Aile: kelime kartları açık çocuğun kahramanının görünüşü açılır, seçim önizlemeyi değiştirir (kaydedilmez).
+    if (role === 'parent') {
+      go('settings'); await settle();
+      let det = null; // Aile listesi sunucudan ayrıca gelir
+      for (let i = 0; i < 50 && !(det = document.querySelector('details.hero-edit')); i++) await wait(150);
+      if (det) {
+        det.open = true;
+        for (let i = 0; i < 40 && !det.querySelector('.hero-preview svg'); i++) await wait(150);
+        const swatches = det.querySelectorAll('.swatch').length, chips = det.querySelectorAll('.chip').length;
+        const before = det.querySelector('.hero-preview')?.innerHTML;
+        det.querySelectorAll('.swatch')[5]?.click();
+        const changed = !!before && det.querySelector('.hero-preview').innerHTML !== before;
+        check('Aile: kahramanın görünüşü açılır, seçim önizlemeyi değiştirir', swatches === 19 && chips === 9 && changed && /fotoğraf/i.test(det.innerText),
+          `renk ${swatches}, seçenek ${chips}, değişti ${changed}`);
+        det.open = false;
+      } else check('Aile: kahramanın görünüşü', false, 'kelime kartları açık çocuk yok');
     }
 
     // Geri: tarayıcı tuşu da üst çubuktaki düğme de bir önceki sayfaya döner.
@@ -137,6 +164,7 @@
         if (startBtn) {
           startBtn.click(); await settle();
           const inGame = state.session?.track === 'words' && history.state?.overlay === 'session' && !document.querySelector('nav.tabs')
+            && !!document.querySelector('.trip') // yolculuk çubuğu kartın üstünde
             && document.querySelectorAll('.word-opt').length === 4
             && (!!document.querySelector('.word-big')?.textContent || !!document.querySelector('.listen-big')); // dinleme kartında yazı yok
           document.querySelector('.word-opt')?.click(); await wait(100);

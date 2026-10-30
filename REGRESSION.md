@@ -110,18 +110,36 @@ Her maddenin yanında nasıl denendiği yazar:
 - Altı sekmeli alt menü dar telefona da sığar. [E]
 
 **Kelime kahramanı** (İngilizce sekmesi) [A], oyun [E]
-- Sevimli bir çocuk çizimi, hep pazılarını gösterir. Kız ya da erkek oluşunu veli seçer (Ayarlar → Günlük plan → Kelime kahramanı);
-  seçilmediyse kıvırcık saçlı. Çocuk bunu kendisi değiştiremez.
-- Güç 0–10, bildiği kelime sayısından gelir (kararlılığı 7 günü aşan kelime): 5, 15, 30, 50 … 290 kelime. [O]
+- Sevimli bir çocuk çizimi, hep pazılarını gösterir. Görünüşünü veli seçer (Ayarlar → Aile → 🦸 Kelime kahramanı); seçilmediyse
+  kıvırcık saçlı. Çocuk bunu kendisi değiştiremez.
+- Güç 0–10, kelime gücünden gelir: 5, 15, 30, 50 … 290. [O]
+  - Kelime gücü: her kelime, ulaştığı en yüksek kararlılığın 7'de biri kadar sayılır, en çok 1. Hiç azalmaz; unuttuğu kelime
+    gücü düşürmez.
   - Seviye arttıkça kolları kalınlaşır, pazıları şişer, omuzları genişler.
-  - Kıyafet: düz tişört → yıldızlı mavi tişört → çizgili spor ve şapka (kızda saç bandı) → 10 numaralı forma ve bileklik
+  - Kıyafet: düz tişört → yıldızlı mavi tişört → çizgili spor ve şapka (uzun saçta saç bandı) → 10 numaralı forma ve bileklik
     → pelerinli kahraman → altın madalya ve taç.
+- Yolculuk: her güç bir yer. Ev, park, çiftlik, köy, orman, büyük şehir, mercan bahçesi, batık gemi, buzullar, bulutların
+  üstü, uzay. Kahramanın sahnesi bulunduğu yerin renklerini alır.
+  - Yolculuk çubuğu: bulunduğu yer → gittiği yer; yolda aracı, aracı yoksa yürüyen çocuk; "Ormana N kelime kaldı".
+  - Köyden sonrasına araç götürür; araçlar büyük ödüldür ve sırayla alınır. Araba (orman, büyük şehir), denizaltı (mercan
+    bahçesi, batık gemi), hovercraft (buzullar), uçak (bulutların üstü), roket (uzay). [O]
+  - Aracı yoksa güç bir öncekinde durur; çubukta "Ormana araba götürür: N altın daha biriktir" yazar. Aracı alınca gücü
+    hemen yetiştiği yere çıkar. Sırayı atlayan araç işe yaramaz.
+- Aracı olan çocuk kartları aracın penceresinden çözer [E]:
+  - araba yan camı, denizaltı lombozları, hovercraft ön camı, uçak pencereleri, roket penceresi;
+  - camdan gittiği yerin manzarası görünür, doğru her cevapta akar;
+  - yeni yere varınca pencerede "🎉 Orman! Güç 5" çıkar, manzara (gerekirse araç) değişir.
 - Kelime altını 🪙: ilk denemede doğru her kart 1, günün kartlarını bitirdiği her gün 5. [O]
   - Emin olma ölçeğinden bağımsızdır; çocuk fazla altın için "tamamen eminim" demez.
   - Oturum sonunda tekrar sorulan kart altın vermez.
-- Mağaza: toptan şatoya 15 eşya, her biri bir kez alınır. Aldıkları kahramanın sahnesinde durur.
-- Oturum sonunda kazandığı altın görünür. Güç artınca kutlama ve yeni kahraman görünür.
-- Raporda güç, altın ve aldıkları görünür.
+- Mağaza:
+  - en üstte sıradaki büyük ödül, biriken altın çubuğu ve "Arabayı al!";
+  - yolculuk araçları sırayla ("Önce arabayı al");
+  - dünyanı süsle: toptan şatoya 12 eşya, her biri bir kez. Aldıkları kahramanın sahnesinde durur.
+- Araç alınınca gösterişli kutlama: araç ekrana süzülür, konfeti yağar, "Ormana vardın! Güç 5"; "Yola çık!" kelime sayfasına
+  götürür. [E]
+- Oturum sonunda kazandığı altın görünür. Yeni yere varınca konfetili kutlama ve yeni kahraman görünür.
+- Raporda güç, bulunduğu yer, altın, aracı beklediği ve aldıkları görünür.
 
 **Okuduğum kitap** (ilkokul, Yükle sekmesi) [A], gönderme ve sorular [E]
 - Çocuk okuduğu kitabın sayfalarını fotoğraflar. Genelde hikâye kitabı olur, ama her tür kitap gönderilebilir.
@@ -209,7 +227,11 @@ Her maddenin yanında nasıl denendiği yazar:
 - Aile:
   - çocuk ekleme ve silme (silmede adını yazarak onay);
   - veli ekleme;
-  - öğretmen bağlama (ders seçerek).
+  - öğretmen bağlama (ders seçerek);
+  - 🦸 Kelime kahramanı (kelime kartları açık her çocuk). Kız ya da erkek, ten, saç rengi, saç modeli, göz, gözlük, çil
+    seçilir; önizleme hemen değişir; Kaydet, Sıfırla.
+  - Vesikalık fotoğraf yüklenir; saatlik iş bir saat içinde kahramanı ona benzetir, yine çizgi karakter kalır. Fotoğrafı
+    yalnızca veliler görür; benzetildikten sonra "Fotoğrafı sil".
 
 ## Öğretmen [A], içindekiler [E]
 - Sadece velinin açtığı çocukları ve kendi derslerini görür; salt okunur.
@@ -220,6 +242,7 @@ Her maddenin yanında nasıl denendiği yazar:
 - Kâğıt denemeleri notlandırır: teşhis, kırpılmış soru, konu durumu, hata maddeleri.
 - Kitap sayfalarından havuza soru ekler. Öğrencinin gönderdiği soruları işler (1e).
 - Okuduğu kitabın sayfalarından anlama soruları yazar (1f). Sınavı geçmiş kitabın hata maddelerini bekletir (1c).
+- Velinin yüklediği vesikalık fotoğrafa bakıp kahramanın görünüşünü yazar (1g). Fotoğrafı tarif etmez, kopyalamaz, silmez.
 - Uygulama içi deneme yanlışlarına teşhis yazar ve her hata maddesine benzer sorular yazar.
 - MEB kitapçıklarını aktarır. Bunlar aile içi kullanım içindir, hiçbir yerde yayımlanmaz.
 - Soru havuzunu doldurur: boş konular önce gelir, sık çıkan konular önde.
@@ -234,8 +257,11 @@ Her maddenin yanında nasıl denendiği yazar:
 - Birlikte baktık: veli ve o dersin öğretmeni işaretler.
 - Şiir dizeleri: çocuk yazar; veli ve Türkçe öğretmeni okur.
 - Soru ekle: öğrenci ve velisi gönderir; kardeşi adına gönderilemez.
-- Kelime kahramanı: çocuk alışverişini kendisi yapar, aynı eşyayı iki kez alamaz, kardeşi adına alamaz; kahramanın kız ya da erkek
-  oluşunu veli seçer, çocuk değiştiremez; veli ve İngilizce öğretmeni görür (`test-hero.sql`).
+- Kelime kahramanı (`test-hero.sql`):
+  - çocuk alışverişini (araç ya da eşya) kendisi yapar, aynı şeyi iki kez alamaz, kardeşi adına alamaz;
+  - kahramanın kız ya da erkek oluşunu ve görünüşünü veli seçer, çocuk değiştiremez;
+  - alışverişi veli ve İngilizce öğretmeni görür;
+  - vesikalık fotoğrafı yalnızca çocuğun velileri yükler ve görür; çocuk, kardeş ve öğretmen göremez.
 - Okuduğu kitap:
   - çocuk kendi kitabını ekler ve sayfalarını gönderir, kardeşi adına ekleyemez;
   - sınav tarihini sonradan yalnızca veli değiştirir;

@@ -223,6 +223,36 @@ public, and do not copy long passages into questions.
 5. Patch the submission `done` with a warm Turkish `result_note` to the child, for example "14 sayfadan
    42 soru hazırladım. Sınavına kadar her gün Bugün sayfasında, konu tekrarının altında gelecek."
 
+## 1g. Hero likeness from a photo (every run)
+
+Primary children have a cartoon hero (Kelime kahramanı) in their İngilizce tab. A parent can upload
+a passport-style photo of the child (Ayarlar → Aile → Kelime kahramanı) so the hero looks like them.
+The hero stays a cartoon; you only choose its colours and hair from fixed lists. Find waiting photos:
+```
+node tools/sb.mjs get "profiles?role=eq.student&hero_photo_at=not.is.null&select=id,avatar,hero_look,hero_photo_at,hero_look_at"
+```
+A photo waits when `hero_look_at` is empty or older than `hero_photo_at`. For each one:
+1. `node tools/sb.mjs download kahraman <id>/foto.jpg .work/kahraman/<id>.jpg`. If it is missing (404),
+   the parent deleted it; skip it.
+2. Look at the photo and choose, from what you can actually see:
+   - `ten` (skin): 0 very light, 1 light, 2 light-medium, 3 medium/olive, 4 brown, 5 dark brown.
+   - `sac` (hair colour): 0 black, 1 very dark brown, 2 dark brown, 3 chestnut, 4 light brown,
+     5 dark blonde, 6 blonde, 7 red/auburn.
+   - `model` (hair): `kisa` short, `kivircik` curly, `uzun` long and loose, `orgu` two braids or
+     pigtails, `atkuyrugu` ponytail, `kakul` bob with a fringe. Pick the closest.
+   - `goz` (eyes): 0 very dark, 1 brown, 2 hazel, 3 green, 4 blue.
+   - `gozluk`: `''` none, `yuvarlak` round, `koseli` rectangular. `cil`: true only for clearly
+     visible freckles.
+   Choose only these. Do not guess girl or boy (`avatar` is the parent's choice; leave it). If the photo
+   shows no child's face clearly (blurry, someone else, not a person), do not change `hero_look`; still
+   set `hero_look_at` so it stops waiting, and say so in the run summary for the parent to upload again.
+3. `node tools/sb.mjs patch "profiles?id=eq.<id>" '{"hero_look":{"ten":2,"sac":1,"model":"kisa","goz":1,"gozluk":"","cil":false},"hero_look_at":"<now ISO>"}'`
+
+The photo is the family's private picture of a child. Never describe the child's appearance in the
+run summary or anywhere else (write only "kahraman fotoğraftan benzetildi"). Never copy or upload the
+photo anywhere. Delete your local copy (`.work/kahraman/`) at the end of the run. Never delete the
+photo in Supabase; the parent deletes it from the app.
+
 ## 1b2. Mock exams taken in the app (every run)
 
 Students can now take timed mock exams inside the app (`exams.kind = 'uygulama'`: a real LGS paper

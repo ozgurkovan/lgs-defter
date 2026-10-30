@@ -15,7 +15,8 @@ begin
     'word_progress', (select count(*) from public.word_progress),
     'word_answers', (select count(*) from public.word_answers),
     'books', (select count(*) from public.books),
-    'purchases', (select count(*) from public.purchases)
+    'purchases', (select count(*) from public.purchases),
+    'kahraman_foto', (select count(*) from storage.objects where bucket_id = 'kahraman')
   ) into r;
   perform set_config('role', 'postgres', true);
   return r;
