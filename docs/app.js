@@ -387,6 +387,10 @@ setInterval(checkForUpdate, 5 * 60 * 1000);
 let pendingTab = null; // oturumdan ya da denemeden düğmeyle çıkarken: oturum kaydı geri alınınca açılacak sayfa
 const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
+// Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
+const allowedTabs = () => (state.profile?.role === 'student'
+  ? ['home', 'upload', 'send', 'paper', 'ask', 'topics', 'settings', 'reasons', 'together']
+  : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
   else go(rootTab(), 'replace');
@@ -411,7 +415,7 @@ window.addEventListener('popstate', (e) => {
     state.leaveOverlay?.();
   }
   // Bitmiş bir oturumun kaydına ileri tuşuyla gelinirse düz sayfa kaydına çevrilir.
-  const tab = s.tab || rootTab();
+  const tab = allowedTabs().includes(s.tab) ? s.tab : rootTab();
   if (s.overlay) history.replaceState({ tab, depth: s.depth ?? 0 }, '');
   // Gönderilmemiş fotoğraf varken vazgeçerse sayfanın kaydı geri konur.
   if (!go(tab, 'history')) history.pushState({ tab: state.tab, depth: (s.depth ?? 0) + 1 }, '');
@@ -484,8 +488,7 @@ async function start() {
     sessionStorage.removeItem('defter.resumeTab'); sessionStorage.removeItem('defter.resumeDepth');
   } catch (e) { /* önemli değil */ }
   if (resume && resumeDepth !== null) history.replaceState({ tab: resume, depth: +resumeDepth || 0 }, '');
-  const allowed = profile.role === 'student' ? ['home', 'upload', 'send', 'paper', 'ask', 'topics', 'settings', 'reasons', 'together']
-    : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together'];
+  const allowed = allowedTabs();
   const here = history.state?.tab;
   go(allowed.includes(resume) ? resume : allowed.includes(here) ? here : profile.role === 'student' ? 'home' : 'report', 'replace');
 }
@@ -509,6 +512,8 @@ async function loadStudents() {
 }
 
 function viewLogin() {
+  // Çıkıştan sonra bu sekmede giriş yapan, önceki kişinin kaldığı sayfadan değil kendi ilk sayfasından başlar.
+  history.replaceState(null, '');
   const email = h('input', { id: 'email', type: 'email', autocomplete: 'username', inputmode: 'email', required: true });
   const pass = h('input', { id: 'password', type: 'password', autocomplete: 'current-password', required: true });
   const msg = h('p', { class: 'error', hidden: true });

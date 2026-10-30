@@ -1,4 +1,4 @@
-// Arayüz duman testi. Giriş yapılmış bir TEST hesabıyla (IrfTest ya da test öğretmeni) uygulama sayfasında çalışır:
+// Arayüz duman testi. Giriş yapılmış bir TEST hesabıyla (IrfTest, test velisi ya da test öğretmeni) uygulama sayfasında çalışır:
 // tarayıcı bölmesinin JavaScript aracına bu dosyanın içeriği verilir ya da tarayıcı konsoluna yapıştırılır.
 // Rolün bütün sayfalarını açar; hata kutusu, eksik bölüm, eksik ya da fazladan "← Geri" ve geri tuşu davranışını
 // raporlar. Veritabanına hiçbir şey yazmaz: soru cevaplamaz, kaydetmez; açtığı deneme telefondan silinir.
@@ -24,8 +24,15 @@
     const pages = role === 'student'
       ? { home: ['hata tekrarı', 'konu tekrarı'], upload: ['deneme çöz', 'karma deneme'], send: ['soru ekle', 'kâğıt deneme'],
           ask: ['yapamadığım sorular', 'beğendiğim sorular'], paper: ['hangi deneme?'], topics: [], settings: [], together: ['birlikte bakılacaklar'] }
-      : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'],
-          ...(role === 'parent' ? { upload: ['hangi deneme?'] } : {}) };
+      : role === 'parent'
+        ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
+            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile'], together: ['birlikte bakılacaklar'] }
+        : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
+    // Öğretmen mesaj bırakamaz, aileyi yönetemez.
+    if (role === 'teacher') {
+      go('report'); await settle();
+      check('Öğretmende mesaj kutusu yok', !pageText().includes('mesaj bırak'));
+    }
     for (const [tab, must] of Object.entries(pages)) {
       go(tab); await settle();
       const t = pageText();

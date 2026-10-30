@@ -14,8 +14,8 @@ Her maddenin yanında nasıl denendiği yazar:
    her öğrencinin bugünkü durumu. Yetki testleri kullanıcıların yerine geçip dener; hepsi geri alınır,
    veritabanında iz kalmaz. Her testin beklenen sonucu dosyasındaki `-- beklenen:` satırındadır.
 2. Yerel önizlemede (`localhost:5500`) test hesabıyla giriş yapılır; `tools/ui-smoke.js` içeriği sayfada
-   çalıştırılır. Biri öğrenci (IrfTest), biri öğretmen (test öğretmeni) olarak; bütün satırlar `OK` olmalı.
-   Bu test hiçbir şey kaydetmez.
+   çalıştırılır. Üç kez çalıştırılır: öğrenci (IrfTest), test velisi (yalnızca IrfTest'e bağlı) ve test
+   öğretmeni (IrfTest'te matematik ve fen) olarak. Bütün satırlar `OK` olmalı. Bu test hiçbir şey kaydetmez.
 3. Değişikliğin dokunduğu **[E]** maddeleri test hesabıyla elle denenir.
 4. Gerçek hesaplar yalnızca salt okunur kontrol edilir (`supabase/check-students.sql`, 1. adımda çalışır).
    Onların adına hiçbir şey yapılmaz, girilmez.
@@ -31,7 +31,7 @@ Her maddenin yanında nasıl denendiği yazar:
 - Yeni sürüm yayınlanınca uygulama kendini yeniler (Ctrl+F5 gerekmez). Soru çözerken, denemedeyken ya da gönderilmemiş fotoğraf varken beklenir. [E]
 - Geri: üst çubuktaki "← Geri" ve tarayıcının geri tuşu bir önceki sayfaya döner; ilk sayfada tarayıcı tuşu siteden çıkar. [A]
 - Soru çözerken ve denemedeyken geri tuşu önce sorar. Denemede süre işlemeye devam eder ve deneme telefonda saklanır. [A]
-- Sayfa yenilenince aynı sayfada kalınır. [E]
+- Sayfa yenilenince aynı sayfada kalınır. Aynı sekmede çıkış yapıp başka biri girerse kendi ilk sayfasından başlar. [E]
 
 **Bugün (ana sayfa): sade**
 - Tarih ve selam. Selam bazen şakacı olur ("…ciğim, napıyon?"). 8. sınıfta LGS'ye kalan gün. [A]
