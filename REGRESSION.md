@@ -215,8 +215,11 @@ Her maddenin yanında nasıl denendiği yazar:
 - Son yüklemelerin durumu.
 - Gönderilmemiş fotoğraf varken sayfadan çıkılırsa sorulur. Panodan yapıştırma çalışır.
 
-**Konularım** [A], işaretleme [E]
-- Konuyu işlendi ya da işlenmedi diye işaretleme. LGS sıklığı bilgisi, seyrek konu düğmesi, bir üst sınıfın konuları.
+**Konularım** öğrencide yok (velinin isteği) [A]
+- Konuları veli işaretler (Konular sekmesi), yıllık plandaki haftası gelince kendiliğinden de açılır. Öğrencinin alt
+  menüsünde Konularım yok; adresle de açılmaz, Bugün'e döner.
+- Eksik konuların kısa anlatımı soru çözerken açılır: o konunun sorusunda "Anlamadım" deyince ya da yardım isteyince,
+  YouTube bağlantısının yanında "📖 Bu konunun kısa anlatımı". [E]
 
 ## Veli
 
@@ -248,7 +251,8 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Diğer sayfalar**
 - Sorular sayfası. [A]
-- Konular: işlendi ya da işlenmedi işaretleme. [E]
+- Konular: işlendi ya da işlenmedi işaretleme (yalnızca veli; "Bu konuları okulda işlediniz mi?" sorusu da burada). LGS
+  sıklığı bilgisi, seyrek konu düğmesi, bir üst sınıfın konuları. [E]
 - Deneme yükleme (çocuk için) ve kitap sayfası ekleme (ortak soru havuzu). [E]
 - Çocuk değiştirme (üst çubukta). [E]
 

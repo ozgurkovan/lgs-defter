@@ -23,7 +23,7 @@
     const root = rootTab();
     const pages = role === 'student'
       ? { home: ['hata tekrarı', 'konu tekrarı'], upload: ['deneme çöz', 'karma deneme'], send: ['soru ekle', 'kâğıt deneme'],
-          ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], topics: [], settings: [], together: ['birlikte bakılacaklar'] }
+          ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
             book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı'], together: ['birlikte bakılacaklar'] }
@@ -55,6 +55,13 @@
       check(`Sayfa: ${tab}`, state.tab === tab && !broken && !missing.length && back === wantBack,
         [state.tab !== tab && `açılan ${state.tab}`, broken && 'hata kutusu', missing.length && 'eksik: ' + missing.join(', '),
           back !== wantBack && (back ? 'fazladan Geri' : 'Geri yok')].filter(Boolean).join('; '));
+    }
+
+    // Konuları veli işaretler, yıllık plana göre kendiliğinden de açılır; öğrencide Konularım yok, adresle de açılmaz.
+    if (role === 'student') {
+      const noTab = ![...document.querySelectorAll('nav.tabs button')].some((x) => /Konular/.test(x.textContent));
+      go('topics'); await settle();
+      check('Konularım öğrencide yok', noTab && state.tab === 'home', `açılan ${state.tab}`);
     }
 
     // Klavye sekmesi yalnızca dersleri açık öğrencide (ilkokulda varsayılan açık, sonrasında veli açar).
@@ -136,7 +143,7 @@
     }
 
     // Geri: tarayıcı tuşu da üst çubuktaki düğme de bir önceki sayfaya döner.
-    const [a, b] = role === 'student' ? ['topics', 'settings'] : ['questions', 'topics'];
+    const [a, b] = role === 'student' ? ['send', 'settings'] : ['questions', 'topics'];
     go(a); await settle(); go(b); await settle();
     history.back(); await settle();
     check('Tarayıcı geri tuşu önceki sayfaya döner', state.tab === a, `şu an ${state.tab}`);

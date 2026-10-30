@@ -329,7 +329,7 @@ function renderTabs() {
       : [['settings', 'Ayarlar', 'settings']])
     : role === 'teacher'
       ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
-      : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'], ['topics', 'Konularım', 'topics'],
+      : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'],
           typingPerDay(state.student) > 0 && hasKeyboard() ? ['typing', 'Klavye', 'keyboard'] : null,
           wordsPerDay(state.student) > 0 ? ['words', 'İngilizce', 'words'] : null, ['settings', 'Ayarlar', 'settings']].filter(Boolean);
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
@@ -392,7 +392,7 @@ const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', 'words', 'shop', 'typing', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'settings', 'reasons', 'together']
+  ? ['home', 'words', 'shop', 'typing', 'upload', 'send', 'paper', 'ask', 'read', 'settings', 'reasons', 'together']
   : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
@@ -966,7 +966,17 @@ function statusTag(status) {
 
 // ---------------------------------------------------------------- öğrenci: soru oturumu
 
+// Eksik konuların kısa anlatımları (saatlik iş yazar, topic_status.lesson). Öğrenci Konularım'ı görmediği için anlatım,
+// o konunun sorusunda "Anlamadım" deyince ya da yardım isteyince açılır.
+let gapLessons = new Map();
+function loadGapLessons() {
+  const id = sid();
+  sb.from('topic_status').select('topic_id, lesson').eq('student_id', id).eq('status', 'gap').not('lesson', 'is', null)
+    .then(({ data }) => { if (sid() === id) gapLessons = new Map((data || []).map((r) => [r.topic_id, r.lesson])); });
+}
+
 function runSession(track, s) {
+  loadGapLessons();
   state.session = { track, entries: examOrder(s.entries, studentSubjects(state.student)), index: 0, results: new Map(), stats: { correct: 0, total: 0 }, together: [] };
   pushOverlay('session'); // geri tuşu önce sorsun; oturum bitince tek geri ana sayfaya döner
   showQuestion();
@@ -1073,10 +1083,14 @@ function showQuestion() {
     // Kitap sorusunda konu anlatımı yok; kitabın o bölümüne bakılır.
     const yt = item.track === 'book' ? null
       : h('a', { class: 'btn', hidden: !help || null, href: youtubeSearch(item.topics?.name || SUBJECTS[subject]?.name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı');
+    const gapText = item.track === 'book' ? null : gapLessons.get(question.topic_id || item.topic_id);
+    const gapBox = gapText ? h('details', { class: 'small', hidden: !help || null }, h('summary', {}, '📖 Bu konunun kısa anlatımı'),
+      h('div', { class: 'note teacher', style: 'margin-top: 6px' }, gapText)) : null;
     if (!correct && !help) {
       const btns = [[true, 'Anladım'], [false, 'Anlamadım']].map(([v, label]) => h('button', { class: 'chip', 'aria-pressed': 'false', onclick: async (e) => {
         btns.forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
         if (yt) yt.hidden = v;
+        if (gapBox) gapBox.hidden = v;
         // "Anlamadım" dediği yanlış da birlikte bakılacaklara girer.
         const mine = ss.together.find((t) => t.question === question);
         if (!v && !mine) ss.together.push({ question, answer: selected, correct, kind: 'notUnderstood', topic: item.topics?.name });
@@ -1086,14 +1100,14 @@ function showQuestion() {
           await q(sb.from('reviews').update({ understood: v }).eq('id', reviewId));
         } catch (err) { toast('Kaydedilemedi, tekrar dene.'); }
       } }, label));
-      understoodRow = h('div', { class: 'stack', style: 'gap: 6px' }, h('p', { class: 'small muted' }, 'Çözümü anladın mı?'), h('div', { class: 'chips' }, btns), yt);
+      understoodRow = h('div', { class: 'stack', style: 'gap: 6px' }, h('p', { class: 'small muted' }, 'Çözümü anladın mı?'), h('div', { class: 'chips' }, btns), gapBox, yt);
     }
     fill(feedback, help
       ? [h('p', { class: 'verdict' }, 'Tamam, bu soruyu ayırdım.'),
          h('p', { class: 'small' }, `Bunu sonra velin ya da öğretmeninle birlikte çözeceksiniz. Doğru cevap ${question.answer}.`),
          question.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüme şimdi bakmak istersen'),
            h('div', { class: 'note teacher', style: 'margin-top: 6px' }, question.solution)) : null,
-         yt]
+         gapBox, yt]
       : [h('p', { class: 'verdict ' + (correct ? 'ok' : 'no') }, correct ? 'Doğru' : `Yanlış. Doğru cevap ${question.answer}.`),
          coachNote ? h('p', { class: 'small' }, coachNote) : null,
          question.solution ? h('div', { class: 'note teacher' }, question.solution) : null,
@@ -2484,6 +2498,9 @@ function showExamResult(exam, rows, results, reason, saved) {
 // ---------------------------------------------------------------- öğrenci: konular
 
 async function viewTopics() {
+  // Konuları veli işaretler, yıllık plandaki haftası gelince kendiliğinden de açılır; öğrenci bu sayfayı görmez (velinin
+  // isteği). Eksik konuların kısa anlatımı öğrenciye soru çözerken açılır (gapLessons).
+  if (state.profile?.role === 'student') return go('home', 'replace');
   loading();
   const [topics, statuses, items] = await Promise.all([
     // "Kitap okuma" konusu okuduğu kitabın sorularınındır; Konular'da işaretlenmez.
@@ -2535,7 +2552,7 @@ async function viewTopics() {
     h('section', { class: 'stack', style: 'gap: 4px' },
       h('h2', {}, 'Okulda işlenen konular'),
       h('p', { class: 'small muted' }, isTeacherView()
-        ? 'İşaretli konular okulda işlenmiş ve tekrar takviminde. Konu işaretlerini öğrenci ve veli değiştirir.'
+        ? 'İşaretli konular okulda işlenmiş ve tekrar takviminde. Konu işaretlerini veli değiştirir; yıllık plana göre kendiliğinden de açılırlar.'
         : isParentView()
         ? 'İşlenen konuları işaretleyin; işaretli konular tekrar takvimine girer. İşaretsizler, yıllık plandaki haftası gelince kendiliğinden açılır.'
         : 'İşlediğin konuları işaretle; işaretli konular tekrar takvimine girer. İşlemediğin bir konunun işaretini kaldırırsan o konudan soru gelmez.')),
