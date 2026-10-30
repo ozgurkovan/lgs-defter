@@ -14,15 +14,20 @@ Her maddenin yanında nasıl denendiği yazar:
    her öğrencinin bugünkü durumu. Yetki testleri kullanıcıların yerine geçip dener; hepsi geri alınır,
    veritabanında iz kalmaz. Her testin beklenen sonucu dosyasındaki `-- beklenen:` satırındadır.
 2. Yerel önizlemede (`localhost:5500`) test hesabıyla giriş yapılır; `tools/ui-smoke.js` içeriği sayfada
-   çalıştırılır. Üç kez çalıştırılır: öğrenci (IrfTest), test velisi (yalnızca IrfTest'e bağlı) ve test
-   öğretmeni (IrfTest'te matematik ve fen) olarak. Bütün satırlar `OK` olmalı. Bu test hiçbir şey kaydetmez.
-   Giriş bağlantısı: `node tools/sb.mjs login-link irftest` (ya da `testveli`, `testogretmen`). Araç yalnızca bu
-   üç test hesabına bağlantı üretir (`tools/test-accounts.mjs`).
+   çalıştırılır. Dört kez çalıştırılır:
+   - öğrenci IrfTest (8. sınıf);
+   - ilkokul öğrencisi test4.sinif (4. sınıf);
+   - test velisi;
+   - test öğretmeni (IrfTest'te matematik). Öğretmenle önce seçili çocuğun IrfTest olduğuna bakılır.
+
+   Bütün satırlar `OK` olmalı. Bu test hiçbir şey kaydetmez.
+
+   Giriş bağlantısı: `node tools/sb.mjs login-link irftest` (ya da `test4`, `testveli`, `testogretmen`). Araç yalnızca bu
+   test hesaplarına bağlantı üretir (`tools/test-accounts.mjs`).
 3. Değişikliğin dokunduğu **[E]** maddeleri test hesabıyla elle denenir.
 4. Gerçek hesaplar yalnızca salt okunur kontrol edilir (`supabase/check-students.sql`, 1. adımda çalışır).
    Onların adına hiçbir şey yapılmaz, girilmez.
-5. İlkokul görünümü gerekiyorsa IrfTest'in sınıfı geçici olarak 3 ya da 4 yapılır, sonra 8'e döner.
-   Saatlik görevin çalıştığı dakikalar (:10–:20) dışında yapılır.
+5. İlkokul görünümü 4. sınıf test öğrencisiyle (test4.sinif) denenir; IrfTest'in sınıfını değiştirmeye gerek yok.
 6. Aile fonksiyonu (`supabase/functions/family`) değiştiyse `node tools/test-family.mjs` çalıştırılır (her zaman
    test öğrencisi IrfTest olarak): girişsiz ve öğrenci olarak yapılan çağrılar reddedilmeli.
 
@@ -181,5 +186,5 @@ Her maddenin yanında nasıl denendiği yazar:
   - günlük sayıyı veli ayarlar, çocuk değiştiremez;
   - veli ve İngilizce öğretmeni okur; başka öğretmen ve kardeş göremez.
 - Aile dışından biri hiçbir şey görmez.
-- Test araçları şifresiz giriş bağlantısını yalnızca üç test hesabına üretir (IrfTest, Test Veli, Test Öğretmen).
+- Test araçları şifresiz giriş bağlantısını yalnızca test hesaplarına üretir (IrfTest, test4.sinif, Test Veli, Test Öğretmen).
   Başka bir ad ya da adres verilirse durur, Supabase'e hiç gitmez; hesap açılmaz.

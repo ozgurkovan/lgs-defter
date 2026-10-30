@@ -1,4 +1,4 @@
-// Arayüz duman testi. Giriş yapılmış bir TEST hesabıyla (IrfTest, test velisi ya da test öğretmeni) uygulama sayfasında çalışır:
+// Arayüz duman testi. Giriş yapılmış bir TEST hesabıyla (IrfTest, test4.sinif, test velisi ya da test öğretmeni) uygulama sayfasında çalışır:
 // tarayıcı bölmesinin JavaScript aracına bu dosyanın içeriği verilir ya da tarayıcı konsoluna yapıştırılır.
 // Rolün bütün sayfalarını açar; hata kutusu, eksik bölüm, eksik ya da fazladan "← Geri" ve geri tuşu davranışını
 // raporlar. Veritabanına hiçbir şey yazmaz: soru cevaplamaz, kaydetmez; açtığı deneme telefondan silinir.

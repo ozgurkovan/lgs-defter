@@ -2,7 +2,8 @@
 // Supabase, hesabı olmayan bir adrese giriş bağlantısı istenince o adrese yeni hesap açar. Bu yüzden adres
 // elle yazılmaz, hesabın kimliğinden okunur.
 export const TEST_ACCOUNTS = {
-  irftest: 'dbdb25a7-5944-49b6-94b0-fcd855a205ed', // öğrenci
+  irftest: 'dbdb25a7-5944-49b6-94b0-fcd855a205ed', // öğrenci, 8. sınıf
+  test4: 'c16864e7-684c-42fb-bb5e-f99c05b2a219', // öğrenci, 4. sınıf (ilkokul görünümü)
   testveli: 'eac9fc92-6e78-4e48-a81b-409aff6678c9', // veli, yalnızca IrfTest'e bağlı
   testogretmen: '0502e009-7d69-40a9-b7c6-ceedaad1012f', // öğretmen, IrfTest'te matematik ve fen
 };
