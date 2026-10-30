@@ -1,5 +1,6 @@
 -- Profil korumalarının testi: öğrenci olarak ve veli olarak güncelleme dener. Sonuç hata mesajıyla döner;
 -- hata yüzünden her değişiklik geri alınır.
+-- beklenen: {"veli_plan":1,"ogrenci_rol":"Bu alan değiştirilemez","ogrenci_plan":"Bu ayarı veli değiştirir","veli_kendi_rolu":"Bu alan değiştirilemez","ogrenci_lgs_tarihi":1}
 do $$
 declare
   kid uuid := (select id from public.profiles where display_name = 'IrfTest' and role = 'student');

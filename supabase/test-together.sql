@@ -1,5 +1,6 @@
 -- "Birlikte baktık" yetki testi. Geçici bir öğretmen (sadece Türkçe) oluşturur; veli, öğretmen ve öğrenci
 -- olarak işaretlemeyi dener. Sonuç hata mesajıyla döner; her değişiklik geri alınır.
+-- beklenen: {"ogrenci_kardes_yazma":0,"ogrenci_kendi_sorusu":"Bu soruyu işaretleme yetkin yok","veli_matematik_sorusu":true,"ogretmen_turkce_sorusu":true,"isaretleyen_ogretmen_mi":true,"ogretmen_dogrudan_yazma":0,"ogretmen_matematik_sorusu":"Bu soruyu işaretleme yetkin yok"}
 do $$
 declare
   t uuid := gen_random_uuid();

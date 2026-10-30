@@ -185,13 +185,13 @@ function authErrorText(error, wrongText = 'Bilgiler hatalı.') {
 
 // Türkçe eklerde son ünlü: ince (e, i, ö, ü) mi, kalın mı; yuvarlak mı.
 const lastVowel = (s) => [...s.toLocaleLowerCase('tr')].filter((ch) => 'aeıioöuü'.includes(ch)).pop() || 'e';
-// Sevgi hitabı: Ömer → Ömerciğim, İrfan → İrfancığım, Isla → Islacığım, Umut → Umutçuğum.
+// Sevgi hitabı: Mert → Mertçiğim, Can → Cancığım, Ayla → Aylacığım, Umut → Umutçuğum.
 function endearing(name) {
   const last = name.toLocaleLowerCase('tr').slice(-1);
   const c = 'çfhkpsşt'.includes(last) ? 'ç' : 'c';
   return name + c + { a: 'ığım', ı: 'ığım', e: 'iğim', i: 'iğim', o: 'uğum', u: 'uğum', ö: 'üğüm', ü: 'üğüm' }[lastVowel(name)];
 }
-// Yönelme eki: Ömer'e, İrfan'a, Isla'ya.
+// Yönelme eki: Mert'e, Can'a, Ayla'ya.
 function toName(name) {
   const endsVowel = 'aeıioöuü'.includes(name.toLocaleLowerCase('tr').slice(-1));
   return `${name}'${endsVowel ? 'y' : ''}${'eiöü'.includes(lastVowel(name)) ? 'e' : 'a'}`;
@@ -228,8 +228,12 @@ function fill(el, ...nodes) {
 
 function render(...nodes) {
   // Soru çözerken dikkat dağılmasın diye üst çubuk ve menü gizlenir.
+  // "← Geri" ilk sayfa dışında her sayfada; tarayıcının geri tuşuyla aynı işi yapar.
+  const canBack = navDepth() > 0 || state.tab !== rootTab();
   const bar = state.profile && !state.session && !state.exam
-    ? h('div', { class: 'topbar' }, studentSwitcher(),
+    ? h('div', { class: 'topbar' },
+        canBack ? h('button', { class: 'ghost small back', onclick: goBack }, '← Geri') : null,
+        studentSwitcher(),
         h('button', { class: 'ghost small', onclick: signOut }, 'Çıkış yap'))
     : null;
   fill(app, bar, ...nodes);
@@ -294,6 +298,7 @@ function lazyImg(bucket, path, alt) {
 const ICONS = {
   home: 'M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
   upload: 'M12 16V4m0 0-5 5m5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3',
+  exam: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm0-12v4l2.5 2.5M10 2h4M19 6l1.5-1.5',
   topics: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11',
   report: 'M4 20V10m6 10V4m6 16v-7m4 7H2',
   questions: 'M9 6h11M9 12h11M9 18h11M4.5 6l1 1 2-2M4.5 12l1 1 2-2M4.5 18l1 1 2-2',
@@ -323,7 +328,7 @@ function renderTabs() {
       : [['settings', 'Ayarlar', 'settings']])
     : role === 'teacher'
       ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
-      : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']];
+      : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']];
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
       h('button', { 'aria-current': state.tab === id ? 'page' : null, onclick: () => go(id) }, icon(ic), label))));
@@ -362,6 +367,7 @@ function applyUpdate(nextTab) {
     if (sessionStorage.getItem('defter.updateTried') === String(v)) return false;
     sessionStorage.setItem('defter.updateTried', String(v));
     if (nextTab) sessionStorage.setItem('defter.resumeTab', nextTab);
+    sessionStorage.setItem('defter.resumeDepth', String(navDepth()));
   } catch (e) { return false; }
   location.replace(`${location.pathname}?v=${v}`);
   return true;
@@ -370,27 +376,77 @@ function applyUpdate(nextTab) {
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible') return;
   await checkForUpdate();
-  if (['home', 'report', 'questions', 'together', 'topics'].includes(state.tab)) applyUpdate(state.tab);
+  if (['home', 'report', 'questions', 'together', 'topics', 'send'].includes(state.tab)) applyUpdate(state.tab);
 });
 setInterval(checkForUpdate, 5 * 60 * 1000);
 
-function go(tab) {
-  if (!confirmLeave()) return;
-  if (applyUpdate(tab)) return;
+/* Geri: üst çubuktaki "← Geri" ile tarayıcının geri tuşu aynı işi yapar, bir önceki sayfaya döner (eskiden tarayıcı
+   tuşu doğrudan önceki siteye gidiyordu). Her sayfa geçişi geçmişe bir kayıt ekler: { tab, depth: uygulama içinde
+   kaçıncı sayfa, overlay?: 'session' | 'exam' }. Soru çözme ve deneme, açıldıkları sayfanın üstünde ayrı bir kayıttır;
+   orada geri tuşu önce sorar. Aynı sayfayı yeniden çizmek (çocuk değiştirmek, "Tekrar dene") kayıt eklemez. */
+let pendingTab = null; // oturumdan ya da denemeden düğmeyle çıkarken: oturum kaydı geri alınınca açılacak sayfa
+const navDepth = () => history.state?.depth ?? 0;
+const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
+function goBack() {
+  if (navDepth() > 0) history.back();
+  else go(rootTab(), 'replace');
+}
+function pushOverlay(kind) {
+  history.pushState({ tab: state.tab, depth: navDepth() + 1, overlay: kind }, '');
+}
+window.addEventListener('popstate', (e) => {
+  if (!state.profile || state.inRecovery) return;
+  const s = e.state || {};
+  if (pendingTab) {
+    const tab = pendingTab;
+    pendingTab = null;
+    history.replaceState({ tab, depth: s.depth ?? 0 }, '');
+    go(tab, 'history');
+    return;
+  }
+  if (state.session || state.exam) {
+    const exam = !!state.exam;
+    if (!confirm(exam ? 'Denemeden çıkılsın mı? Cevapların kayıtlı; süre işlemeye devam eder, Deneme sayfasından kaldığın yere dönebilirsin.'
+      : 'Çalışmaya ara verilsin mi? Cevapladığın sorular kaydedildi.')) { pushOverlay(exam ? 'exam' : 'session'); return; }
+    state.leaveOverlay?.();
+  }
+  // Bitmiş bir oturumun kaydına ileri tuşuyla gelinirse düz sayfa kaydına çevrilir.
+  const tab = s.tab || rootTab();
+  if (s.overlay) history.replaceState({ tab, depth: s.depth ?? 0 }, '');
+  // Gönderilmemiş fotoğraf varken vazgeçerse sayfanın kaydı geri konur.
+  if (!go(tab, 'history')) history.pushState({ tab: state.tab, depth: (s.depth ?? 0) + 1 }, '');
+});
+
+// how: 'push' yeni sayfa; 'replace' bu kaydın yerine (ilk açılış, kendiliğinden yönlendirme); 'history' geri/ileri
+// tuşundan geldi, geçmişe dokunulmaz. Sayfa değiştiyse true döner.
+function go(tab, how = 'push') {
+  if (!confirmLeave()) return false;
+  // Oturum ya da deneme kaydının üstündeyken: önce o kayıt geri alınır, sayfa popstate'te açılır (geri tuşunda
+  // aynı sayfa iki kez durmasın).
+  if (how === 'push' && history.state?.overlay) { pendingTab = tab; history.back(); return true; }
+  if (how !== 'history') {
+    const entry = { tab, depth: navDepth() };
+    if (how === 'push' && history.state?.tab !== tab) { entry.depth++; history.pushState(entry, ''); }
+    else history.replaceState(entry, '');
+  }
+  if (applyUpdate(tab)) return true;
   state.tab = tab;
   state.session = null;
+  state.leaveOverlay = null;
   // Denemeden çıkılınca sayaç durur; deneme telefonda kayıtlı, Deneme sayfasından devam edilir.
   clearInterval(state.examTimer);
   state.exam = null;
   window.scrollTo(0, 0);
   const views = {
-    // Öğrencinin Deneme sekmesi uygulama içi denemeleri açar; kâğıt deneme yükleme oradan ("paper").
+    // Öğrencinin Deneme sekmesi uygulama içi denemeleri açar; Yükle sekmesi kâğıt deneme ("paper") ve tek tek
+    // soru gönderme ("ask": yapamadığı ya da beğendiği sorular).
     home: viewHome, upload: () => (state.profile?.role === 'student' ? viewExamHub() : viewUpload('deneme')),
-    paper: () => viewUpload('deneme'), book: () => viewUpload('kitap'),
+    send: viewSend, paper: () => viewUpload('deneme'), ask: () => viewUpload('soru'), book: () => viewUpload('kitap'),
     topics: viewTopics, settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
     together: viewTogether,
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
+  return true;
 }
 
 // ---------------------------------------------------------------- giriş
@@ -412,7 +468,7 @@ async function start() {
   // Öğretmen, sadece velilerin kendisine açtığı çocukları görür (salt okunur).
   await loadStudents();
   if (!state.student) {
-    if (profile.role === 'parent') return go('settings'); // ilk çocuğu Aile bölümünden ekler
+    if (profile.role === 'parent') return go('settings', 'replace'); // ilk çocuğu Aile bölümünden ekler
     return render(h('div', { class: 'card' },
       h('h2', {}, 'Henüz bağlı öğrenci yok'),
       h('p', { class: 'muted' }, profile.role === 'teacher'
@@ -420,12 +476,18 @@ async function start() {
         : 'Hesabınız henüz bir öğrenciye bağlanmamış.'),
       h('button', { onclick: signOut }, 'Çıkış yap')));
   }
-  // Kendini güncellemeden sonra, kullanıcının gitmek istediği sayfaya devam edilir.
-  let resume = null;
-  try { resume = sessionStorage.getItem('defter.resumeTab'); sessionStorage.removeItem('defter.resumeTab'); } catch (e) { /* önemli değil */ }
-  const allowed = profile.role === 'student' ? ['home', 'upload', 'paper', 'topics', 'settings', 'reasons', 'together']
+  // Kendini güncellemeden sonra kullanıcının gitmek istediği sayfaya, yenileyince de bulunduğu sayfaya devam edilir
+  // (geçmiş kaydı korunur; geri tuşu yine önceki sayfaya döner).
+  let resume = null, resumeDepth = null;
+  try {
+    resume = sessionStorage.getItem('defter.resumeTab'); resumeDepth = sessionStorage.getItem('defter.resumeDepth');
+    sessionStorage.removeItem('defter.resumeTab'); sessionStorage.removeItem('defter.resumeDepth');
+  } catch (e) { /* önemli değil */ }
+  if (resume && resumeDepth !== null) history.replaceState({ tab: resume, depth: +resumeDepth || 0 }, '');
+  const allowed = profile.role === 'student' ? ['home', 'upload', 'send', 'paper', 'ask', 'topics', 'settings', 'reasons', 'together']
     : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together'];
-  go(allowed.includes(resume) ? resume : profile.role === 'student' ? 'home' : 'report');
+  const here = history.state?.tab;
+  go(allowed.includes(resume) ? resume : allowed.includes(here) ? here : profile.role === 'student' ? 'home' : 'report', 'replace');
 }
 
 async function loadStudents() {
@@ -850,6 +912,7 @@ function statusTag(status) {
 
 function runSession(track, s) {
   state.session = { track, entries: examOrder(s.entries, studentSubjects(state.student)), index: 0, results: new Map(), stats: { correct: 0, total: 0 }, together: [] };
+  pushOverlay('session'); // geri tuşu önce sorsun; oturum bitince tek geri ana sayfaya döner
   showQuestion();
 }
 
@@ -875,6 +938,7 @@ function showQuestion() {
   };
   tick();
   timerId = setInterval(tick, 1000);
+  state.leaveOverlay = () => clearInterval(timerId); // geri tuşuyla ara verilirse sayaç durur
 
   const choiceBtns = ['A', 'B', 'C', 'D'].filter((k) => question.choices?.[k] !== undefined).map((k) =>
     h('button', { class: 'choice', 'aria-pressed': 'false', onclick: () => {
@@ -1592,7 +1656,6 @@ async function viewTogether() {
   const trackName = { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma' };
   render(
     h('header', { class: 'stack', style: 'gap: 6px' },
-      h('button', { class: 'ghost small', style: 'align-self: flex-start', onclick: () => go(isParentView() ? 'report' : 'home') }, '← Geri'),
       h('h1', {}, 'Birlikte bakılacaklar'),
       h('p', { class: 'muted' }, isParentView()
         ? `${name} bu soruları anlamadığını söyledi ya da tahmin etti. Yanına oturup birlikte çözün, iyice anladığından emin olun.` +
@@ -1624,11 +1687,12 @@ async function viewReasons() {
     .select('*, topics(name), exams(name), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
     .eq('student_id', sid()).neq('outcome', 'dogru').is('student_reason', null).not('diagnosis_cause', 'is', null)
     .order('exam_id').order('subject').order('q_no'));
-  if (!rows.length) return go('home');
+  // Bitince açıldığı sayfaya geri dönülür (geri tuşunda bu sayfa tekrar açılıp kendini kapatmasın).
+  if (!rows.length) return goBack();
   let i = 0;
 
   const show = () => {
-    if (i >= rows.length) { toast('Hepsi tamam.'); return go('home'); }
+    if (i >= rows.length) { toast('Hepsi tamam.'); return goBack(); }
     const r = rows[i];
     let reason = null, confident = null;
     const saveBtn = h('button', { class: 'primary block', disabled: true, onclick: save }, 'Kaydet ve yorumu gör');
@@ -1669,9 +1733,7 @@ async function viewReasons() {
     }
 
     render(
-      h('div', { class: 'spread' },
-        h('button', { class: 'ghost', onclick: () => go('home') }, '← Geri'),
-        h('span', { class: 'small muted num' }, `${i + 1} / ${rows.length}`)),
+      h('p', { class: 'small muted num', style: 'text-align: right' }, `${i + 1} / ${rows.length}`),
       h('section', { class: 'card' },
         h('div', { class: 'row' }, subjTag(r.subject), h('span', { class: 'small muted' }, `${r.exams?.name || ''} · ${r.q_no}. soru`)),
         examQuestionContent(r),
@@ -1791,7 +1853,8 @@ async function viewUpload(kind) {
     timeNote = t;
     timeChips.forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget)));
   } }, t));
-  const noteInput = h('textarea', { id: 'book-note', rows: 2, placeholder: 'Hangi kitap, hangi konu? (isteğe bağlı)' });
+  const noteInput = h('textarea', { id: 'book-note', rows: 2, placeholder: kind === 'soru'
+    ? 'Nerede takıldın? Hangi test ya da kitap? (isteğe bağlı)' : 'Hangi kitap, hangi konu? (isteğe bağlı)' });
 
   const status = h('p', { class: 'small muted', hidden: true });
   const sendBtn = h('button', { class: 'primary block', disabled: true, onclick: send }, 'Gönder');
@@ -1799,9 +1862,9 @@ async function viewUpload(kind) {
   const missingNote = h('p', { class: 'small muted' });
 
   function refresh() {
-    if (kind === 'kitap') {
+    if (kind !== 'deneme') {
       sendBtn.disabled = !photos.length;
-      missingNote.textContent = photos.length ? '' : 'Göndermek için en az bir sayfa ekle.';
+      missingNote.textContent = photos.length ? '' : kind === 'soru' ? 'Göndermek için en az bir soru fotoğrafı ekle.' : 'Göndermek için en az bir sayfa ekle.';
       return;
     }
     const examOk = examSel.value && (examSel.value !== '__new' || newName.value.trim());
@@ -1829,13 +1892,14 @@ async function viewUpload(kind) {
           await q(sb.from('exams').update({ time_note: timeNote }).eq('id', examId));
         }
       }
-      // Deneme öğrenciye aittir; kitap sayfaları herkesin kullandığı ortak havuza gider.
+      // Deneme ve gönderilen sorular öğrenciye aittir; kitap sayfaları herkesin kullandığı ortak havuza gider.
+      const own = kind !== 'kitap';
       const sub = await q(sb.from('submissions').insert({
-        kind, exam_id: examId, student_id: kind === 'deneme' ? sid() : null, uploaded_by: state.user.id,
-        note: kind === 'kitap' ? noteInput.value.trim() || null : null,
+        kind, exam_id: examId, student_id: own ? sid() : null, uploaded_by: state.user.id,
+        note: kind !== 'deneme' ? noteInput.value.trim() || null : null,
       }).select().single());
-      const folder = kind === 'deneme' ? `${sid()}/${sub.id}` : `books/${sub.id}`;
-      const order = { kitapcik: 0, cevap_anahtari: 1, optik: 2, kitap_sayfa: 0 };
+      const folder = own ? `${sid()}/${sub.id}` : `books/${sub.id}`;
+      const order = { kitapcik: 0, cevap_anahtari: 1, optik: 2, kitap_sayfa: 0, yapamadim: 0, begendim: 1 };
       const sorted = [...photos].sort((a, b) => order[a.role] - order[b.role]);
       let n = 0;
       for (const p of sorted) {
@@ -1854,8 +1918,11 @@ async function viewUpload(kind) {
         h('h2', {}, kind === 'kitap' ? 'Sayfaları aldım' : 'Sorularını aldım'),
         h('p', { class: 'muted' }, kind === 'kitap'
           ? 'Bir saat içinde soruları ayırıp soru havuzuna ekleyeceğim.'
-          : 'Bir saat içinde işleyeceğim. Yanlışlarının nedenini seçme görevi ana sayfaya düşecek, ilk tekrarları yarın gelecek.'),
-        h('button', { class: 'primary block', onclick: () => go(state.profile.role === 'parent' ? 'report' : 'home') }, 'Tamam')));
+          : kind === 'soru'
+            ? 'Bir saat içinde çözümlerini yazacağım; Yükle sekmesinde "Gönderdiğin sorular" altında göreceksin. Yapamadıkların yarından itibaren benzerleriyle hata tekrarında gelecek.'
+            : 'Bir saat içinde işleyeceğim. Yanlışlarının nedenini seçme görevi ana sayfaya düşecek, ilk tekrarları yarın gelecek.'),
+        // Açıldığı sayfaya döner (öğrenci Yükle sekmesine, veli rapora ya da Deneme'ye).
+        h('button', { class: 'primary block', onclick: goBack }, 'Tamam')));
     } catch (e) {
       console.error(e);
       status.innerHTML = '';
@@ -1864,6 +1931,18 @@ async function viewUpload(kind) {
     }
   }
 
+  if (kind === 'soru') {
+    render(
+      h('header', { class: 'stack', style: 'gap: 4px' },
+        h('p', { class: 'label' }, 'Soru ekle'), h('h1', {}, 'Soru gönder'),
+        h('p', { class: 'muted' }, 'Her fotoğrafta bir soru olsun; şıkları da görünsün. İstersen yapamadıklarını ve beğendiklerini birlikte gönder.')),
+      photoPicker('Yapamadığım sorular', 'Çözümünü yazarım; benzerleri hata tekrarında gelir.', 'yapamadim', photos, refresh),
+      photoPicker('Beğendiğim sorular', 'Bu tarzda yeni sorular yazarım.', 'begendim', photos, refresh),
+      h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
+      sendBtn, missingNote, status);
+    refresh();
+    return;
+  }
   if (kind === 'kitap') {
     render(
       h('header', { class: 'stack', style: 'gap: 4px' },
@@ -1930,13 +2009,10 @@ const examNet = (rs) => rs.reduce((s, r) => s + r.correct - r.wrong / 3, 0);
 async function viewExamHub() {
   loading();
   const lgs = isLgsStudent(state.student);
-  const [bookletRows, past, subs] = await Promise.all([
+  const [bookletRows, past] = await Promise.all([
     lgs ? q(sb.from('questions').select('booklet').in('booklet', BOOKLETS.map((b) => b[0])).eq('active', true)) : [],
     q(sb.from('exams').select('id, name, booklet, exam_date, time_note, exam_results(correct, wrong, blank)')
       .eq('student_id', sid()).eq('kind', 'uygulama').order('created_at', { ascending: false }).limit(12)),
-    // Son yüklemeler (eskiden ana sayfadaydı): kâğıt denemenin işlenip işlenmediği burada görünür.
-    q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name)')
-      .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(4)),
   ]);
   const count = {};
   bookletRows.forEach((r) => { count[r.booklet] = (count[r.booklet] || 0) + 1; });
@@ -1989,15 +2065,58 @@ async function viewExamHub() {
       past.map((p) => h('div', { class: 'card flat spread', style: 'padding: 12px' },
         h('div', {}, h('div', {}, p.name), h('div', { class: 'small muted' }, `${fmtDate(p.exam_date)}${p.time_note ? ' · ' + p.time_note : ''}`)),
         h('b', { class: 'num' }, `net ${fmtNet(examNet(p.exam_results || []))}`)))) : null,
-    h('section', { class: 'card flat stack', style: 'gap: 6px' },
+    // Kâğıt deneme yükleme Yükle sekmesinde; buradan da bir dokunuşla gidilir.
+    h('p', { class: 'small muted', style: 'text-align: center' }, 'Kâğıt üzerinde bir deneme mi çözdün? ',
+      h('a', { href: '#', onclick: (e) => { e.preventDefault(); go('send'); } }, 'Yükle sekmesinden gönder.')));
+}
+
+// Yüklemenin listede görünen adı.
+const subLabel = (s) => s.exams?.name || { kitap: 'Kitap sayfaları', soru: 'Gönderilen sorular' }[s.kind] || 'Yükleme';
+
+/* Öğrencinin Yükle sekmesi: tek tek soru gönderme (testte yapamadığı ya da beğendiği sorular) ve kâğıt deneme.
+   Altta gönderdiği soruların çözümleri (görev işledikten sonra) ve son yüklemelerin durumu. */
+async function viewSend() {
+  loading();
+  const subs = await q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name)')
+    .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(8));
+  const done = subs.filter((s) => s.kind === 'soru' && s.status === 'done').map((s) => s.id);
+  const added = done.length ? await q(sb.from('questions')
+    .select('id, subject, stem, image_path, choices, answer, hint, solution, source_note, submission_id, topics(name)')
+    .in('submission_id', done).order('created_at', { ascending: false }).limit(12)) : [];
+
+  render(
+    h('header', { class: 'stack', style: 'gap: 4px' },
+      h('p', { class: 'label' }, 'Yükle'),
+      h('h1', {}, 'Fotoğrafla gönder'),
+      h('p', { class: 'muted' }, 'Tek tek sorular ya da kâğıt üzerinde çözdüğün bir deneme.')),
+    h('section', { class: 'card stack', style: 'gap: 8px' },
+      h('h2', {}, 'Soru ekle'),
+      h('p', { class: 'small muted' }, 'Testte yapamadığın ya da çok beğendiğin bir soru mu var? Fotoğrafını çek, gönder. ' +
+        'Bir saat içinde çözümünü yazarım; yapamadıkların benzerleriyle hata tekrarına girer, beğendiklerinin benzerleri de gelir.'),
+      h('button', { class: 'primary block', onclick: () => go('ask') }, 'Soru ekle')),
+    h('section', { class: 'card stack', style: 'gap: 8px' },
+      h('h2', {}, 'Kâğıt deneme'),
       h('p', { class: 'small muted' }, 'Kâğıt üzerinde bir deneme mi çözdün? Fotoğraflarını gönder, ben notlandırayım.'),
-      h('button', { class: 'block', onclick: () => go('paper') }, 'Kâğıt denemeyi yükle'),
-      subs.length ? [h('p', { class: 'label', style: 'margin-top: 6px' }, 'Son yüklemeler'),
-        subs.map((s) => h('div', { class: 'stack', style: 'gap: 2px; padding-top: 6px; border-top: 1px solid var(--rule)' },
-          h('div', { class: 'spread' },
-            h('span', {}, s.exams?.name || (s.kind === 'kitap' ? 'Kitap sayfaları' : 'Yükleme')),
-            statusTag(s.status)),
-          s.result_note && s.status !== 'submitted' ? h('p', { class: 'small muted' }, s.result_note) : null))] : null));
+      h('button', { class: 'block', onclick: () => go('paper') }, 'Kâğıt denemeyi yükle')),
+    added.length ? h('section', { class: 'stack' },
+      h('h2', {}, 'Gönderdiğin sorular'),
+      added.map((x) => h('div', { class: 'card stack', style: 'gap: 8px' },
+        h('div', { class: 'row' }, subjTag(x.subject), h('span', { class: 'small muted' }, x.topics?.name || ''),
+          /beğen/i.test(x.source_note || '') ? h('span', { class: 'tag green' }, 'Beğendin') : h('span', { class: 'tag amber' }, 'Yapamamıştın')),
+        x.image_path ? lazyImg('questions', x.image_path) : null,
+        x.stem ? h('p', { class: 'stem small' }, x.stem) : null,
+        h('div', { class: 'stack', style: 'gap: 4px' }, ['A', 'B', 'C', 'D'].filter((k) => x.choices?.[k] !== undefined).map((k) =>
+          h('div', { class: 'opt small' }, h('b', {}, k), h('span', {}, x.choices[k])))),
+        h('details', {}, h('summary', {}, 'Çözümü gör'),
+          h('div', { class: 'note', style: 'margin-top: 8px' },
+            h('p', {}, h('b', {}, `Doğru cevap: ${x.answer}`)),
+            x.hint ? h('p', { class: 'small', style: 'margin-top: 6px' }, h('b', {}, 'İpucu: '), x.hint) : null,
+            x.solution ? h('p', { style: 'margin-top: 6px' }, x.solution) : null))))) : null,
+    subs.length ? h('section', { class: 'card flat stack', style: 'gap: 6px' },
+      h('p', { class: 'label' }, 'Son yüklemeler'),
+      subs.map((s) => h('div', { class: 'stack', style: 'gap: 2px; padding-top: 6px; border-top: 1px solid var(--rule)' },
+        h('div', { class: 'spread' }, h('span', {}, subLabel(s)), statusTag(s.status)),
+        s.result_note && s.status !== 'submitted' ? h('p', { class: 'small muted' }, s.result_note) : null))) : null);
 }
 
 async function startBookletExam(id, title, section) {
@@ -2063,6 +2182,7 @@ function beginExam({ id, booklet, title, section, questions }) {
 function showExam(exam) {
   state.exam = exam;
   clearInterval(state.examTimer);
+  if (history.state?.overlay !== 'exam') pushOverlay('exam'); // geri tuşu önce sorar; sonuçtan tek geri Deneme'ye
   if (Date.now() >= exam.endsAt) return finishExam(exam, 'Süre doldu');
   const total = exam.questions.length;
   let shownAt = Date.now();
@@ -2071,6 +2191,8 @@ function showExam(exam) {
     exam.times[qid] = (exam.times[qid] || 0) + (Date.now() - shownAt) / 1000;
     shownAt = Date.now();
   };
+  // Geri tuşuyla çıkılırsa "Ara ver" düğmesi gibi: o sorunun süresi yazılır, deneme telefonda saklanır.
+  state.leaveOverlay = () => { spend(); storeExam(exam); };
   const timer = h('span', { class: 'timer num' });
   const tick = () => {
     const left = Math.round((exam.endsAt - Date.now()) / 1000);
@@ -2971,7 +3093,7 @@ async function viewReport() {
   const job = h('section', { class: 'card' },
     h('h2', {}, 'Yüklemeler'),
     subs.length ? subs.map((s) => h('div', { class: 'stack', style: 'gap: 4px' },
-      h('div', { class: 'spread' }, h('span', {}, s.exams?.name || (s.kind === 'kitap' ? 'Kitap sayfaları' : 'Yükleme')), statusTag(s.status)),
+      h('div', { class: 'spread' }, h('span', {}, subLabel(s)), statusTag(s.status)),
       s.result_note ? h('p', { class: 'small muted' }, s.result_note) : null)) : h('p', { class: 'muted' }, 'Henüz yükleme yok.'),
     feedbackRows.length ? h('p', { class: 'small muted' },
       `Soru bildirimi: ${feedbackRows.length}. Kontrol edilen ${feedbackRows.filter((f) => f.status === 'checked').length}, ` +
@@ -3138,7 +3260,7 @@ function splitBar(label, counts) {
 // ---------------------------------------------------------------- başlat
 
 // Kendini güncellemeden gelinmişse adresteki ?v= temizlenir (giriş bağlantılarının #... kısmına dokunulmaz).
-if (/[?&]v=\d+/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
+if (/[?&]v=\d+/.test(location.search)) history.replaceState(history.state, '', location.pathname + location.hash);
 checkForUpdate();
 
 // Süresi dolmuş ya da kullanılmış bir giriş/sıfırlama bağlantısı açılırsa adres hatayla gelir.

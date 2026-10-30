@@ -133,6 +133,36 @@ Türkçe 120 s, İnkılap 75 s, Din 60 s, İngilizce 75 s (sözel: 50 questions 
 Matematik 150 s, Fen 90 s (sayısal: 40 questions / 80 min). Write questions that a well-prepared
 student can solve within that time; LGS questions are long to read, not long to compute.
 
+### 1e. Questions a student sends (`kind = soru`, has `student_id`)
+
+From the app's "Yükle → Soru ekle", a student photographs single questions from her school tests or books:
+`photo_role = yapamadim` (she could not solve it) or `begendim` (she liked it). The submission `note` may
+say where she got stuck. These are the family's own books: like the MEB booklets, they stay in this
+private app and never go anywhere public. For every photo (usually one question each):
+1. Transcribe the question into `stem` and `choices` (keep its own number of choices). If it depends on
+   a figure, graph or table, crop it and upload to the `questions` bucket
+   (`upload questions ogrenci/<submission_id>/<n>.jpg <file>`) and set `image_path`. Map `topic_id` to the
+   student's grade topics (plus `extra_grades`) as in 1a step 4. If the photo is unreadable or not a
+   question, skip it and say so in `result_note`.
+2. Solve it; Matematik and Fen twice by independent routes. If the routes disagree and you cannot settle
+   it, skip the question and say so. Write `hint` and a step-by-step `solution` at her level. For
+   `yapamadim` the solution is what she reads first in the app, so make it a clear, kind explanation
+   that starts from where she said she got stuck.
+3. Insert into `questions` with `source='ogrenci'`, `submission_id` = the submission,
+   `source_note='Öğrencinin gönderdiği soru (yapamadım)'` or `'(beğendi)'`, plus `subject`, `styles`,
+   `answer`, `target_seconds` and `verified=true` as for any question. The app shows these, with their
+   solutions, under "Gönderdiğin sorular".
+4. `yapamadim`: make sure the topic is `active` for her (`topic_status` as in 1a step 7) and that she
+   has a `topic` item for it, then create a `mistake` item (`track=mistake, topic_id,
+   question_id=<new question id>, step=0, interval_days=1, due_date=tomorrow,
+   note='Yapamadığı soru (kendi gönderdi)'`). Section 1c then writes its variants (in this run if
+   time allows).
+5. `begendim`: write 2 new questions in the same style and on the same skill (new numbers, names and
+   context), `variant_of` = the liked question's id, `source=claude`, `source_note='Beğendiği sorunun
+   benzeri'`. They join the pool and reach her in topic reviews and extra practice.
+6. Patch the submission `done` with a short, warm Turkish `result_note` to her, for example "2 soru
+   eklendi. Çözümleri 'Gönderdiğin sorular'da; yapamadığının benzerleri yarın hata tekrarında."
+
 ## 1b2. Mock exams taken in the app (every run)
 
 Students can now take timed mock exams inside the app (`exams.kind = 'uygulama'`: a real LGS paper
@@ -148,7 +178,8 @@ That is what puts the "nedenlerini seç" task on the student's home screen. Upda
 ## 1c. Similar questions for mistakes (every run, before section 2)
 
 Every wrong answer becomes a `mistake` item: deneme mistakes carry `exam_question_id`, and wrong answers
-(or "Bunu birlikte bakalım" skips) in topic reviews and extra practice carry `question_id`. Its reviews
+(or "Bunu birlikte bakalım" skips) in topic reviews and extra practice carry `question_id`, as do the
+questions a student sent because she could not solve them (1e). Its reviews
 (next day, then 2, 4, 14, 30 days) should show changed versions of that very question, never the
 question itself. Find the items that need them:
 ```

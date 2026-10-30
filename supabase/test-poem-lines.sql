@@ -1,9 +1,10 @@
 -- Şiir dizeleri yetki testi: çocuk kendi dizesini yazar ve görür, değiştiremez ve silemez, kardeşi adına yazamaz;
 -- veli görür ama yazamaz; Türkçe'si olmayan öğretmen ve kardeş göremez. Sonuç hata mesajıyla döner; her şey geri alınır.
+-- beklenen: {"cocuk_yazdi":true,"cocuk_goruyor":1,"kardes_adina":"reddedildi","cocuk_degistirdi":"reddedildi","cocuk_sildi":"reddedildi","veli_goruyor":1,"veli_yazdi":"reddedildi","ogretmen_goruyor":0,"kardes_goruyor":0}
 do $$
 declare
   kid uuid := (select id from public.profiles where display_name = 'IrfTest' and role = 'student');
-  sibling uuid := (select id from public.profiles where display_name = 'Isla' and role = 'student');
+  sibling uuid := (select id from public.profiles where role = 'student' and id <> kid order by created_at limit 1);
   parent uuid := (select parent_id from public.family_links where student_id = kid and relation = 'parent' limit 1);
   teacher uuid := (select parent_id from public.family_links where student_id = kid and relation = 'teacher' limit 1);
   lid uuid;

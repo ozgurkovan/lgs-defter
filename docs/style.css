@@ -171,8 +171,9 @@ input, select, textarea {
   width: 100%;
 }
 
-.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: -8px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: -8px; }
 .topbar button { min-height: 40px; color: var(--ink-soft); }
+.topbar button.back { color: var(--accent); font-weight: 600; padding-inline: 4px; }
 .topbar select.switch { width: auto; min-height: 40px; padding: 6px 10px; font-weight: 600; }
 
 /* Konu listesi: tüm satır dokunulabilir, onay kutusu büyük */

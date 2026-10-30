@@ -1,9 +1,10 @@
 -- Aile mesajları yetki testi: veli yazar, çocuk okur ve "okudum" der, çocuk metni değiştiremez,
 -- kardeş göremez, öğrenci kendine/başkasına mesaj yazamaz. Sonuç hata mesajıyla döner; her şey geri alınır.
+-- beklenen: {"veli_yazdi":true,"cocuk_sildi":0,"cocuk_okudum":1,"cocuk_goruyor":1,"kardes_goruyor":0,"veli_baskasi_adina":"reddedildi","cocuk_kendine_yazdi":"reddedildi","cocuk_metin_degistirdi":"reddedildi"}
 do $$
 declare
   kid uuid := (select id from public.profiles where display_name = 'IrfTest' and role = 'student');
-  sibling uuid := (select id from public.profiles where display_name = 'Isla' and role = 'student');
+  sibling uuid := (select id from public.profiles where role = 'student' and id <> kid order by created_at limit 1);
   parent uuid := (select parent_id from public.family_links where student_id = kid and relation = 'parent' limit 1);
   mid uuid;
   r jsonb := '{}';
