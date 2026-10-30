@@ -258,6 +258,17 @@ nav.tabs svg { width: 22px; height: 22px; }
 /* Kelime kartları: büyük kelime, altında iki sütun dört şık */
 .word-card { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding-block: 28px; }
 .word-big { font-family: var(--font-display); font-size: 2.2rem; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+/* Kelime kahramanı: gökyüzü ve çimen; kahraman ortada, aldıkları çevresinde. Çizim olduğu için koyu temada da açık kalır. */
+.hero-scene {
+  position: relative; height: 250px; border-radius: 16px; overflow: hidden;
+  background: linear-gradient(#BFE3FF 0%, #E8F5FF 60%, #B9E39F 60%, #9ED47F 100%);
+}
+.hero-scene svg.hero { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); height: 236px; width: auto; }
+.hero-item { position: absolute; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.18)); }
+.hero-shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.hero-shop .card { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 14px 10px; }
+.hero-shop .emoji { font-size: 44px; line-height: 1.1; }
+
 /* Dinleme kartı: kelime yazılmaz, büyük bir dinle düğmesi */
 .listen-big { width: 96px; height: 96px; min-height: 96px; border-radius: 50%; padding: 0; font-size: 2.6rem; }
 .word-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

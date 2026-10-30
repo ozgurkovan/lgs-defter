@@ -109,6 +109,20 @@ Her maddenin yanında nasıl denendiği yazar:
 - Oyun sırasında alt menü gizlenir, geri tuşu önce sorar. Hızlı "Sonraki kelime" kart atlatmaz.
 - Altı sekmeli alt menü dar telefona da sığar. [E]
 
+**Kelime kahramanı** (İngilizce sekmesi) [A], oyun [E]
+- Sevimli bir çocuk çizimi, hep pazılarını gösterir. Kız ya da erkek oluşunu veli seçer (Ayarlar → Günlük plan → Kelime kahramanı);
+  seçilmediyse kıvırcık saçlı. Çocuk bunu kendisi değiştiremez.
+- Güç 0–10, bildiği kelime sayısından gelir (kararlılığı 7 günü aşan kelime): 5, 15, 30, 50 … 290 kelime. [O]
+  - Seviye arttıkça kolları kalınlaşır, pazıları şişer, omuzları genişler.
+  - Kıyafet: düz tişört → yıldızlı mavi tişört → çizgili spor ve şapka (kızda saç bandı) → 10 numaralı forma ve bileklik
+    → pelerinli kahraman → altın madalya ve taç.
+- Kelime altını 🪙: ilk denemede doğru her kart 1, günün kartlarını bitirdiği her gün 5. [O]
+  - Emin olma ölçeğinden bağımsızdır; çocuk fazla altın için "tamamen eminim" demez.
+  - Oturum sonunda tekrar sorulan kart altın vermez.
+- Mağaza: toptan şatoya 15 eşya, her biri bir kez alınır. Aldıkları kahramanın sahnesinde durur.
+- Oturum sonunda kazandığı altın görünür. Güç artınca kutlama ve yeni kahraman görünür.
+- Raporda güç, altın ve aldıkları görünür.
+
 **Okuduğum kitap** (ilkokul, Yükle sekmesi) [A], gönderme ve sorular [E]
 - Çocuk okuduğu kitabın sayfalarını fotoğraflar. Genelde hikâye kitabı olur, ama her tür kitap gönderilebilir.
   - Kitap seçilir ya da yeni kitap eklenir: adı ve biliyorsa sınav tarihi.
@@ -220,6 +234,8 @@ Her maddenin yanında nasıl denendiği yazar:
 - Birlikte baktık: veli ve o dersin öğretmeni işaretler.
 - Şiir dizeleri: çocuk yazar; veli ve Türkçe öğretmeni okur.
 - Soru ekle: öğrenci ve velisi gönderir; kardeşi adına gönderilemez.
+- Kelime kahramanı: çocuk alışverişini kendisi yapar, aynı eşyayı iki kez alamaz, kardeşi adına alamaz; kahramanın kız ya da erkek
+  oluşunu veli seçer, çocuk değiştiremez; veli ve İngilizce öğretmeni görür (`test-hero.sql`).
 - Okuduğu kitap:
   - çocuk kendi kitabını ekler ve sayfalarını gönderir, kardeşi adına ekleyemez;
   - sınav tarihini sonradan yalnızca veli değiştirir;

@@ -14,7 +14,8 @@ begin
     'links', (select count(*) from public.family_links),
     'word_progress', (select count(*) from public.word_progress),
     'word_answers', (select count(*) from public.word_answers),
-    'books', (select count(*) from public.books)
+    'books', (select count(*) from public.books),
+    'purchases', (select count(*) from public.purchases)
   ) into r;
   perform set_config('role', 'postgres', true);
   return r;

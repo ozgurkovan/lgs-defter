@@ -26,9 +26,12 @@
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], topics: [], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
-            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları'], together: ['birlikte bakılacaklar'] }
+            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'kelime kahramanı'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
-    if (role === 'student' && wordsPerDay(state.student) > 0) pages.words = ['kelime kartları'];
+    if (role === 'student' && wordsPerDay(state.student) > 0) {
+      pages.words = ['kelime kartları', 'güç', 'mağaza'];
+      pages.shop = ['mağaza', 'kelime altını'];
+    }
     // İlkokul: okuduğu kitabın sayfaları Yükle sekmesinden gönderilir.
     if (role === 'student' && (state.student?.grade || 8) <= 4) {
       pages.send = [...pages.send, 'okuduğum kitap'];
@@ -55,6 +58,12 @@
     if (role === 'student' && (state.student?.grade || 8) > 4) {
       go('send'); await settle();
       check('İlkokul dışında "Okuduğum kitap" görünmez', !pageText().includes('okuduğum kitap'));
+    }
+
+    // Kelime kahramanı İngilizce sayfasında çizilir.
+    if (role === 'student' && wordsPerDay(state.student) > 0) {
+      go('words'); await settle();
+      check('Kelime kahramanı çizilir', !!document.querySelector('.hero-scene svg.hero'));
     }
 
     // Kelime kartlarının sekmesi "İngilizce" adıyla Ayarlar'ın hemen solunda (velinin isteği).

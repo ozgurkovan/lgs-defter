@@ -391,7 +391,7 @@ const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', 'words', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'settings', 'reasons', 'together']
+  ? ['home', 'words', 'shop', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'settings', 'reasons', 'together']
   : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
@@ -450,7 +450,7 @@ function go(tab, how = 'push') {
     send: viewSend, paper: () => viewUpload('deneme'), ask: () => viewUpload('soru'), book: () => viewUpload('kitap'),
     read: () => viewUpload('okuma'), // ilkokul: okuduğu kitabın sayfaları
     topics: viewTopics, settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
-    together: viewTogether, words: viewWords,
+    together: viewTogether, words: viewWords, shop: viewShop,
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
   return true;
@@ -2731,6 +2731,119 @@ function speak(text) {
   speechSynthesis.speak(u);
 }
 
+/* Kelime kahramanı (velinin isteği): İngilizce sekmesinde öğrendikçe güçlenen bir çocuk. Güç seviyesi bildiği kelime
+   sayısından gelir (kararlılığı 7 günü aşan kelime): pazıları seviyeyle şişer, kıyafeti seviye seviye güzelleşir.
+   Kız ya da erkek oluşunu veli seçer (profiles.avatar); seçilmediyse kıvırcık saçlı bir çocuk. Kelime altınıyla
+   mağazadan eşya alır; aldıkları kahramanın çevresinde durur. */
+const HERO_LEVELS = [0, 5, 15, 30, 50, 75, 105, 140, 180, 230, 290]; // bu kadar kelimeyle bu güç (0–10)
+const heroLevel = (known) => HERO_LEVELS.filter((n) => known >= n).length - 1;
+const wordKnown = (p) => (p.stability ? p.stability >= 7 : p.box >= 2);
+// Kelime altını: ilk denemede doğru her kart 1, günün kartlarını bitirdiği her gün 5 daha; harcadıkları düşülür. Emin
+// olma ölçeği altını değiştirmez: çocuk fazla altın için "tamamen eminim" demesin, tekrar zamanları bozulmasın.
+function heroCoins(answers, purchases, goal) {
+  const firsts = answers.filter((a) => !a.again);
+  const days = {};
+  for (const a of firsts) (days[localDate(new Date(a.answered_at))] ||= new Set()).add(a.word);
+  const earned = firsts.filter((a) => a.correct).length + (goal > 0 ? Object.values(days).filter((s) => s.size >= goal).length * 5 : 0);
+  const spent = purchases.reduce((n, p) => n + p.price, 0);
+  return { earned, spent, balance: earned - spent };
+}
+// Mağaza: ucuzdan pahalıya. pos: sahnedeki yeri.
+const HERO_SHOP = [
+  { id: 'top', name: 'Top', emoji: '⚽', price: 20, pos: 'left: 36%; bottom: 1%', size: 22 },
+  { id: 'cicek', name: 'Çiçekler', emoji: '🌻', price: 25, pos: 'right: 4%; bottom: 17%', size: 30 },
+  { id: 'agac', name: 'Ağaç', emoji: '🌳', price: 30, pos: 'right: 21%; bottom: 33%', size: 44 },
+  { id: 'kedi', name: 'Kedi', emoji: '🐱', price: 40, pos: 'left: 22%; bottom: 2%', size: 30 },
+  { id: 'kopek', name: 'Köpek', emoji: '🐶', price: 40, pos: 'right: 22%; bottom: 2%', size: 30 },
+  { id: 'kaykay', name: 'Kaykay', emoji: '🛹', price: 60, pos: 'left: 22%; bottom: 17%', size: 26 },
+  { id: 'cadir', name: 'Çadır', emoji: '⛺', price: 70, pos: 'left: 21%; bottom: 34%', size: 34 },
+  { id: 'bisiklet', name: 'Bisiklet', emoji: '🚲', price: 80, pos: 'left: 1%; bottom: 2%', size: 38 },
+  { id: 'gitar', name: 'Gitar', emoji: '🎸', price: 100, pos: 'right: 22%; bottom: 17%', size: 28 },
+  { id: 'at', name: 'At', emoji: '🐴', price: 250, pos: 'left: 3%; bottom: 17%', size: 38 },
+  { id: 'araba', name: 'Araba', emoji: '🚗', price: 300, pos: 'right: 1%; bottom: 2%', size: 40 },
+  { id: 'ev', name: 'Ev', emoji: '🏡', price: 600, pos: 'left: 1%; bottom: 31%', size: 58 },
+  { id: 'ucak', name: 'Uçak', emoji: '✈️', price: 900, pos: 'left: 8%; top: 6%', size: 30 },
+  { id: 'roket', name: 'Roket', emoji: '🚀', price: 1500, pos: 'right: 17%; top: 8%', size: 30 },
+  { id: 'sato', name: 'Şato', emoji: '🏰', price: 2500, pos: 'right: 1%; bottom: 31%', size: 58 },
+];
+// Kahramanın çizimi (SVG metni; içindekiler sabit, kullanıcı metni yok). Hep pazılarını gösterir; seviye 0'da kolları
+// ince, 10'da kocaman. Kıyafet: 0–1 düz tişört, 2–3 renkli yıldızlı tişört, 4–5 çizgili spor kıyafet ve şapka (kızda
+// saç bandı), 6–7 10 numaralı forma ve bileklik, 8–9 pelerinli kahraman, 10 altın madalya ve taç.
+function heroSvg(gender, level) {
+  const L = Math.min(10, Math.max(0, level | 0));
+  const skin = '#F5CBA7', shade = '#E5AE86', hair = gender === 'kiz' ? '#6B3E26' : '#4A2E1F';
+  const tier = L >= 10 ? 5 : L >= 8 ? 4 : L >= 6 ? 3 : L >= 4 ? 2 : L >= 2 ? 1 : 0;
+  const o = [
+    { shirt: '#EDEBE6', shorts: '#8D99AE', shoe: '#A9AFB8' },
+    { shirt: '#4C8DF6', shorts: '#2E3A59', shoe: '#FFFFFF', star: true },
+    { shirt: '#F25C54', shorts: '#264653', shoe: '#2EC4B6', stripes: true, hat: true },
+    { shirt: '#7B4DD8', shorts: '#2B2D42', shoe: '#FFC531', number: true, bands: true },
+    { shirt: '#E63946', shorts: '#1D3557', shoe: '#1D3557', cape: '#2F80ED', emblem: true },
+    { shirt: '#E63946', shorts: '#1D3557', shoe: '#F4B400', cape: '#2F80ED', medal: true, crown: true },
+  ][tier];
+  const cx = 100, sy = 106;
+  const tw = 34 + L * 2.2, arm = 7 + L * 1.3, bic = 2 + L * 1.7, ex = 28 + L * 1.3, legW = 11 + L * 0.5;
+  const s = [];
+  if (o.cape) s.push(`<path d="M${cx - tw / 2 + 4} ${sy - 8} L${cx - tw / 2 - 16} 190 Q${cx} 200 ${cx + tw / 2 + 16} 190 L${cx + tw / 2 - 4} ${sy - 8} Z" fill="${o.cape}"/>`);
+  s.push(`<ellipse cx="${cx}" cy="207" rx="${44 + L * 1.6}" ry="7" fill="rgba(0,0,0,.12)"/>`);
+  // Bacaklar, ayakkabılar, şort
+  for (const x of [cx - 4 - legW, cx + 4]) s.push(`<rect x="${x}" y="150" width="${legW}" height="48" rx="${legW / 2}" fill="${skin}"/>`);
+  for (const x of [cx - 4 - legW / 2 - 3, cx + 4 + legW / 2 + 3]) s.push(`<ellipse cx="${x}" cy="200" rx="${legW / 2 + 7}" ry="6.5" fill="${o.shoe}" stroke="rgba(0,0,0,.18)" stroke-width="1.2"/>`);
+  s.push(`<rect x="${cx - tw / 2 + 1}" y="140" width="${tw - 2}" height="25" rx="9" fill="${o.shorts}"/>`);
+  // Gövde ve tişört süsleri
+  s.push(`<rect x="${cx - tw / 2}" y="${sy - 10}" width="${tw}" height="${154 - sy}" rx="15" fill="${o.shirt}"/>`);
+  if (o.stripes) for (const y of [118, 130]) s.push(`<rect x="${cx - tw / 2 + 3}" y="${y}" width="${tw - 6}" height="5" rx="2" fill="#fff" opacity=".9"/>`);
+  if (o.star) s.push(`<text x="${cx}" y="127" text-anchor="middle" font-size="16" fill="#fff">★</text>`);
+  if (o.number) s.push(`<text x="${cx}" y="131" text-anchor="middle" font-size="19" font-weight="800" font-family="Arial, sans-serif" fill="#fff">10</text>`);
+  if (o.emblem) s.push(`<circle cx="${cx}" cy="122" r="11" fill="#FFD166"/><text x="${cx}" y="127.5" text-anchor="middle" font-size="15" font-weight="900" font-family="Arial, sans-serif" fill="#E63946">E</text>`);
+  // Kollar: hep pazı gösterir. Üst kol omuzdan dirseğe, ön kol yukarı, yumruk; pazı seviyeyle şişer.
+  for (const d of [-1, 1]) {
+    const shx = cx + d * (tw / 2 - 4), elx = cx + d * (tw / 2 + ex), ely = sy + 5, fy = ely - 30 - L * 0.7;
+    s.push(`<line x1="${shx}" y1="${sy}" x2="${elx}" y2="${ely}" stroke="${skin}" stroke-width="${arm}" stroke-linecap="round"/>`);
+    s.push(`<line x1="${elx}" y1="${ely}" x2="${elx}" y2="${fy}" stroke="${skin}" stroke-width="${arm * 0.9}" stroke-linecap="round"/>`);
+    s.push(`<ellipse cx="${(shx + elx) / 2 + d * 3}" cy="${sy - arm * 0.3}" rx="${5 + bic * 0.85}" ry="${1.5 + bic * 0.95}" fill="${skin}"/>`);
+    if (L >= 3) s.push(`<path d="M${(shx + elx) / 2 - d * (2 + bic * 0.3)} ${sy - bic * 0.5} q${d * (3 + bic * 0.3)} ${-bic * 0.45} ${d * (6 + bic * 0.6)} 0" stroke="${shade}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`);
+    s.push(`<line x1="${shx}" y1="${sy}" x2="${shx + d * 9}" y2="${sy + 1}" stroke="${o.shirt}" stroke-width="${arm + 6}" stroke-linecap="round"/>`);
+    if (o.bands) s.push(`<line x1="${elx}" y1="${fy + arm * 0.55 + 1}" x2="${elx}" y2="${fy + arm * 0.55 + 7}" stroke="#FFC531" stroke-width="${arm + 3}"/>`);
+    s.push(`<circle cx="${elx}" cy="${fy}" r="${arm * 0.62 + 2.5}" fill="${skin}"/>`);
+  }
+  // Boyun, kız saçının arka kısmı (örgüler), baş, kulaklar
+  s.push(`<rect x="94" y="80" width="12" height="18" rx="5" fill="${shade}"/>`);
+  if (gender === 'kiz') s.push(`<circle cx="66" cy="70" r="11" fill="${hair}"/><circle cx="134" cy="70" r="11" fill="${hair}"/>`);
+  s.push(`<circle cx="70" cy="61" r="6.5" fill="${skin}"/><circle cx="130" cy="61" r="6.5" fill="${skin}"/>`);
+  s.push(`<circle cx="100" cy="58" r="30" fill="${skin}"/>`);
+  // Saç
+  if (gender === 'kiz') {
+    s.push(`<path d="M67 62 C61 27 86 17 102 19 C121 20 140 31 133 62 C128 45 117 39 103 39 C89 39 75 45 67 62 Z" fill="${hair}"/>`);
+    for (const x of [64, 136]) s.push(`<path d="M${x - 8} 52 L${x} 57 L${x - 8} 62 Z M${x + 8} 52 L${x} 57 L${x + 8} 62 Z" fill="#FF6FA8"/><circle cx="${x}" cy="57" r="2.6" fill="#E84D8A"/>`);
+  } else if (gender === 'erkek') {
+    s.push(`<path d="M69 57 C66 30 86 22 102 24 C120 25 135 34 131 57 C126 45 116 40 104 41 C92 41 77 46 69 57 Z" fill="${hair}"/>`);
+    s.push(`<path d="M97 25 q7 -11 16 -4 q-7 1 -9 7 Z" fill="${hair}"/>`);
+  } else {
+    for (const [x, y, r] of [[73, 47, 9], [80, 36, 10], [92, 29, 11], [106, 28, 11], [119, 34, 10], [127, 46, 9]]) s.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${hair}"/>`);
+  }
+  // Yüz: gözler, parıltı, yanaklar, gülümseme (güçlendikçe genişler)
+  for (const x of [89, 111]) s.push(`<ellipse cx="${x}" cy="60" rx="4" ry="5" fill="#2D2A32"/><circle cx="${x + 1.4}" cy="58.2" r="1.5" fill="#fff"/>`);
+  for (const x of [82, 118]) s.push(`<circle cx="${x}" cy="69" r="5" fill="#F79E9E" opacity=".55"/>`);
+  const sm = 7 + L * 0.35;
+  s.push(`<path d="M${cx - sm} 71 Q${cx} ${77 + L * 0.3} ${cx + sm} 71" stroke="#9A4A3C" stroke-width="2.6" fill="none" stroke-linecap="round"/>`);
+  // Şapka ya da saç bandı, madalya, taç
+  if (o.hat && gender === 'kiz') s.push(`<path d="M72 44 Q100 26 128 44" stroke="#2EC4B6" stroke-width="6" fill="none" stroke-linecap="round"/>`);
+  else if (o.hat) s.push(`<path d="M70 46 C70 22 130 22 130 46 Z" fill="#2EC4B6"/><path d="M98 43 L142 46 Q140 51 98 49 Z" fill="#23A393"/>`);
+  if (o.medal) s.push(`<path d="M92 96 L100 114 L108 96" stroke="#2F80ED" stroke-width="4" fill="none"/><circle cx="100" cy="121" r="9" fill="#F4C430" stroke="#D4A017" stroke-width="1.5"/><text x="100" y="125.5" text-anchor="middle" font-size="11" font-weight="900" font-family="Arial, sans-serif" fill="#B8860B">1</text>`);
+  if (o.crown) s.push(`<path d="M80 31 L84 14 L93 25 L100 10 L107 25 L116 14 L120 31 Z" fill="#F4C430" stroke="#D4A017" stroke-width="1.5"/><circle cx="100" cy="22" r="2.4" fill="#E63946"/>`);
+  return `<svg class="hero" viewBox="0 0 200 220" role="img" aria-label="Kelime kahramanı, güç ${L}">${s.join('')}</svg>`;
+}
+// Kahraman ve aldıkları: gökyüzü ve çimen üstünde.
+function heroScene(gender, level, owned) {
+  const box = h('div', { class: 'hero-scene' });
+  box.innerHTML = heroSvg(gender, level);
+  for (const it of HERO_SHOP.filter((x) => owned.has(x.id))) {
+    box.append(h('span', { class: 'hero-item', title: it.name, style: `${it.pos}; font-size: ${it.size}px` }, it.emoji));
+  }
+  return box;
+}
+
 // Bugünün kartları: önce günü gelen tekrarlar (en eskisi önce), kalan yer listedeki sıradaki yeni kelimelerle dolar.
 function wordQueue(list, progress, answeredToday, n) {
   const today = localDate();
@@ -2749,38 +2862,54 @@ function wordQueue(list, progress, answeredToday, n) {
 async function viewWords() {
   loading();
   const goal = wordsPerDay(state.student);
-  const [list, progress, answers] = await Promise.all([
+  const [list, progress, answers, purchases] = await Promise.all([
     loadWords(),
     q(sb.from('word_progress').select('word, box, due_date, right_count, wrong_count, stability, difficulty, updated_at').eq('student_id', sid())),
-    q(sb.from('word_answers').select('word, answered_at, correct, stability_before, elapsed_days').eq('student_id', sid())),
+    q(sb.from('word_answers').select('word, answered_at, correct, again, stability_before, elapsed_days').eq('student_id', sid())),
+    q(sb.from('purchases').select('item, price').eq('student_id', sid())),
   ]);
   const start = dayStart();
-  const answered = new Set(answers.filter((r) => r.answered_at >= start).map((r) => r.word));
+  const answered = new Set(answers.filter((r) => r.answered_at >= start && !r.again).map((r) => r.word));
   const scale = fitWordScale(answers);
   const learned = progress.filter(wordLearned).length;
   const queue = wordQueue(list, progress, answered, Math.max(0, goal - answered.size));
   const extra = queue.length ? [] : wordQueue(list, progress, answered, 5);
+  // Kelime kahramanı: güç (bildiği kelime), altın, aldıkları.
+  const known = progress.filter(wordKnown).length;
+  const level = heroLevel(known);
+  const coins = heroCoins(answers, purchases, goal);
+  const hero = { level, doneToday: answered.size, goal };
+  const nextAt = HERO_LEVELS[level + 1];
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, 'İngilizce'), h('h1', {}, 'Kelime kartları'),
       h('p', { class: 'muted' }, 'İngilizce kelimeler, kolaydan zora. Bilemediğin kelime yakında yine gelir; bildikçe daha seyrek gelir.')),
     h('section', { class: 'card stack', style: 'gap: 10px' },
+      heroScene(state.student?.avatar, level, new Set(purchases.map((p) => p.item))),
+      h('div', { class: 'spread' },
+        h('b', {}, `💪 Güç ${level}`),
+        h('b', { class: 'num' }, `🪙 ${coins.balance}`),
+        h('button', { class: 'small', onclick: () => go('shop') }, 'Mağaza')),
+      h('p', { class: 'small muted' }, nextAt != null ? `Kelime öğrendikçe pazıların şişer. Bir sonraki güç için ${nextAt - known} kelime daha.`
+        : 'En güçlü kelime kahramanı sensin! 👑')),
+    h('section', { class: 'card stack', style: 'gap: 10px' },
       h('div', { class: 'spread' }, h('b', { class: 'num' }, `Bugün ${answered.size}/${goal}`),
         h('span', { class: 'small muted' }, `Öğrendiğin kelime: ${learned}`)),
       h('div', { class: 'progress' }, h('i', { style: `width: ${Math.min(100, (answered.size / Math.max(1, goal)) * 100)}%` })),
       !goal ? h('p', { class: 'muted' }, 'Kelime kartları kapalı; velin Ayarlar\'dan açabilir.')
-        : queue.length ? h('button', { class: 'primary block', onclick: () => runWords(queue, list, progress, scale) }, answered.size ? 'Devam et' : 'Başla')
+        : queue.length ? h('button', { class: 'primary block', onclick: () => runWords(queue, list, progress, scale, hero) }, answered.size ? 'Devam et' : 'Başla')
           : h('p', {}, 'Bugünlük bu kadar, aferin! 🎉 Yarın yeni kelimeler gelecek.'),
-      goal && extra.length ? h('button', { class: 'block', onclick: () => runWords(extra, list, progress, scale) }, `${extra.length} kelime daha`) : null),
+      goal && extra.length ? h('button', { class: 'block', onclick: () => runWords(extra, list, progress, scale, hero) }, `${extra.length} kelime daha`) : null),
     h('p', { class: 'small muted', style: 'text-align: center' }, `${list.length} kelimenin ${progress.length} tanesini gördün.`));
 }
 
 // Kart oyunu, soru çözme oturumu gibi açılır: alt menü gizlenir, geri tuşu önce sorar (state.session).
-function runWords(queue, list, progress, scale = 1) {
-  const run = { track: 'words', cards: queue.map((w) => ({ w, again: false })), index: 0, right: 0, firstTries: queue.length, scale };
+function runWords(queue, list, progress, scale = 1, hero = { level: 0, doneToday: 0, goal: 0 }) {
+  const byWord = new Map(progress.map((p) => [p.word, p]));
+  const run = { track: 'words', cards: queue.map((w) => ({ w, again: false })), index: 0, right: 0, firstTries: queue.length, scale, hero, byWord };
   state.session = run;
   pushOverlay('session');
-  showWordCard(run, list, new Map(progress.map((p) => [p.word, p])));
+  showWordCard(run, list, byWord);
 }
 
 function showWordCard(run, list, byWord) {
@@ -2849,7 +2978,8 @@ function showWordCard(run, list, byWord) {
     const repeat = !again && (!ok || !sure);
     if (repeat) run.cards.push({ w, again: true });
     fill(feedback,
-      h('p', { class: 'verdict ' + (ok ? 'ok' : 'no') }, ok ? WORD_PRAISE[Math.floor(Math.random() * WORD_PRAISE.length)] : 'Olmadı'),
+      // İlk denemede doğru her kart 1 kelime altını (emin olma ölçeğinden bağımsız).
+      h('p', { class: 'verdict ' + (ok ? 'ok' : 'no') }, ok ? WORD_PRAISE[Math.floor(Math.random() * WORD_PRAISE.length)] + (again ? '' : ' +1 🪙') : 'Olmadı'),
       h('p', { class: 'word-meaning' }, w.emoji ? `${w.emoji} ` : '', h('b', { lang: 'en' }, w.en), ` = ${w.tr}`,
         canSpeak() ? h('button', { class: 'ghost small', 'aria-label': 'Dinle', onclick: () => speak(w.en) }, '🔊') : null),
       repeat ? h('p', { class: 'small muted' }, ok ? 'Emin olmadığın için birazdan bir kez daha soracağım.'
@@ -2891,7 +3021,7 @@ async function saveWord(w, ok, confidence, mode, again, byWord, scale = 1) {
     : p ? { stability: LEGACY_WORD_DAYS[Math.min(p.box, LEGACY_WORD_DAYS.length - 1)] || 1, difficulty: 5 } : null;
   const days = p?.updated_at ? Math.max(0, daysBetween(localDate(new Date(p.updated_at)), today)) : 0;
   try {
-    await q(sb.from('word_answers').insert({ student_id: sid(), word: w.en, correct: ok, confidence, reverse: mode === 'ters', mode,
+    await q(sb.from('word_answers').insert({ student_id: sid(), word: w.en, correct: ok, confidence, reverse: mode === 'ters', mode, again,
       stability_before: !again && prev ? prev.stability : null, elapsed_days: !again && prev ? days : null }));
     if (again) return;
     const st = nextWordState(prev, wordGrade(ok, confidence), days);
@@ -2909,12 +3039,53 @@ async function saveWord(w, ok, confidence, mode, again, byWord, scale = 1) {
 function endWords(run) {
   const missed = [...new Set(run.cards.filter((c) => c.again).map((c) => c.w.en))];
   state.session = null; // sonuç ekranında geri tuşu sormadan Kelime sayfasına döner
+  // Kazandığı altın: ilk denemede doğru kartlar, günün kartları bu oturumda bittiyse 5 daha.
+  const { hero } = run;
+  const bonus = hero.goal > 0 && hero.doneToday < hero.goal && hero.doneToday + run.firstTries >= hero.goal ? 5 : 0;
+  const level = heroLevel([...run.byWord.values()].filter(wordKnown).length);
+  const up = level > hero.level;
   render(
-    h('section', { class: 'card stack', style: 'margin-top: 6vh; text-align: center' },
+    h('section', { class: 'card stack', style: 'margin-top: 4vh; text-align: center' },
       h('h2', {}, run.right === run.firstTries ? 'Hepsini bildin! 🎉' : `${run.firstTries} kelimeden ${run.right} tanesini bildin`),
+      h('p', { class: 'big num' }, `+${run.right + bonus} 🪙`),
+      bonus ? h('p', { class: 'small muted' }, 'Günün kartlarını bitirdin: 5 altın da ödül.') : null,
       missed.length ? h('p', { class: 'muted' }, `Yakında yine gelecekler: ${missed.join(', ')}`) : null,
       h('button', { class: 'primary block', onclick: () => go('words') }, 'Tamam')),
-    Math.random() < 0.5 ? jokeCard('Mola') : null);
+    // Güç seviyesi arttıysa kutlama: pazılar büyüdü, belki yeni kıyafet.
+    up ? h('section', { class: 'card stack', style: 'text-align: center; gap: 8px' },
+      h('h2', {}, `💪 Güç ${level}! Pazıların büyüdü.`),
+      heroScene(state.student?.avatar, level, new Set())) : null,
+    !up && Math.random() < 0.5 ? jokeCard('Mola') : null);
+}
+
+/* Mağaza: kelime altınıyla eşya alır, her eşya bir kez. Aldıkları kahramanın sahnesinde durur. */
+async function viewShop() {
+  loading();
+  const [answers, purchases] = await Promise.all([
+    q(sb.from('word_answers').select('word, correct, again, answered_at').eq('student_id', sid())),
+    q(sb.from('purchases').select('item, price').eq('student_id', sid())),
+  ]);
+  const coins = heroCoins(answers, purchases, wordsPerDay(state.student));
+  const owned = new Set(purchases.map((p) => p.item));
+  const buy = async (it) => {
+    if (!confirm(`${it.emoji} ${it.name} ${it.price} altın. Alalım mı?`)) return;
+    try { await q(sb.from('purchases').insert({ student_id: sid(), item: it.id, price: it.price })); } catch (e) { return toast('Alınamadı, tekrar dene.'); }
+    toast(`${it.emoji} ${it.name} artık senin!`);
+    viewShop();
+  };
+  render(
+    h('header', { class: 'stack', style: 'gap: 4px' },
+      h('p', { class: 'label' }, 'İngilizce'), h('h1', {}, 'Mağaza'),
+      h('p', { class: 'muted' }, `Kelime altınınla dünyanı süsle. Altının: 🪙 ${coins.balance}`),
+      h('p', { class: 'small muted' }, 'İlk denemede doğru bildiğin her kart 1 altın, günün kartlarını bitirince 5 altın daha.')),
+    h('div', { class: 'hero-shop' }, HERO_SHOP.map((it) => {
+      const short = it.price - coins.balance;
+      return h('div', { class: 'card' },
+        h('span', { class: 'emoji' }, it.emoji), h('b', {}, it.name), h('span', { class: 'small muted num' }, `🪙 ${it.price}`),
+        owned.has(it.id) ? h('span', { class: 'tag green' }, 'Senin ✓')
+          : short > 0 ? h('span', { class: 'small muted' }, `${short} altın daha`)
+            : h('button', { class: 'primary block', onclick: () => buy(it) }, 'Al'));
+    })));
 }
 
 /* Rapordaki kelime kartları özeti (veli ve İngilizce öğretmeni): bugün, son 7 gün, öğrendiği ve zorlandığı
@@ -2922,12 +3093,16 @@ function endWords(run) {
 function wordBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
   (async () => {
-    const [progress, answers, list, memory] = await Promise.all([
+    const [progress, answers, list, memory, all, purchases] = await Promise.all([
       q(sb.from('word_progress').select('word, box, wrong_count, stability').eq('student_id', sid())),
       q(sb.from('word_answers').select('word, correct, confidence, mode, answered_at').eq('student_id', sid()).gte('answered_at', addDays(localDate(), -6) + 'T00:00:00')),
       loadWords(),
       q(sb.from('word_answers').select('correct, stability_before, elapsed_days').eq('student_id', sid()).not('stability_before', 'is', null)),
+      q(sb.from('word_answers').select('word, correct, again, answered_at').eq('student_id', sid())),
+      q(sb.from('purchases').select('item, price').eq('student_id', sid())),
     ]);
+    const owned = new Set(purchases.map((x) => x.item));
+    const coins = heroCoins(all, purchases, wordsPerDay(state.student));
     if (!progress.length && !answers.length) return;
     const tr = Object.fromEntries(list.map((w) => [w.en, w.tr]));
     const today = localDate();
@@ -2945,6 +3120,8 @@ function wordBox() {
         + (unsure ? `; ${unsure} doğrusunda emin değildi (kararsız ya da tahmin).` : '.')
         + (heard.length ? ` Dinleyerek ${heard.length} kartın ${heard.filter((a) => a.correct).length} tanesini bildi.` : '')),
       h('p', {}, `Öğrendiği: ${progress.filter(wordLearned).length} kelime · gördüğü: ${progress.length} / ${list.length}`),
+      h('p', {}, `Kelime kahramanı: 💪 güç ${heroLevel(progress.filter(wordKnown).length)} · 🪙 ${coins.balance} altın`
+        + (owned.size ? ` · aldıkları: ${HERO_SHOP.filter((x) => owned.has(x.id)).map((x) => x.emoji).join(' ')}` : '')),
       // Hafıza katsayısı en az 10 tekrar cevabından öğrenilir; o zamana kadar 1.
       memory.length >= 10 ? h('p', { class: 'small muted' }, `Tekrar aralıkları hafızasına göre ayarlanıyor: ×${scale.toFixed(2).replace('.', ',')}`
         + (scale > 1.05 ? ' (modelin beklediğinden iyi hatırlıyor).' : scale < 0.95 ? ' (modelin beklediğinden çabuk unutuyor; aralıklar kısaltıldı).' : '.')) : null,
@@ -3142,14 +3319,19 @@ function planSection(p) {
     // Kelime kartları ders dışıdır: okuldaki İngilizce'nin sayısından ayrı, çocuğun İngilizce sekmesinde. 0 sekmeyi kapatır.
     const wordsInput = h('input', { type: 'number', min: 0, max: 50, value: wordsPerDay(p), inputmode: 'numeric',
       'aria-label': 'Günlük kelime kartı sayısı', style: 'width: 76px' });
+    // Kelime kahramanı: İngilizce sekmesinde öğrendikçe güçlenen çocuk; kız ya da erkek oluşunu veli seçer.
+    const heroSel = h('select', { 'aria-label': 'Kelime kahramanı', style: 'width: auto; min-height: 40px; padding: 6px 10px' },
+      [['', 'Seçilmedi'], ['kiz', 'Kız'], ['erkek', 'Erkek']].map(([v, l]) => h('option', { value: v, selected: (p.avatar || '') === v || null }, l)));
     const wordsRow = h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0 4px; border-top: 2px solid var(--rule)' },
       h('div', { class: 'spread' }, h('b', {}, 'Kelime kartları'), wordsInput),
+      h('div', { class: 'spread' }, h('span', {}, 'Kelime kahramanı'), heroSel),
       h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı: çocuğun İngilizce sekmesinde kelime kartları, kolaydan zora. '
         + `Günde kaç kart gelsin? 0 yazarsan sekme kapanır. Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü.`));
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
-      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: Math.min(50, Math.max(0, Math.round(+wordsInput.value || 0))) };
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: Math.min(50, Math.max(0, Math.round(+wordsInput.value || 0))),
+        avatar: heroSel.value || null };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;

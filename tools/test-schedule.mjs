@@ -13,9 +13,10 @@ const code = [
   pick('function gradeItem', '/* Bugünün oturumunu'),
   pick('/* Sorular sınavdaki gibi', '// ---------------------------------------------------------------- öğrenci: bugün'),
   pick('/* Tekrar zamanı: FSRS', 'const wordsPerDay'),
-  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale };',
+  pick('/* Kelime kahramanı', '// Mağaza:'),
+  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins };',
 ].join('\n');
-const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale } = new Function(code)();
+const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins } = new Function(code)();
 
 // Soru süreleri LGS oturum sürelerine eşit olmalı: sözel 50 soru / 75 dk, sayısal 40 soru / 80 dk.
 const counts = { turkce: 20, inkilap: 10, din: 10, ingilizce: 10, matematik: 20, fen: 20 };
@@ -142,5 +143,17 @@ const kForget = fitWordScale(synth(60, 1, 0.6)), kGood = fitWordScale(synth(60, 
 check('kelime: hafıza katsayısı', kForget < 0.8 && kGood > 1.2 && kFew === 1,
   `çabuk unutan ×${kForget.toFixed(2)}, iyi hatırlayan ×${kGood.toFixed(2)}, az veri ×${kFew}`);
 check('kelime: seviye (kart türü için)', nextWordBox(0, true, 100) === 2 && nextWordBox(5, true, 50) === 4 && nextWordBox(9, false, 100) === 1);
+
+// Kelime kahramanı: güç bildiği kelimeyle artar (0–10); altın ilk denemede doğru kartlardan ve günün kartlarını
+// bitirmekten gelir, emin olma ölçeğinden bağımsız; oturum sonu tekrarı altın vermez; harcadığı düşülür.
+check('kahraman: güç seviyeleri', heroLevel(0) === 0 && heroLevel(4) === 0 && heroLevel(5) === 1 && heroLevel(29) === 2 && heroLevel(290) === 10 && heroLevel(2000) === 10);
+const at = (h) => `2026-10-${h}T10:00:00`;
+const ans = [
+  { word: 'a', correct: true, again: false, answered_at: at(28) }, { word: 'b', correct: true, again: false, answered_at: at(28) },
+  { word: 'c', correct: false, again: false, answered_at: at(28) }, { word: 'c', correct: true, again: true, answered_at: at(28) },
+  { word: 'd', correct: true, again: false, answered_at: at(29) },
+];
+const coins = heroCoins(ans, [{ item: 'top', price: 2 }], 3);
+check('kahraman: altın', coins.earned === 3 + 5 && coins.spent === 2 && coins.balance === 6, JSON.stringify(coins));
 
 process.exit(fails ? 1 : 0);
