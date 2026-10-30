@@ -124,6 +124,15 @@
         [!opened && 'açılmadı', !intro && 'tanıtım yok', !lit && 'satır yanmadı', !erase && '⌫ yok', !cleared && 'silinmedi'].filter(Boolean).join('; '));
     }
 
+    // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).
+    if (role === 'parent') {
+      go('settings'); await settle();
+      let sw = [];
+      for (let i = 0; i < 40 && (sw = ['Kelime kartları (İngilizce sekmesi) açık', 'Klavye dersleri (Klavye sekmesi) açık']
+        .map((l) => document.querySelector(`input[aria-label="${l}"]`))).some((x) => !x); i++) await wait(150);
+      check('Günlük plan: İngilizce ve Klavye açma düğmeleri', sw.every(Boolean), sw.map((x) => (x ? (x.checked ? 'açık' : 'kapalı') : 'yok')).join(', '));
+    }
+
     // Aile: kelime kartları açık çocuğun kahramanının görünüşü açılır, seçim önizlemeyi değiştirir (kaydedilmez).
     if (role === 'parent') {
       go('settings'); await settle();

@@ -81,7 +81,7 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Kelime kartları** (ayrı "İngilizce" sekmesi, Ayarlar'ın solunda) [A], oynama [E]
 - Okuldaki İngilizce dersinden ayrıdır, günlük plandaki ders sayılarına girmez.
-- 1–4. sınıfta açık, günde 10 kart. Veli sayıyı değiştirir ya da 0 ile kapatır; büyük sınıfa da açabilir.
+- Aile isterse açar (Ayarlar → Günlük plan, açma düğmesi), her sınıfta; açılmadıysa kapalı. Açıkken günde kaç kart (varsayılan 10).
 - Liste (`docs/words.json`): 386 kelime, 30 grup, kolaydan zora. Selamlaşma, renkler, sayılarla başlar; meslekler ve fiillerle biter.
 - Kart: İngilizce kelime ve altında dört Türkçe şık. Yanlış şıklar aynı gruptan seçilir.
   - İyice bildiği kelimede bazen tersi sorulur.
@@ -146,17 +146,20 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Klavye** (on parmak klavye, bilgisayarda) [A], ders [E]
 - Alt menüde "Klavye" sekmesi, İngilizce'nin solunda. Yalnızca klavyeli cihazda (fare ya da dokunmatik yüzey varsa) görünür,
-  telefonda görünmez. Günde kaç ders olacağını veli seçer (0 kapalı); ayarlanmadıysa ilkokulda 2, sonrasında kapalı. [A]
+  telefonda görünmez. Aile isterse açar (Ayarlar → Günlük plan, açma düğmesi), her sınıfta (8. sınıf da); açılmadıysa
+  kapalı. Açıkken günde kaç ders (varsayılan 2). [A]
 - Ekranda Türkçe Q klavyenin bütün tuşları (62 tuş) parmak renkleriyle: serçe mor, yüzük mavi, orta yeşil, işaret turuncu.
   Üstünde iki el; F ve J'deki çıkıntı çizili. [A]
 - Ders önce "İşaret parmaklarını F ve J'ye koy… Hazırsan F ve J'ye bas" der. [A]
   - Sonra yeni tuşlar tek tek gelir: "Yeni tuş: D · sol orta parmağın. D'ye üç kez bas".
   - Her harfte hangi parmağın hangi tuşa basacağı yazar. Tuş yanar, o parmak renklenip tuşa uzanır.
 - "asas asas asas asas" gibi satırlar yazılır. Doğru yazdıkça alttaki satırda harf harf ışık yanar. [A]
-  - Yanlışta harf kırmızı olur ve "Sağ serçe parmağınla ⌫ geri sil" yazar.
-  - ⌫ yanıp söner, sağ serçe parmak ona uzanır. ⌫'den başka tuş kabul edilmez.
+  - Yanlışta harf kırmızı olur ve "Önce sağ serçe parmağınla ⌫ geri sil, sonra sol işaret parmağınla F'ye bas" gibi yazar.
+  - ⌫ yanıp söner, sağ serçe parmak ona uzanır (on parmakta ⌫'nin doğru parmağı). Doğru harfin tuşu ve parmağı da yanar.
+    ⌫'den başka tuş kabul edilmez.
 - Bilgisayarda Türkçe ses varsa parmak ve tuş sesli de söylenir; "Sesli anlatım" düğmesiyle kapanır. [E]
-- 22 ders. Her derste yalnızca öğrenilmiş harfler kullanılır. Bir ders, bir öncekinden en az bir yıldız alınca açılır. [O]
+- 22 ders. Her derste yalnızca öğrenilmiş harfler kullanılır. Bir ders, bir öncekinden üç yıldız alınca açılır (velinin
+  isteği: önce iyice öğrensin); sonuçta "üç yıldız gerekiyor: bu derste en çok N yanlış" yazar. [O]
   - Orta sıra: F J, D K, S L, A Ş, G H, İ.
   - Üst sıra ve alt sıra.
   - Sonra hayvanlar, renkler ve sayılar, cümleler, İngilizce kelimeler.
@@ -258,8 +261,8 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Ayarlar** [E]
 - Ders ders günlük soru sayısı; bugün ve son 7 günde harcanan süre; hata tekrarı sınırı aşıyorsa uyarı ve "X yap".
-- Kelime kartları: günde kaç kart (0 kapalı). Ders sayılarından ayrı bir satırda, bugün kaç kart çözdüğüyle. [A]
-- Klavye dersleri: günde kaç ders (0 kapalı), kelime kartlarının altında. [A]
+- İngilizce (kelime kartları) ve Klavye dersleri: aile isterse açar, her sınıfta; açma düğmesi ve açıkken günde kaç kart ya
+  da ders. Kapalıyken çocuğun sekmesi görünmez. Ders sayılarından ayrı satırlarda; kelimede bugün kaç kart çözdüğü. [A]
 - Sınıf (1–8), bir üst sınıfın konuları, LGS tarihi (8. sınıf).
 - Seyrek konu katsayısı: 1, 1,5, 2, 3 ya da 0 (tekrar etme).
 - Aile:

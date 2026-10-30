@@ -83,10 +83,14 @@ check('klavye altını: yıldız başına 5, günün dersleri bittiği gün 5', 
 check('bugün bitirilen ders sayısı (yıldızlı)', st.today === 1);
 
 // Kilit ve sıradaki ders.
-const none = {}, first = { fj: 1 }, allDone = Object.fromEntries(T.TYPING_LESSONS.map((l, i) => [l.id, i === 5 ? 1 : 3]));
-check('ilk ders açık, sonraki bir yıldızla açılır', T.typingOpen(none, 0) && !T.typingOpen(none, 1) && T.typingOpen(first, 1) && !T.typingOpen(first, 2));
-check('sıradaki ders: yıldızsız ilk açık ders, hepsi bittiyse en az yıldızlı', T.typingNext(none) === 0 && T.typingNext(first) === 1 && T.typingNext(allDone) === 5);
-check('günde kaç ders: ilkokulda 2, sonra kapalı, veli ayarı geçer', T.typingPerDay({ grade: 4 }) === 2 && T.typingPerDay({ grade: 8 }) === 0
-  && T.typingPerDay({ grade: 3, daily_typing: 0 }) === 0 && T.typingPerDay({ grade: 8, daily_typing: 5 }) === 5);
+// Önce iyice öğrensin (velinin isteği): sonraki ders üç yıldızla açılır.
+const none = {}, two = { fj: 2 }, three = { fj: 3 }, stuck = Object.fromEntries(T.TYPING_LESSONS.map((l, i) => [l.id, i === 5 ? 2 : 3]));
+const all3 = Object.fromEntries(T.TYPING_LESSONS.map((l) => [l.id, 3]));
+check('ilk ders açık, sonraki üç yıldızla açılır', T.typingOpen(none, 0) && !T.typingOpen(none, 1) && !T.typingOpen(two, 1) && T.typingOpen(three, 1)
+  && !T.typingOpen(three, 2) && !T.typingOpen(stuck, 6));
+check('sıradaki ders: üç yıldızı olmayan ilk açık ders, hepsi bittiyse sonuncusu', T.typingNext(none) === 0 && T.typingNext(two) === 0
+  && T.typingNext(three) === 1 && T.typingNext(stuck) === 5 && T.typingNext(all3) === 21);
+check('günde kaç ders: aile açar, açılmadıysa kapalı (her sınıfta)', T.typingPerDay({ grade: 4 }) === 0 && T.typingPerDay({ grade: 8 }) === 0
+  && T.typingPerDay({ grade: 3, daily_typing: 0 }) === 0 && T.typingPerDay({ grade: 8, daily_typing: 2 }) === 2);
 
 process.exit(fails ? 1 : 0);

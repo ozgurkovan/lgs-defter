@@ -137,18 +137,16 @@ function typingStats(results, goal) {
   const goalDays = goal > 0 ? Object.values(days).filter((n) => n >= goal).length : 0;
   return { best, stars, power: stars, coins: stars * 5 + goalDays * 5, today: days[localDate()] || 0 };
 }
-// Ders açık mı: ilk ders her zaman; sonrakiler bir öncekinden en az bir yıldızla.
-const typingOpen = (best, i) => i === 0 || (best[TYPING_LESSONS[i - 1].id] || 0) >= 1;
-// Sıradaki ders: açık olup yıldızı olmayan ilk ders; hepsinde yıldız varsa en az yıldızlı olan.
+// Ders açık mı: ilk ders her zaman; sonrakiler bir öncekinden üç yıldızla (velinin isteği: önce iyice öğrensin).
+const TYPING_PASS = 3;
+const typingOpen = (best, i) => i === 0 || (best[TYPING_LESSONS[i - 1].id] || 0) >= TYPING_PASS;
+// Sıradaki ders: açık olup üç yıldızı olmayan ilk ders; hepsi üç yıldızlıysa sonuncusu.
 function typingNext(best) {
-  const i = TYPING_LESSONS.findIndex((l, k) => typingOpen(best, k) && !(best[l.id] > 0));
-  if (i >= 0) return i;
-  let low = 0;
-  TYPING_LESSONS.forEach((l, k) => { if ((best[l.id] || 0) < (best[TYPING_LESSONS[low].id] || 0)) low = k; });
-  return low;
+  const i = TYPING_LESSONS.findIndex((l, k) => typingOpen(best, k) && (best[l.id] || 0) < TYPING_PASS);
+  return i >= 0 ? i : TYPING_LESSONS.length - 1;
 }
-// Günde kaç ders (veli ayarı, 0 kapatır); ayarlanmadıysa ilkokulda 2, sonrasında kapalı.
-const typingPerDay = (p) => (p?.daily_typing ?? (p?.grade && p.grade <= 4 ? 2 : 0));
+// Günde kaç ders: aile isterse açar (velinin isteği), her sınıfta; açılmadıysa kapalı.
+const typingPerDay = (p) => p?.daily_typing ?? 0;
 
 /* Klavye: ses */
 
@@ -202,7 +200,8 @@ const THUMB_TIP = [[268, 230], [350, 230]];
 const FINGER_W = [19, 22, 23, 23, 23, 23, 22, 19, 25, 25];
 
 // Klavye çizimi (SVG) ve üstünde iki el. show({ codes, erase, all }): basılacak tuş(lar) yanar, o parmak renklenip tuşa
-// uzanır; erase: ⌫ yanıp söner, sağ serçe parmak ona uzanır, üstünde ok; all: bütün parmaklar kendi renginde (parmak
+// uzanır; erase: ⌫ yanıp söner, sağ serçe parmak ona uzanır, üstünde ok (codes o sırada doğru harfin tuşu: o da yanar,
+// parmağı serçe değilse tuşa uzanır); all: bütün parmaklar kendi renginde (parmak
 // yerleri). flash(kod, doğru mu): basılan tuş bir an yeşil ya da kırmızı yanar.
 function keyboardView() {
   const NS = 'http://www.w3.org/2000/svg';
@@ -265,18 +264,18 @@ function keyboardView() {
     lit = [];
     const want = HAND_BASE.map((_, i) => homeTip(i));
     const active = new Set(all ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : []);
-    for (const code of erase ? ['Backspace'] : codes) {
+    for (const code of erase ? ['Backspace', ...codes] : codes) {
       const k = keys[code];
       if (!k) continue;
-      k.g.classList.add(erase ? 'erase' : 'target');
+      k.g.classList.add(erase && code === 'Backspace' ? 'erase' : 'target');
       lit.push(k.g);
       const f = FINGER_OF[code] ?? 8;
-      if (f === 8) { active.add(8); active.add(9); } else { active.add(f); want[f] = [k.cx, k.cy + TIP_DOWN]; }
+      if (f === 8) { active.add(8); active.add(9); } else if (!active.has(f)) { active.add(f); want[f] = [k.cx, k.cy + TIP_DOWN]; }
     }
     svg.classList.toggle('all', all);
     fingers.forEach((line, i) => {
       line.classList.toggle('on', active.has(i));
-      line.style.stroke = active.has(i) ? (erase ? '#E5484D' : FINGER_COLOR[Math.min(i, 8)]) : '';
+      line.style.stroke = active.has(i) ? (erase && i === 7 ? '#E5484D' : FINGER_COLOR[Math.min(i, 8)]) : '';
     });
     arrow.classList.toggle('show', erase);
     moveTo(want);
@@ -327,14 +326,15 @@ async function viewTyping() {
   const tile = (l, i) => {
     const open = typingOpen(best, i), stars = best[l.id] || 0;
     return h('button', { class: 'ty-lesson' + (i === next ? ' next' : ''), disabled: !open || null,
-      'aria-label': `Ders ${i + 1}: ${l.title}${open ? `, ${stars} yıldız` : ', kilitli'}`, onclick: () => runTyping(i, hero) },
+      'aria-label': `Ders ${i + 1}: ${l.title}${open ? `, ${stars} yıldız` : ', kilitli: önceki dersten üç yıldız gerekiyor'}`, onclick: () => runTyping(i, hero) },
       h('span', { class: 'small muted' }, `Ders ${i + 1}`), h('b', {}, l.title),
       h('span', { class: 'stars' }, open ? '⭐'.repeat(stars) + '☆'.repeat(3 - stars) : '🔒'));
   };
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, 'Klavye'), h('h1', {}, 'On parmak klavye'),
-      h('p', { class: 'muted' }, 'Klavyeye bakmadan, on parmakla yazmayı öğren. Her harfte hangi parmağın hangi tuşa basacağı ekranda yanar.')),
+      h('p', { class: 'muted' }, 'Klavyeye bakmadan, on parmakla yazmayı öğren. Her harfte hangi parmağın hangi tuşa basacağı ekranda yanar. '
+        + 'Bir dersten üç yıldız alınca sonraki açılır.')),
     hasKeyboard() ? null : h('p', { class: 'card warn' }, 'Bu dersler bilgisayar klavyesiyle yapılır. Bilgisayardan aç.'),
     h('section', { class: 'card stack', style: 'gap: 10px' },
       heroScene(state.student, hero.level, hero.owned),
@@ -520,8 +520,9 @@ function drawTyping(run) {
     run.kb.show({});
   } else if (run.err) {
     v.guide.classList.add('bad');
-    fill(v.guide, dot(7), 'Yanlış tuş! Sağ serçe parmağınla ⌫ geri sil tuşuna bas.');
-    run.kb.show({ erase: true });
+    const ch = line[pos], f = FINGER_OF[TQ_KEY[ch]] ?? 8;
+    fill(v.guide, dot(7), `Yanlış tuş! Önce sağ serçe parmağınla ⌫ geri sil, sonra ${FINGER_NAMES[f]}la ${keyTo(ch)} bas.`);
+    run.kb.show({ erase: true, codes: [TQ_KEY[ch]] });
   } else {
     const ch = line[pos], code = TQ_KEY[ch] || '', f = FINGER_OF[code] ?? 8;
     fill(v.guide, dot(f), `${upFirst(FINGER_NAMES[f])} → ${keyName(ch)}`);
@@ -555,7 +556,8 @@ async function endTyping(run) {
     hero.typing.stars += gained;
     hero.level = level;
   }
-  const nextOpen = run.index + 1 < TYPING_LESSONS.length && (stars >= 1 || typingOpen(hero?.typing.best || {}, run.index + 1));
+  const nextOpen = run.index + 1 < TYPING_LESSONS.length && (stars >= TYPING_PASS || typingOpen(hero?.typing.best || {}, run.index + 1));
+  const maxErrors = Math.floor((run.chars * 3) / 97); // üç yıldızın (%97) izin verdiği yanlış
   if (stars) sayTr(stars === 3 ? 'Harika! Üç yıldız.' : stars === 2 ? 'Aferin! İki yıldız.' : 'Aferin! Bir yıldız.');
   render(
     h('section', { class: 'card stack', style: 'margin-top: 4vh; text-align: center; align-items: center' },
@@ -563,7 +565,8 @@ async function endTyping(run) {
       h('p', { class: 'ty-stars', 'aria-label': `${stars} yıldız` }, '⭐'.repeat(stars) + '☆'.repeat(3 - stars)),
       h('p', { class: 'num' }, `${run.points} puan · doğruluk %${acc} · dakikada ${wpm} kelime`),
       gained ? h('p', {}, `+${gained} yeni yıldız: kahramanına +${gained} güç, +${gained * 5} 🪙`) : null,
-      !stars ? h('p', { class: 'small muted' }, 'Bir yıldız için harflerin dörtte üçünü ilk seferde doğru yazmalısın. Yavaş ve dikkatli yaz; hız sonra gelir.')
+      stars < TYPING_PASS && !nextOpen ? h('p', { class: 'small' }, `Sonraki derse geçmek için üç yıldız gerekiyor: bu derste en çok ${maxErrors} yanlış. `
+        + 'Önce bu dersi iyice öğren; yavaş ve dikkatli yaz, hız sonra gelir.')
         : stars < 3 ? h('p', { class: 'small muted' }, 'Daha az yanlışla daha çok yıldız kazanırsın.') : null,
       misses.length ? h('p', { class: 'small' }, `En çok zorlandığın tuşlar: ${misses.join(', ')}`) : null,
       saved ? null : h('p', { class: 'error small' }, 'Sonuç kaydedilemedi; internetini kontrol et.'),

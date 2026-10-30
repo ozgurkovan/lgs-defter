@@ -2726,7 +2726,8 @@ function nextWordBox(box, ok, confidence) {
   if (confidence >= 75) return box ? Math.min(30, box + 1) : 2;
   return box ? Math.max(1, box - 1) : 1;
 }
-const wordsPerDay = (p) => (p?.daily_words ?? (p?.grade && p.grade <= 4 ? 10 : 0));
+// Günde kaç kelime kartı: aile isterse açar (velinin isteği), her sınıfta; açılmadıysa kapalı.
+const wordsPerDay = (p) => p?.daily_words ?? 0;
 const WORD_PRAISE = ['Aferin! 🎉', 'Süper! ⭐', 'Harika! 👏', 'Doğru! 🙌', 'Bravo! 🌟'];
 let wordList = null;
 async function loadWords() {
@@ -3528,6 +3529,7 @@ function viewSettings() {
         h('p', { class: 'label' }, `Günlük plan · ${planTotal(plan)} soru`),
         h('p', { class: 'small muted' }, studentSubjects(p).filter((s) => plan[s]).map((s) => `${SUBJECTS[s].name} ${plan[s]}`).join(' · ')),
         wordsPerDay(p) ? h('p', { class: 'small muted' }, `Kelime kartları: günde ${wordsPerDay(p)} kart`) : null,
+        typingPerDay(p) ? h('p', { class: 'small muted' }, `Klavye: günde ${typingPerDay(p)} ders`) : null,
         h('p', { class: 'small muted' }, 'Bu sayıları velin ayarlıyor.')) : null,
       h('button', { class: 'primary block', onclick: async () => {
         const upd = { lgs_date: lgs.value || p.lgs_date };
@@ -3624,33 +3626,39 @@ function planSection(p) {
           + (st.due ? ` · bugün ${st.due} hata tekrarı` : '')),
         warn);
     });
-    // Kelime kartları ders dışıdır: okuldaki İngilizce'nin sayısından ayrı, çocuğun İngilizce sekmesinde. 0 sekmeyi kapatır.
-    const wordsInput = h('input', { type: 'number', min: 0, max: 50, value: wordsPerDay(p), inputmode: 'numeric',
-      'aria-label': 'Günlük kelime kartı sayısı', style: 'width: 76px' });
-    const wordsRow = h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0 4px; border-top: 2px solid var(--rule)' },
-      h('div', { class: 'spread' }, h('b', {}, 'Kelime kartları'), wordsInput),
-      h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı: çocuğun İngilizce sekmesinde kelime kartları, kolaydan zora. '
-        + `Günde kaç kart gelsin? 0 yazarsan sekme kapanır. Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü. `
-        + 'Kelime kahramanının görünüşü (kız ya da erkek, saç, fotoğraftan benzetme) Aile bölümünde.'));
-    // Klavye dersleri (on parmak klavye, çocuğun Klavye sekmesi; bilgisayar klavyesiyle). 0 sekmeyi kapatır.
-    const typingInput = h('input', { type: 'number', min: 0, max: 10, value: typingPerDay(p), inputmode: 'numeric',
-      'aria-label': 'Günlük klavye dersi sayısı', style: 'width: 76px' });
-    const typingRow = h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0 4px; border-top: 1px solid var(--rule)' },
-      h('div', { class: 'spread' }, h('b', {}, 'Klavye dersleri'), typingInput),
-      h('p', { class: 'small muted' }, 'On parmak klavye: ekranda klavye ve eller, hangi parmağın hangi tuşa basacağı yanar. Bilgisayarda yapılır, '
-        + 'telefonda sekme görünmez. Günde kaç ders? 0 yazarsan sekme kapanır. Kazandığı yıldızlar kelime kahramanını güçlendirir.'));
+    // İngilizce (kelime kartları) ve Klavye ders dışıdır; aile isterse açar (velinin isteği), her sınıfta. Kapalıyken çocuğun
+    // sekmesi görünmez; açıkken günde kaç kart ya da ders geleceği yazılır.
+    const switchRow = (label, on, count, max, fallback, text, top) => {
+      const box = h('input', { type: 'checkbox', checked: on || null, 'aria-label': `${label} açık` });
+      const input = h('input', { type: 'number', min: 1, max, value: count || fallback, inputmode: 'numeric', disabled: !on || null,
+        'aria-label': `${label}: günde kaç`, style: 'width: 76px' });
+      box.addEventListener('change', () => { input.disabled = !box.checked; });
+      const row = h('div', { class: 'stack', style: `gap: 4px; padding: 10px 0 4px; border-top: ${top} solid var(--rule)` },
+        h('div', { class: 'spread' }, h('label', { class: 'row' }, box, h('b', {}, label)), input),
+        h('p', { class: 'small muted' }, text));
+      // Kapalıysa 0; açıksa 1…max (boş bırakıldıysa varsayılan).
+      row.value = () => (box.checked ? Math.min(max, Math.max(1, Math.round(+input.value || fallback))) : 0);
+      row.show = (v) => { box.checked = v > 0; input.disabled = !(v > 0); input.value = v || fallback; };
+      return row;
+    };
+    const wordsRow = switchRow('Kelime kartları (İngilizce sekmesi)', wordsPerDay(p) > 0, wordsPerDay(p), 50, 10,
+      'Aile isterse açar; kapalıyken sekme görünmez. Okuldaki İngilizce dersinden ayrı: İngilizce kelimeler, kolaydan zora. '
+        + `Açıkken günde kaç kart gelsin? Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü. `
+        + 'Kelime kahramanının görünüşü (kız ya da erkek, saç, fotoğraftan benzetme) Aile bölümünde.', '2px');
+    const typingRow = switchRow('Klavye dersleri (Klavye sekmesi)', typingPerDay(p) > 0, typingPerDay(p), 10, 2,
+      'Aile isterse açar, her sınıfta. On parmak klavye: ekranda klavye ve eller, hangi parmağın hangi tuşa basacağı yanar. '
+        + 'Bilgisayarda yapılır, telefonda sekme görünmez. Açıkken günde kaç ders? Kazandığı yıldızlar kelime kahramanını güçlendirir.', '1px');
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
-      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: Math.min(50, Math.max(0, Math.round(+wordsInput.value || 0))),
-        daily_typing: Math.min(10, Math.max(0, Math.round(+typingInput.value || 0))) };
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value() };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;
       Object.assign(p, upd);
       subjects.forEach((s) => { inputs[s].value = by[s]; });
-      wordsInput.value = upd.daily_words;
-      typingInput.value = upd.daily_typing;
+      wordsRow.show(upd.daily_words);
+      typingRow.show(upd.daily_typing);
       update();
       toast('Kaydedildi. Yeni sayılar bugünden geçerli.');
     } }, 'Kaydet');
@@ -3809,10 +3817,10 @@ function familySection() {
       return [h('button', { class: 'ghost small danger', onclick: () => { confirmBox.hidden = !confirmBox.hidden; } }, 'Sil'), confirmBox];
     };
 
-    // Kelime kahramanının görünüşü: kelime kartları açık her çocuk için; açılınca yüklenir.
+    // Kelime kahramanının görünüşü: İngilizce ya da Klavye açık her çocuk için (ikisi de kahramanı büyütür); açılınca yüklenir.
     const heroDetails = (kid) => {
       const st = state.students.find((x) => x.id === kid.id) || kid;
-      if (!(wordsPerDay(st) > 0)) return null;
+      if (!(wordsPerDay(st) > 0 || typingPerDay(st) > 0)) return null;
       let opened = false;
       return h('details', { class: 'hero-edit', ontoggle: (e) => {
         if (!e.currentTarget.open || opened) return;
