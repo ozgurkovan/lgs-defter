@@ -23,7 +23,7 @@
     const root = rootTab();
     const pages = role === 'student'
       ? { home: ['hata tekrarı', 'konu tekrarı'], upload: ['deneme çöz', 'karma deneme'], send: ['soru ekle', 'kâğıt deneme'],
-          ask: ['yapamadığım sorular', 'beğendiğim sorular'], paper: ['hangi deneme?'], topics: [], settings: [], together: ['birlikte bakılacaklar'] }
+          ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], topics: [], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
             book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile'], together: ['birlikte bakılacaklar'] }

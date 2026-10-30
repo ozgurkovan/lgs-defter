@@ -89,6 +89,10 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Yükle sekmesi** [A], gönderme [E]
 - **Soru ekle**: "Yapamadığım sorular" ve "Beğendiğim sorular" fotoğrafları, istenirse not.
+  - Sayfanın üstündeki not kutusu Isla'dan şunları yazmasını ister: nerede takıldığı, hangi şıklar arasında kaldığı, hangisini işaretlediği. [A]
+    - Bunları ya kâğıdın üstüne kalemle ya da Not kısmına numarasıyla yazar.
+    - Her soruya ayrı alan yoktur; 10 soru gönderirken zorlanmasın diye.
+  - Görev bu notları okur ve çözümü takıldığı yerden anlatır.
   - Görev çözümünü yazar.
   - Yapamadığı soru hata tekrarına girer; beğendiğinin benzerleri yazılır.
   - Çözümler "Gönderdiğin sorular" altında görünür.

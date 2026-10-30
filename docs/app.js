@@ -1859,7 +1859,7 @@ async function viewUpload(kind) {
     timeChips.forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget)));
   } }, t));
   const noteInput = h('textarea', { id: 'book-note', rows: 2, placeholder: kind === 'soru'
-    ? 'Nerede takıldın? Hangi test ya da kitap? (isteğe bağlı)' : 'Hangi kitap, hangi konu? (isteğe bağlı)' });
+    ? 'Örn. 1. soru: B ile C arasında kaldım, B\'yi işaretledim. Hangi test ya da kitap? (isteğe bağlı)' : 'Hangi kitap, hangi konu? (isteğe bağlı)' });
 
   const status = h('p', { class: 'small muted', hidden: true });
   const sendBtn = h('button', { class: 'primary block', disabled: true, onclick: send }, 'Gönder');
@@ -1940,8 +1940,13 @@ async function viewUpload(kind) {
     render(
       h('header', { class: 'stack', style: 'gap: 4px' },
         h('p', { class: 'label' }, 'Soru ekle'), h('h1', {}, 'Soru gönder'),
-        h('p', { class: 'muted' }, 'Her fotoğrafta bir soru olsun; şıkları da görünsün. İstersen yapamadıklarını ve beğendiklerini birlikte gönder.')),
-      photoPicker('Yapamadığım sorular', 'Çözümünü yazarım; benzerleri hata tekrarında gelir.', 'yapamadim', photos, refresh),
+        h('p', { class: 'muted' }, 'Her fotoğrafta bir soru olsun; şıkları ve kâğıda yazdıkların da görünsün. İstersen yapamadıklarını ve beğendiklerini birlikte gönder.')),
+      // Takıldığı yer, arasında kaldığı şıklar ve işaretlediği şık kâğıtta kalemle ya da Not kısmında numarasıyla gelir;
+      // saatlik görev okur (INSTRUCTIONS 1e). Her soruya ayrı alan yok: 10 soru gönderirken zorlanmasın.
+      h('p', { class: 'note', style: 'border-left: 4px solid var(--amber)' },
+        '✏️ Yapamadığın her soruda nerede takıldığını, hangi şıklar arasında kaldığını ve hangisini işaretlediğini yaz: ' +
+        'fotoğrafı çekmeden önce kâğıdın üstüne kalemle ya da aşağıdaki Not kısmına numarasıyla (1. soru: …).'),
+      photoPicker('Yapamadığım sorular', 'Çözümünü takıldığın yerden anlatırım; benzerleri hata tekrarında gelir.', 'yapamadim', photos, refresh),
       photoPicker('Beğendiğim sorular', 'Bu tarzda yeni sorular yazarım.', 'begendim', photos, refresh),
       h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
       sendBtn, missingNote, status);
