@@ -1,7 +1,7 @@
 // Regresyon testinin otomatik kısmı. Her değişiklikten sonra, yayınlamadan önce: node tools/regression.mjs
 //  1. Uygulama dosyası hatasız okunuyor mu, sürüm numaraları tutuyor mu; şifresiz giriş bağlantısı yalnızca
 //     test hesaplarına mı üretiliyor (bu deneme Supabase'e gitmez).
-//  2. Takvim ve günlük plan hesapları (tools/test-schedule.mjs).
+//  2. Takvim ve günlük plan hesapları (tools/test-schedule.mjs), klavye dersleri (tools/test-typing.mjs).
 //  3. Veritabanı yetkileri: supabase/test-*.sql. Her test kullanıcıların yerine geçip dener ve sonucu
 //     "SONUC {...}" hatasıyla döndürür; hata yüzünden her şey geri alınır, iz kalmaz. Sonuç dosyadaki
 //     "-- beklenen:" satırıyla karşılaştırılır (">0" gibi değerler sayı aralığıdır).
@@ -23,11 +23,11 @@ const node = (args) => {
 };
 
 // 1
-const checked = node(['--check', 'docs/app.js']);
-report(!checked.trim(), 'app.js sözdizimi', checked.trim().split('\n')[0]);
+const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']);
+report(!checked.trim(), 'app.js ve typing.js sözdizimi', checked.trim().split('\n')[0]);
 const html = readFileSync('docs/index.html', 'utf8');
 const v = JSON.parse(readFileSync('docs/version.json', 'utf8')).v;
-const inHtml = [...html.matchAll(/(?:app\.js|style\.css)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
+const inHtml = [...html.matchAll(/(?:app\.js|style\.css|typing\.js|typing\.css)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
 report(inHtml.length > 0 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
 // Başka bir adres reddedilmeli. Deneme kapalı bir porta gider: koruma bozulsa bile Supabase'e ulaşmaz, hesap açılmaz.
 // Giriş bağlantısı üreten her araç adresi test-accounts.mjs'ten almalı.
@@ -44,6 +44,10 @@ report(onlyTest && !rawMagic.length, 'Giriş bağlantısı yalnızca test hesapl
 const sched = node(['tools/test-schedule.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const schedBad = sched.filter((l) => !l.startsWith('OK'));
 report(sched.length > 0 && !schedBad.length, 'Takvim ve günlük plan', schedBad.length ? schedBad.join(' | ') : `${sched.length} kontrol`);
+// Klavye dersleri: harfler, satırlar, yıldız ve kahramana katkı (tools/test-typing.mjs).
+const typingOut = node(['tools/test-typing.mjs']).trim().split(/\r?\n/).filter(Boolean);
+const typingBad = typingOut.filter((l) => !l.startsWith('OK'));
+report(typingOut.length > 0 && !typingBad.length, 'Klavye dersleri', typingBad.length ? typingBad.join(' | ') : `${typingOut.length} kontrol`);
 
 // 3
 const fits = (want, got) => {

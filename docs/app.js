@@ -330,6 +330,7 @@ function renderTabs() {
     : role === 'teacher'
       ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
       : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'], ['topics', 'Konularım', 'topics'],
+          typingPerDay(state.student) > 0 && hasKeyboard() ? ['typing', 'Klavye', 'keyboard'] : null,
           wordsPerDay(state.student) > 0 ? ['words', 'İngilizce', 'words'] : null, ['settings', 'Ayarlar', 'settings']].filter(Boolean);
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
@@ -391,7 +392,7 @@ const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', 'words', 'shop', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'settings', 'reasons', 'together']
+  ? ['home', 'words', 'shop', 'typing', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'settings', 'reasons', 'together']
   : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
@@ -413,7 +414,7 @@ window.addEventListener('popstate', (e) => {
   if (state.session || state.exam) {
     const exam = !!state.exam;
     if (!confirm(exam ? 'Denemeden çıkılsın mı? Cevapların kayıtlı; süre işlemeye devam eder, Deneme sayfasından kaldığın yere dönebilirsin.'
-      : 'Çalışmaya ara verilsin mi? Cevapladığın sorular kaydedildi.')) { pushOverlay(exam ? 'exam' : 'session'); return; }
+      : state.session.leaveText || 'Çalışmaya ara verilsin mi? Cevapladığın sorular kaydedildi.')) { pushOverlay(exam ? 'exam' : 'session'); return; }
     state.leaveOverlay?.();
   }
   // Bitmiş bir oturumun kaydına ileri tuşuyla gelinirse düz sayfa kaydına çevrilir.
@@ -450,7 +451,7 @@ function go(tab, how = 'push') {
     send: viewSend, paper: () => viewUpload('deneme'), ask: () => viewUpload('soru'), book: () => viewUpload('kitap'),
     read: () => viewUpload('okuma'), // ilkokul: okuduğu kitabın sayfaları
     topics: viewTopics, settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
-    together: viewTogether, words: viewWords, shop: viewShop,
+    together: viewTogether, words: viewWords, shop: viewShop, typing: viewTyping, // klavye dersleri: typing.js
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
   return true;
@@ -2761,11 +2762,12 @@ function heroBest(progress, answers) {
 const heroPower = (best) => [...best.values()].reduce((n, s) => n + Math.min(1, s / 7), 0);
 // Kelime altını: ilk denemede doğru her kart 1, günün kartlarını bitirdiği her gün 5 daha; harcadıkları düşülür. Emin
 // olma ölçeği altını değiştirmez: çocuk fazla altın için "tamamen eminim" demesin, tekrar zamanları bozulmasın.
-function heroCoins(answers, purchases, goal) {
+// bonus: klavye derslerinden gelen altın (typing.js, typingStats).
+function heroCoins(answers, purchases, goal, bonus = 0) {
   const firsts = answers.filter((a) => !a.again);
   const days = {};
   for (const a of firsts) (days[localDate(new Date(a.answered_at))] ||= new Set()).add(a.word);
-  const earned = firsts.filter((a) => a.correct).length + (goal > 0 ? Object.values(days).filter((s) => s.size >= goal).length * 5 : 0);
+  const earned = bonus + firsts.filter((a) => a.correct).length + (goal > 0 ? Object.values(days).filter((s) => s.size >= goal).length * 5 : 0);
   const spent = purchases.reduce((n, p) => n + p.price, 0);
   return { earned, spent, balance: earned - spent };
 }
@@ -3078,11 +3080,12 @@ function wordQueue(list, progress, answeredToday, n) {
 async function viewWords() {
   loading();
   const goal = wordsPerDay(state.student);
-  const [list, progress, answers, purchases] = await Promise.all([
+  const [list, progress, answers, purchases, typed] = await Promise.all([
     loadWords(),
     q(sb.from('word_progress').select('word, box, due_date, right_count, wrong_count, stability, difficulty, updated_at').eq('student_id', sid())),
     q(sb.from('word_answers').select('word, answered_at, correct, again, stability_before, elapsed_days').eq('student_id', sid())),
     q(sb.from('purchases').select('item, price').eq('student_id', sid())),
+    q(sb.from('typing_results').select('lesson, stars, created_at').eq('student_id', sid())),
   ]);
   const start = dayStart();
   const answered = new Set(answers.filter((r) => r.answered_at >= start && !r.again).map((r) => r.word));
@@ -3090,14 +3093,16 @@ async function viewWords() {
   const learned = progress.filter(wordLearned).length;
   const queue = wordQueue(list, progress, answered, Math.max(0, goal - answered.size));
   const extra = queue.length ? [] : wordQueue(list, progress, answered, 5);
-  // Kelime kahramanı: güç (kelime gücü, araçlarının götürdüğü yere kadar), altın, yolculuk, sıradaki büyük ödül.
+  // Kelime kahramanı: güç (kelime gücü ve klavye yıldızları, araçlarının götürdüğü yere kadar), altın, yolculuk, sıradaki
+  // büyük ödül.
   const owned = new Set(purchases.map((p) => p.item));
+  const typing = typingStats(typed, typingPerDay(state.student));
   const best = heroBest(progress, answers);
-  const power = heroPower(best);
+  const power = heroPower(best) + typing.power;
   const cap = heroCap(owned);
   const level = heroLevel(power, cap);
-  const coins = heroCoins(answers, purchases, goal);
-  const hero = { level, doneToday: answered.size, goal, best, owned, cap, balance: coins.balance };
+  const coins = heroCoins(answers, purchases, goal, typing.coins);
+  const hero = { level, doneToday: answered.size, goal, best, owned, cap, balance: coins.balance, extra: typing.power };
   const prize = nextRide(owned);
   const rides = HERO_SHOP.filter((it) => isRide(it) && owned.has(it.id));
   render(
@@ -3133,7 +3138,7 @@ function runWords(queue, list, progress, scale = 1, hero = { level: 0, doneToday
   // Yolculuk: aracı varsa penceresi (kartlar onun içinden çözülür), her durumda yolculuk çubuğu.
   const owned = hero.owned || new Set();
   run.window = rideWindow(hero.level, owned);
-  run.trip = tripBar(heroPower(run.best), hero.level, owned, hero.balance || 0);
+  run.trip = tripBar(heroPower(run.best) + (hero.extra || 0), hero.level, owned, hero.balance || 0);
   run.ride = h('div', { class: 'stack', style: 'gap: 6px' }, run.window, run.trip);
   state.session = run;
   pushOverlay('session');
@@ -3273,7 +3278,7 @@ function heroStep(run, word) {
   const st = run.byWord.get(word)?.stability || 0;
   if (st > (run.best.get(word) || 0)) run.best.set(word, st);
   if (!run.trip) return;
-  const power = heroPower(run.best), level = heroLevel(power, run.hero.cap ?? 10);
+  const power = heroPower(run.best) + (run.hero.extra || 0), level = heroLevel(power, run.hero.cap ?? 10);
   if (level > run.level) {
     run.level = level;
     if (run.window) run.window.arrive(level);
@@ -3289,7 +3294,7 @@ function endWords(run) {
   // Kazandığı altın: ilk denemede doğru kartlar, günün kartları bu oturumda bittiyse 5 daha.
   const { hero } = run;
   const bonus = hero.goal > 0 && hero.doneToday < hero.goal && hero.doneToday + run.firstTries >= hero.goal ? 5 : 0;
-  const level = heroLevel(heroPower(run.best), hero.cap ?? 10);
+  const level = heroLevel(heroPower(run.best) + (hero.extra || 0), hero.cap ?? 10);
   const up = level > hero.level;
   render(
     h('section', { class: 'card stack', style: 'margin-top: 4vh; text-align: center' },
@@ -3312,14 +3317,16 @@ function endWords(run) {
    bir kez. En üstte sıradaki büyük ödül ve biriken altın. Araç alınınca gösterişli kutlama. */
 async function viewShop() {
   loading();
-  const [answers, purchases, progress] = await Promise.all([
+  const [answers, purchases, progress, typed] = await Promise.all([
     q(sb.from('word_answers').select('word, correct, again, answered_at, stability_before').eq('student_id', sid())),
     q(sb.from('purchases').select('item, price').eq('student_id', sid())),
     q(sb.from('word_progress').select('word, box, stability').eq('student_id', sid())),
+    q(sb.from('typing_results').select('lesson, stars, created_at').eq('student_id', sid())),
   ]);
-  const coins = heroCoins(answers, purchases, wordsPerDay(state.student));
+  const typing = typingStats(typed, typingPerDay(state.student));
+  const coins = heroCoins(answers, purchases, wordsPerDay(state.student), typing.coins);
   const owned = new Set(purchases.map((p) => p.item));
-  const power = heroPower(heroBest(progress, answers));
+  const power = heroPower(heroBest(progress, answers)) + typing.power;
   const buy = async (it) => {
     if (!confirm(`${it.emoji ? it.emoji + ' ' : ''}${it.name} ${it.price} altın. Alalım mı?`)) return;
     const before = heroLevel(power, heroCap(owned));
@@ -3347,7 +3354,8 @@ async function viewShop() {
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, 'İngilizce'), h('h1', {}, 'Mağaza'),
       h('p', { class: 'muted' }, `Kelime altınınla dünyanı süsle. Altının: 🪙 ${coins.balance}`),
-      h('p', { class: 'small muted' }, 'İlk denemede doğru bildiğin her kart 1 altın, günün kartlarını bitirince 5 altın daha.')),
+      h('p', { class: 'small muted' }, 'İlk denemede doğru bildiğin her kart 1 altın, günün kartlarını bitirince 5 altın daha.'
+        + (typingPerDay(state.student) > 0 ? ' Klavye derslerinde her yeni yıldız 5 altın.' : ''))),
     prize ? h('section', { class: 'card stack prize' },
       h('p', { class: 'label' }, '🏆 Sıradaki büyük ödül'),
       itemIcon(prize, 72),
@@ -3371,17 +3379,19 @@ async function viewShop() {
 function wordBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
   (async () => {
-    const [progress, answers, list, memory, all, purchases] = await Promise.all([
+    const [progress, answers, list, memory, all, purchases, typed] = await Promise.all([
       q(sb.from('word_progress').select('word, box, wrong_count, stability').eq('student_id', sid())),
       q(sb.from('word_answers').select('word, correct, confidence, mode, answered_at').eq('student_id', sid()).gte('answered_at', addDays(localDate(), -6) + 'T00:00:00')),
       loadWords(),
       q(sb.from('word_answers').select('correct, stability_before, elapsed_days').eq('student_id', sid()).not('stability_before', 'is', null)),
       q(sb.from('word_answers').select('word, correct, again, answered_at, stability_before').eq('student_id', sid())),
       q(sb.from('purchases').select('item, price').eq('student_id', sid())),
+      q(sb.from('typing_results').select('lesson, stars, created_at').eq('student_id', sid())),
     ]);
     const owned = new Set(purchases.map((x) => x.item));
-    const coins = heroCoins(all, purchases, wordsPerDay(state.student));
-    const power = heroPower(heroBest(progress, all));
+    const typing = typingStats(typed, typingPerDay(state.student));
+    const coins = heroCoins(all, purchases, wordsPerDay(state.student), typing.coins);
+    const power = heroPower(heroBest(progress, all)) + typing.power;
     const lvl = heroLevel(power, heroCap(owned)), waiting = heroLevel(power) > lvl ? nextRide(owned) : null;
     if (!progress.length && !answers.length) return;
     const tr = Object.fromEntries(list.map((w) => [w.en, w.tr]));
@@ -3605,16 +3615,25 @@ function planSection(p) {
       h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı: çocuğun İngilizce sekmesinde kelime kartları, kolaydan zora. '
         + `Günde kaç kart gelsin? 0 yazarsan sekme kapanır. Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü. `
         + 'Kelime kahramanının görünüşü (kız ya da erkek, saç, fotoğraftan benzetme) Aile bölümünde.'));
+    // Klavye dersleri (on parmak klavye, çocuğun Klavye sekmesi; bilgisayar klavyesiyle). 0 sekmeyi kapatır.
+    const typingInput = h('input', { type: 'number', min: 0, max: 10, value: typingPerDay(p), inputmode: 'numeric',
+      'aria-label': 'Günlük klavye dersi sayısı', style: 'width: 76px' });
+    const typingRow = h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0 4px; border-top: 1px solid var(--rule)' },
+      h('div', { class: 'spread' }, h('b', {}, 'Klavye dersleri'), typingInput),
+      h('p', { class: 'small muted' }, 'On parmak klavye: ekranda klavye ve eller, hangi parmağın hangi tuşa basacağı yanar. Bilgisayarda yapılır, '
+        + 'telefonda sekme görünmez. Günde kaç ders? 0 yazarsan sekme kapanır. Kazandığı yıldızlar kelime kahramanını güçlendirir.'));
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
-      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: Math.min(50, Math.max(0, Math.round(+wordsInput.value || 0))) };
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: Math.min(50, Math.max(0, Math.round(+wordsInput.value || 0))),
+        daily_typing: Math.min(10, Math.max(0, Math.round(+typingInput.value || 0))) };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;
       Object.assign(p, upd);
       subjects.forEach((s) => { inputs[s].value = by[s]; });
       wordsInput.value = upd.daily_words;
+      typingInput.value = upd.daily_typing;
       update();
       toast('Kaydedildi. Yeni sayılar bugünden geçerli.');
     } }, 'Kaydet');
@@ -3624,7 +3643,7 @@ function planSection(p) {
       h('p', {}, `Bugün ${sum('n')} soru çözdü, ${fmtMinutes(sum('sec'))}. Son 7 günde ${fmtMinutes(sum('week'))}`
         + (days ? `, çalıştığı ${days} günde ortalama ${fmtMinutes(sum('week') / days)}.` : '.')),
       h('p', { class: 'small muted' }, 'Her dersten günde en fazla kaç soru gelsin? Önce hata tekrarları, sonra konu tekrarları gelir; kalan sayı en zayıf konulardan ek çalışmayla dolar. Süre, soruyu açtığı andan şıkkı seçtiği ana kadar ölçülür.'),
-      rowsEl, totalLine, wordsRow, save);
+      rowsEl, totalLine, wordsRow, typingRow, save);
   })().catch(() => fill(box, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yüklenemedi, sayfayı yenile.')));
   return box;
 }
@@ -4169,7 +4188,7 @@ async function viewReport() {
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
     tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
-    reportedBox(), poemBox(), wordBox(), booksBox(),
+    reportedBox(), poemBox(), wordBox(), typingBox(), booksBox(),
     h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
 }

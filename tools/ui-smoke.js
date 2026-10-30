@@ -26,12 +26,15 @@
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], topics: [], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
-            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'kelime kahramanı'], together: ['birlikte bakılacaklar'] }
+            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
     if (role === 'student' && wordsPerDay(state.student) > 0) {
       pages.words = ['kelime kartları', 'güç', 'mağaza'];
       pages.shop = ['mağaza', 'kelime altını', 'yolculuk araçları', 'dünyanı süsle'];
     }
+    // Klavye dersleri: klavyeli cihazda (bu tarayıcı bölmesi) sekmesi olan öğrencide.
+    const typingTab = role === 'student' && typingPerDay(state.student) > 0 && hasKeyboard();
+    if (typingTab) pages.typing = ['on parmak klavye', 'orta sıra', 'kelimeler ve cümleler', 'başla: ders'];
     // İlkokul: okuduğu kitabın sayfaları Yükle sekmesinden gönderilir.
     if (role === 'student' && (state.student?.grade || 8) <= 4) {
       pages.send = [...pages.send, 'okuduğum kitap'];
@@ -52,6 +55,11 @@
       check(`Sayfa: ${tab}`, state.tab === tab && !broken && !missing.length && back === wantBack,
         [state.tab !== tab && `açılan ${state.tab}`, broken && 'hata kutusu', missing.length && 'eksik: ' + missing.join(', '),
           back !== wantBack && (back ? 'fazladan Geri' : 'Geri yok')].filter(Boolean).join('; '));
+    }
+
+    // Klavye sekmesi yalnızca dersleri açık öğrencide (ilkokulda varsayılan açık, sonrasında veli açar).
+    if (role === 'student' && !typingTab) {
+      check('Klavye sekmesi kapalıyken görünmez', ![...document.querySelectorAll('nav.tabs button')].some((x) => x.textContent.trim() === 'Klavye'));
     }
 
     // Okuduğum kitap yalnızca ilkokulda.
@@ -80,6 +88,33 @@
       go(root); await settle();
       const labels = [...document.querySelectorAll('nav.tabs button')].map((x) => x.textContent.trim());
       check('İngilizce sekmesi Ayarlar\'ın solunda', labels.at(-2) === 'İngilizce' && labels.at(-1) === 'Ayarlar', labels.join(', '));
+      if (typingTab) check('Klavye sekmesi İngilizce\'nin solunda', labels.at(-3) === 'Klavye', labels.join(', '));
+    }
+
+    // Klavye dersi: ders soru çözme gibi açılır (alt menü gizli), ekranda bütün tuşlar ve eller. F ve J'ye basınca yeni
+    // tuşlar tanıtılır; doğru harf alttaki satırda yanar; yanlışta ⌫ yanıp söner, sağ serçe parmak ona uzanır; ⌫ siler.
+    // Geri tuşu önce sorar, Klavye sayfasına döner. Ders bitmediği için hiçbir şey yazılmaz.
+    if (typingTab) {
+      go('typing'); await settle();
+      [...document.querySelectorAll('#app button.primary')].find((x) => x.textContent.startsWith('Başla: Ders'))?.click(); await wait(200);
+      const r = state.session;
+      const key = (k, c) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: c, bubbles: true, cancelable: true }));
+      const opened = r?.track === 'typing' && history.state?.overlay === 'session' && !document.querySelector('nav.tabs')
+        && document.querySelectorAll('.kb .k').length === 62 && /F ve J/.test(document.querySelector('.ty-guide')?.textContent || '');
+      key('f', 'KeyF'); key('j', 'KeyJ');
+      const intro = r?.phase === 'intro';
+      while (r && r.phase === 'intro') { const ch = r.intro[r.ii]; key(ch, TQ_KEY[ch]); }
+      for (let i = 0; i < 3 && r; i++) { const ch = r.lines[0][r.pos]; key(ch, TQ_KEY[ch]); }
+      const lit = document.querySelectorAll('.ty-typed .lit').length === 3;
+      const wrong = r && [...'qzx'].find((c) => c !== r.lines[0][r.pos]);
+      key(wrong, TQ_KEY[wrong]);
+      const erase = !!document.querySelector('.kb .k.erase') && /⌫/.test(document.querySelector('.ty-guide')?.textContent || '') && !!document.querySelector('.ty-typed .bad');
+      key('Backspace', 'Backspace');
+      const cleared = !r?.err && !document.querySelector('.kb .k.erase');
+      history.back(); await settle();
+      check('Klavye dersi: tuşlar ve eller, F-J ile başlar, doğru harf yanar, yanlışta ⌫ gösterilir, geri tuşu Klavye sayfasına döner',
+        opened && intro && lit && erase && cleared && !state.session && state.tab === 'typing' && !history.state?.overlay,
+        [!opened && 'açılmadı', !intro && 'tanıtım yok', !lit && 'satır yanmadı', !erase && '⌫ yok', !cleared && 'silinmedi'].filter(Boolean).join('; '));
     }
 
     // Aile: kelime kartları açık çocuğun kahramanının görünüşü açılır, seçim önizlemeyi değiştirir (kaydedilmez).

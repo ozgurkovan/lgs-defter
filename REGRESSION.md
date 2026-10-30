@@ -22,6 +22,9 @@ Her maddenin yanında nasıl denendiği yazar:
 
    Bütün satırlar `OK` olmalı. Bu test hiçbir şey kaydetmez.
 
+   İkinci bir Claude oturumu kendi önizlemesini başka bir portta açabilir (örneğin 5501). Aile fonksiyonu yalnızca 5500'e ve
+   canlı siteye izin verir, o yüzden velinin Aile denetimi orada "İşlem yapılamadı" der; Aile bölümü 5500'de denenir.
+
    Giriş bağlantısı: `node tools/sb.mjs login-link irftest` (ya da `test4`, `testveli`, `testogretmen`). Araç yalnızca bu
    test hesaplarına bağlantı üretir (`tools/test-accounts.mjs`).
 3. Değişikliğin dokunduğu **[E]** maddeleri test hesabıyla elle denenir.
@@ -141,6 +144,32 @@ Her maddenin yanında nasıl denendiği yazar:
 - Oturum sonunda kazandığı altın görünür. Yeni yere varınca konfetili kutlama ve yeni kahraman görünür.
 - Raporda güç, bulunduğu yer, altın, aracı beklediği ve aldıkları görünür.
 
+**Klavye** (on parmak klavye, bilgisayarda) [A], ders [E]
+- Alt menüde "Klavye" sekmesi, İngilizce'nin solunda. Yalnızca klavyeli cihazda (fare ya da dokunmatik yüzey varsa) görünür,
+  telefonda görünmez. Günde kaç ders olacağını veli seçer (0 kapalı); ayarlanmadıysa ilkokulda 2, sonrasında kapalı. [A]
+- Ekranda Türkçe Q klavyenin bütün tuşları (62 tuş) parmak renkleriyle: serçe mor, yüzük mavi, orta yeşil, işaret turuncu.
+  Üstünde iki el; F ve J'deki çıkıntı çizili. [A]
+- Ders önce "İşaret parmaklarını F ve J'ye koy… Hazırsan F ve J'ye bas" der. [A]
+  - Sonra yeni tuşlar tek tek gelir: "Yeni tuş: D · sol orta parmağın. D'ye üç kez bas".
+  - Her harfte hangi parmağın hangi tuşa basacağı yazar. Tuş yanar, o parmak renklenip tuşa uzanır.
+- "asas asas asas asas" gibi satırlar yazılır. Doğru yazdıkça alttaki satırda harf harf ışık yanar. [A]
+  - Yanlışta harf kırmızı olur ve "Sağ serçe parmağınla ⌫ geri sil" yazar.
+  - ⌫ yanıp söner, sağ serçe parmak ona uzanır. ⌫'den başka tuş kabul edilmez.
+- Bilgisayarda Türkçe ses varsa parmak ve tuş sesli de söylenir; "Sesli anlatım" düğmesiyle kapanır. [E]
+- 22 ders. Her derste yalnızca öğrenilmiş harfler kullanılır. Bir ders, bir öncekinden en az bir yıldız alınca açılır. [O]
+  - Orta sıra: F J, D K, S L, A Ş, G H, İ.
+  - Üst sıra ve alt sıra.
+  - Sonra hayvanlar, renkler ve sayılar, cümleler, İngilizce kelimeler.
+- Ders sonunda gösterilenler: puan (harf sayısı eksi yanlış), doğruluk, dakikada kelime, en çok zorlandığı tuşlar. [O]
+  - Doğruluk aşağı yuvarlanır.
+  - Yıldız doğruluğa göredir: %97 üç, %90 iki, %75 bir.
+  - "Tekrar dene" ve "Sonraki ders" düğmeleri var.
+  - Yarıda bırakılan ders kaydedilmez; geri tuşu önce sorar.
+- Klavye kahramanı da büyütür. Kelime sayfası, mağaza ve rapor bunu sayar; güç arttıysa kutlama olur. Kahraman Klavye
+  sayfasında da görünür. [O]
+  - Her dersin en iyi yıldızı 1 güç verir; aynı dersi tekrarlamak şişirmez.
+  - Her yeni yıldız 5 altın, günün dersleri bittiği her gün 5 altın.
+
 **Okuduğum kitap** (ilkokul, Yükle sekmesi) [A], gönderme ve sorular [E]
 - Çocuk okuduğu kitabın sayfalarını fotoğraflar. Genelde hikâye kitabı olur, ama her tür kitap gönderilebilir.
   - Kitap seçilir ya da yeni kitap eklenir: adı ve biliyorsa sınav tarihi.
@@ -204,6 +233,10 @@ Her maddenin yanında nasıl denendiği yazar:
   - bugün, son 7 günün doğru oranı;
   - öğrendiği ve zorlandığı kelimeler;
   - hiç kart çözmediyse görünmez. [E]
+- Klavye dersleri kutusu:
+  - bitirdiği dersler, yıldızlar, bugün kaç ders;
+  - son ders (doğruluk ve hız), son 7 günde en çok zorlandığı tuşlar;
+  - hiç ders yoksa görünmez. [E]
 - Okuduğu kitaplar kutusu:
   - sayfa sayısı, hazır soru, çözdüğü soru ve doğru oranı;
   - "Sorular hazırlanıyor" ve "Sınavı geçti" etiketleri;
@@ -222,6 +255,7 @@ Her maddenin yanında nasıl denendiği yazar:
 **Ayarlar** [E]
 - Ders ders günlük soru sayısı; bugün ve son 7 günde harcanan süre; hata tekrarı sınırı aşıyorsa uyarı ve "X yap".
 - Kelime kartları: günde kaç kart (0 kapalı). Ders sayılarından ayrı bir satırda, bugün kaç kart çözdüğüyle. [A]
+- Klavye dersleri: günde kaç ders (0 kapalı), kelime kartlarının altında. [A]
 - Sınıf (1–8), bir üst sınıfın konuları, LGS tarihi (8. sınıf).
 - Seyrek konu katsayısı: 1, 1,5, 2, 3 ya da 0 (tekrar etme).
 - Aile:
@@ -266,6 +300,10 @@ Her maddenin yanında nasıl denendiği yazar:
   - çocuk kendi kitabını ekler ve sayfalarını gönderir, kardeşi adına ekleyemez;
   - sınav tarihini sonradan yalnızca veli değiştirir;
   - veli ve Türkçe öğretmeni görür; başka öğretmen ve kardeş göremez (`test-books.sql`).
+- Klavye dersleri (`test-typing.sql`):
+  - çocuk kendi ders sonucunu yazar, kardeşi adına yazamaz;
+  - günlük ders sayısını veli seçer, çocuk değiştiremez;
+  - sonucu çocuk ve velisi görür; öğretmen ve kardeş göremez.
 - Kelime kartları:
   - çocuk kendi kutusunu ve cevabını yazar, kardeşi adına yazamaz;
   - günlük sayıyı veli ayarlar, çocuk değiştiremez;

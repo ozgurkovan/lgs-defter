@@ -1,0 +1,60 @@
+/* Klavye dersleri: ekrandaki klavye, eller, yazılacak satır ve altındaki yanan satır. Klavye çizim olduğu için koyu
+   temada da açık renk kalır. Parmak renkleri: serçe mor, yüzük mavi, orta yeşil, işaret turuncu, başparmak gri. */
+.ty-wrap { gap: 12px; }
+.ty-guide {
+  display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 8px 12px;
+  border-radius: var(--radius); background: var(--amber-soft); color: var(--ink); font-weight: 700; font-size: 1.1rem; text-align: center;
+}
+.ty-guide.bad { background: var(--red-soft); color: var(--red); }
+.ty-guide.ok { background: var(--green-soft); color: var(--green); }
+.ty-guide .dot { flex: none; width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7); }
+.ty-lines {
+  display: grid; gap: 6px; justify-items: center; padding: 14px 10px; overflow-x: auto;
+  border: 1px solid var(--rule); border-radius: var(--radius); background: var(--card);
+  font-family: var(--font-mono); font-size: clamp(1.25rem, 3.4vw, 2rem); line-height: 1.35; white-space: pre;
+}
+.ty-target span, .ty-typed span { display: inline-block; min-width: 1ch; text-align: center; border-radius: 4px; }
+.ty-target .todo { color: var(--ink-soft); }
+.ty-target .done { color: var(--green); }
+.ty-target .cur { color: var(--ink); background: var(--amber-soft); box-shadow: inset 0 -3px 0 var(--amber); }
+.ty-target .cur.bad { background: var(--red-soft); box-shadow: inset 0 -3px 0 var(--red); }
+.ty-target .big { min-width: 2ch; padding: 0 8px; font-size: 1.6em; }
+.ty-target .sp, .ty-typed .sp { opacity: 0.55; }
+/* Alttaki satır: doğru yazdıkça harf harf ışık yanar */
+.ty-typed .lit { color: #fff; background: #1f9d5c; box-shadow: 0 0 10px rgba(31, 157, 92, 0.7); animation: ty-glow 0.25s ease-out; }
+.ty-typed .lit.sp { opacity: 1; color: rgba(255, 255, 255, 0.7); }
+.ty-typed .bad { color: #fff; background: #e5484d; box-shadow: 0 0 10px rgba(229, 72, 77, 0.7); animation: ty-shake 0.3s; }
+.ty-typed .slot { color: transparent; box-shadow: inset 0 -2px 0 var(--rule); }
+.ty-stars { font-size: 2.4rem; letter-spacing: 6px; margin: 0; }
+@keyframes ty-glow { from { box-shadow: 0 0 22px rgba(31, 157, 92, 1); transform: scale(1.15); } }
+@keyframes ty-shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+/* Ekrandaki klavye ve eller */
+.kb-box { padding: 8px; border-radius: 16px; background: #F4F6F9; border: 1px solid #DDE2EA; }
+.kb { display: block; width: 100%; height: auto; max-height: 52vh; }
+.kb .kc { stroke: #C3CAD6; stroke-width: 1.2; transition: fill 0.12s; }
+.kb .kl { font: 600 15px var(--font-body); fill: #2B3446; text-anchor: middle; dominant-baseline: central; }
+.kb .kl.sm { font-size: 11px; font-weight: 500; fill: #5B6475; }
+.kb .bump { fill: #7E889A; }
+.kb .k.target .kc { stroke: var(--f); stroke-width: 4; filter: drop-shadow(0 0 5px var(--f)); }
+.kb .k.hit .kc { fill: #5BD68F; }
+.kb .k.miss .kc { fill: #FF8E8A; }
+.kb .k.erase .kc { stroke: #E5484D; stroke-width: 4; animation: kb-pulse 0.9s ease-in-out infinite; }
+.kb .palm { fill: #F2C7A5; opacity: 0.3; }
+.kb .fg { stroke: #F2C7A5; stroke-linecap: round; opacity: 0.38; }
+.kb .fg.on { opacity: 0.78; }
+.kb.all .fg.on { opacity: 0.5; }
+.kb .kb-arrow { font-size: 24px; text-anchor: middle; opacity: 0; }
+.kb .kb-arrow.show { opacity: 1; animation: kb-bob 0.8s ease-in-out infinite; }
+@keyframes kb-pulse { 50% { fill: #FFD3D0; } }
+@keyframes kb-bob { 50% { transform: translateY(5px); } }
+
+/* Dersler: yıldızlı ve kilitli kutular */
+.ty-lessons { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ty-lesson { flex-direction: column; align-items: flex-start; gap: 2px; min-height: 84px; padding: 12px; text-align: left; }
+.ty-lesson .stars { letter-spacing: 2px; font-size: 0.95rem; }
+.ty-lesson:disabled { opacity: 0.55; }
+.ty-lesson.next { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  .ty-typed .lit, .ty-typed .bad, .kb .k.erase .kc, .kb .kb-arrow.show { animation: none; }
+}

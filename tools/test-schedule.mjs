@@ -169,5 +169,7 @@ const ans = [
 ];
 const coins = heroCoins(ans, [{ item: 'top', price: 2 }], 3);
 check('kahraman: altın', coins.earned === 3 + 5 && coins.spent === 2 && coins.balance === 6, JSON.stringify(coins));
+const withTyping = heroCoins(ans, [{ item: 'top', price: 2 }], 3, 15);
+check('kahraman: klavye altını eklenir', withTyping.earned === 3 + 5 + 15 && withTyping.balance === 21, JSON.stringify(withTyping));
 
 process.exit(fails ? 1 : 0);

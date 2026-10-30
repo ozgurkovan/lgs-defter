@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "5500", "--directory", "docs"],
       "port": 5500
+    },
+    {
+      "name": "defter-klavye",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5501", "--directory", "docs"],
+      "port": 5501
     }
   ]
 }
