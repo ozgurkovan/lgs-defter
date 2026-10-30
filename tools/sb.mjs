@@ -10,10 +10,12 @@
 //   node tools/sb.mjs patch <tablo?filtre> <dosya.json|json>
 //   node tools/sb.mjs download <bucket> <yol> <çıkış dosyası>
 //   node tools/sb.mjs upload <bucket> <yol> <dosya>
+//   node tools/sb.mjs login-link irftest|testveli|testogretmen   test hesabına şifresiz giriş bağlantısı
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { testAccountEmail } from './test-accounts.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const envPath = join(root, '.secrets', 'supabase.env');
@@ -141,12 +143,15 @@ try {
     }
     case 'recovery-link':
     case 'login-link': {
-      // E-posta göndermeden şifre sıfırlama (recovery-link) ya da şifresiz giriş (login-link) bağlantısı
-      // üretir: 1 saat geçerli, tek kullanımlık. login-link sadece test hesapları için kullanılır.
+      // E-posta göndermeden şifre sıfırlama (recovery-link <e-posta>) ya da şifresiz giriş (login-link <test hesabı>)
+      // bağlantısı üretir: 1 saat geçerli, tek kullanımlık. Giriş bağlantısı yalnızca test hesaplarına üretilir
+      // (test-accounts.mjs). Sıfırlama bağlantısı hesabı olmayan adreste hata verir, hesap açmaz.
+      const login = cmd === 'login-link';
+      const email = login ? await testAccountEmail(args[0], base, serviceHeaders()) : args[0];
       const res = await fetch(`${base}/auth/v1/admin/generate_link`, {
         method: 'POST',
         headers: serviceHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ type: cmd === 'login-link' ? 'magiclink' : 'recovery', email: args[0], redirect_to: 'https://ozgurkovan.github.io/lgs-defter/' }),
+        body: JSON.stringify({ type: login ? 'magiclink' : 'recovery', email, redirect_to: 'https://ozgurkovan.github.io/lgs-defter/' }),
       });
       if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
       const data = await res.json();

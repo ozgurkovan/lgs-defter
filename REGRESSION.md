@@ -16,13 +16,15 @@ Her maddenin yanında nasıl denendiği yazar:
 2. Yerel önizlemede (`localhost:5500`) test hesabıyla giriş yapılır; `tools/ui-smoke.js` içeriği sayfada
    çalıştırılır. Üç kez çalıştırılır: öğrenci (IrfTest), test velisi (yalnızca IrfTest'e bağlı) ve test
    öğretmeni (IrfTest'te matematik ve fen) olarak. Bütün satırlar `OK` olmalı. Bu test hiçbir şey kaydetmez.
+   Giriş bağlantısı: `node tools/sb.mjs login-link irftest` (ya da `testveli`, `testogretmen`). Araç yalnızca bu
+   üç test hesabına bağlantı üretir (`tools/test-accounts.mjs`).
 3. Değişikliğin dokunduğu **[E]** maddeleri test hesabıyla elle denenir.
 4. Gerçek hesaplar yalnızca salt okunur kontrol edilir (`supabase/check-students.sql`, 1. adımda çalışır).
    Onların adına hiçbir şey yapılmaz, girilmez.
 5. İlkokul görünümü gerekiyorsa IrfTest'in sınıfı geçici olarak 3 ya da 4 yapılır, sonra 8'e döner.
    Saatlik görevin çalıştığı dakikalar (:10–:20) dışında yapılır.
-6. Aile fonksiyonu (`supabase/functions/family`) değiştiyse `node tools/test-family.mjs <test öğrencisinin e-postası>`
-   çalıştırılır: girişsiz ve öğrenci olarak yapılan çağrılar reddedilmeli.
+6. Aile fonksiyonu (`supabase/functions/family`) değiştiyse `node tools/test-family.mjs` çalıştırılır (her zaman
+   test öğrencisi IrfTest olarak): girişsiz ve öğrenci olarak yapılan çağrılar reddedilmeli.
 
 ## Öğrenci
 
@@ -146,3 +148,5 @@ Her maddenin yanında nasıl denendiği yazar:
 - Şiir dizeleri: çocuk yazar; veli ve Türkçe öğretmeni okur.
 - Soru ekle: öğrenci ve velisi gönderir; kardeşi adına gönderilemez.
 - Aile dışından biri hiçbir şey görmez.
+- Test araçları şifresiz giriş bağlantısını yalnızca üç test hesabına üretir (IrfTest, Test Veli, Test Öğretmen).
+  Başka bir ad ya da adres verilirse durur, Supabase'e hiç gitmez; hesap açılmaz.

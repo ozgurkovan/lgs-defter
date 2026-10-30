@@ -1,5 +1,6 @@
 // Regresyon testinin otomatik kısmı. Her değişiklikten sonra, yayınlamadan önce: node tools/regression.mjs
-//  1. Uygulama dosyası hatasız okunuyor mu, sürüm numaraları tutuyor mu.
+//  1. Uygulama dosyası hatasız okunuyor mu, sürüm numaraları tutuyor mu; şifresiz giriş bağlantısı yalnızca
+//     test hesaplarına mı üretiliyor (bu deneme Supabase'e gitmez).
 //  2. Takvim ve günlük plan hesapları (tools/test-schedule.mjs).
 //  3. Veritabanı yetkileri: supabase/test-*.sql. Her test kullanıcıların yerine geçip dener ve sonucu
 //     "SONUC {...}" hatasıyla döndürür; hata yüzünden her şey geri alınır, iz kalmaz. Sonuç dosyadaki
@@ -9,6 +10,7 @@
 // Arayüz denetimi (tools/ui-smoke.js) ve elle bakılacaklar: REGRESSION.md.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
+import { testAccountEmail } from './test-accounts.mjs';
 
 let failed = 0;
 const report = (good, name, detail = '') => {
@@ -27,6 +29,16 @@ const html = readFileSync('docs/index.html', 'utf8');
 const v = JSON.parse(readFileSync('docs/version.json', 'utf8')).v;
 const inHtml = [...html.matchAll(/(?:app\.js|style\.css)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
 report(inHtml.length > 0 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
+// Başka bir adres reddedilmeli. Deneme kapalı bir porta gider: koruma bozulsa bile Supabase'e ulaşmaz, hesap açılmaz.
+// Giriş bağlantısı üreten her araç adresi test-accounts.mjs'ten almalı.
+const refused = await testAccountEmail('velitest@hotmail.com', 'http://127.0.0.1:9', {}).then(() => 'kabul edildi', (e) => e.message);
+const rawMagic = readdirSync('tools').filter((f) => f.endsWith('.mjs')).filter((f) => {
+  const src = readFileSync(`tools/${f}`, 'utf8');
+  return /['"]magiclink['"]/.test(src) && !src.includes('testAccountEmail(');
+});
+const onlyTest = refused.startsWith('Giriş bağlantısı yalnızca');
+report(onlyTest && !rawMagic.length, 'Giriş bağlantısı yalnızca test hesaplarına',
+  [!onlyTest && `başka adres: ${refused}`, rawMagic.length && `adresi doğrudan alan: ${rawMagic.join(', ')}`].filter(Boolean).join('; '));
 
 // 2
 const sched = node(['tools/test-schedule.mjs']).trim().split(/\r?\n/).filter(Boolean);
