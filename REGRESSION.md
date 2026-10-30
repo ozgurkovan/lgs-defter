@@ -79,9 +79,13 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Deneme sekmesi** [A], içindekiler [E]
 - Gerçek LGS kitapçıkları (2024–2026, sözel ve sayısal). Bu sorular günlük tekrarda gelmez.
-- Karma deneme: sözel ya da sayısal. Konular LGS sıklığına göre seçilir; ilkokulda 30 soru.
+  - Kitapçıklar bütün yılın konularını kapsar. Bir kitapçık, bütün soruları aktarılınca ve hepsinin konusu işlenince görünür. [A]
+  - O zamana kadar yerinde kısa bir not durur.
+- Karma deneme: sözel ya da sayısal, ilkokulda 30 soru.
+  - Yalnızca işlenen konulardan ve görülmemiş sorulardan gelir; konular LGS sıklığına göre seçilir.
+  - Her başlayışta yeniden kurulur.
 - Süre, "T (tahmin)" işareti, soru haritası, "Ara ver" ve devam, "Bitir".
-- Sonuç ve net. Yanlış ve boşlar hata tekrarına girer. Çözdüğün denemeler listesi.
+- Sonuç ve net. Yanlış ve boşların hepsi hata tekrarına girer, konusu henüz işlenmemiş olsa da. Çözdüğün denemeler listesi.
 
 **Yükle sekmesi** [A], gönderme [E]
 - **Soru ekle**: "Yapamadığım sorular" ve "Beğendiğim sorular" fotoğrafları, istenirse not.

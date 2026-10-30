@@ -2014,25 +2014,30 @@ const examNet = (rs) => rs.reduce((s, r) => s + r.correct - r.wrong / 3, 0);
 async function viewExamHub() {
   loading();
   const lgs = isLgsStudent(state.student);
-  const [bookletRows, past] = await Promise.all([
-    lgs ? q(sb.from('questions').select('booklet').in('booklet', BOOKLETS.map((b) => b[0])).eq('active', true)) : [],
+  const [bookletRows, openTopics, past] = await Promise.all([
+    lgs ? q(sb.from('questions').select('booklet, topic_id').in('booklet', BOOKLETS.map((b) => b[0])).eq('active', true)) : [],
+    lgs ? q(sb.from('topic_status').select('topic_id').eq('student_id', sid()).in('status', ['active', 'gap'])) : [],
     q(sb.from('exams').select('id, name, booklet, exam_date, time_note, exam_results(correct, wrong, blank)')
       .eq('student_id', sid()).eq('kind', 'uygulama').order('created_at', { ascending: false }).limit(12)),
   ]);
-  const count = {};
-  bookletRows.forEach((r) => { count[r.booklet] = (count[r.booklet] || 0) + 1; });
+  // Gerçek LGS bütün yılın konularını kapsar: kitapçık, bütün soruları gelip hepsinin konusu işlenince açılır.
+  const open = new Set(openTopics.map((t) => t.topic_id));
+  const count = {}, untaught = {};
+  bookletRows.forEach((r) => {
+    count[r.booklet] = (count[r.booklet] || 0) + 1;
+    if (r.topic_id && !open.has(r.topic_id)) untaught[r.booklet] = (untaught[r.booklet] || 0) + 1;
+  });
+  const booklets = BOOKLETS.filter(([id, , , n]) => (count[id] || 0) >= n && !untaught[id]);
   const resume = savedExam();
   const minutes = (subjects, n) => Math.round(subjects.reduce((s, x) => s + SECTION_COUNTS[x] * maxSeconds(x), 0) / 60);
 
   const bookletCard = ([id, title, section, n]) => {
-    const ready = (count[id] || 0) >= n;
     const last = past.find((p) => p.booklet === id);
     return h('div', { class: 'card stack', style: 'gap: 6px' },
       h('div', { class: 'spread' }, h('b', {}, title),
         h('span', { class: 'small muted num' }, `${n} soru · ${minutes(SECTION_SUBJECTS[section])} dk`)),
       last ? h('p', { class: 'small muted' }, `Daha önce çözdün: net ${fmtNet(examNet(last.exam_results || []))} (${fmtDate(last.exam_date)})`) : null,
-      ready ? h('button', { class: last ? 'block' : 'primary block', onclick: () => startBookletExam(id, title, section) }, last ? 'Yeniden çöz' : 'Başla')
-        : h('p', { class: 'small muted' }, `Sorular hazırlanıyor (${count[id] || 0}/${n}).`));
+      h('button', { class: last ? 'block' : 'primary block', onclick: () => startBookletExam(id, title, section) }, last ? 'Yeniden çöz' : 'Başla'));
   };
 
   render(
@@ -2049,14 +2054,15 @@ async function viewExamHub() {
       h('div', { class: 'row' },
         h('button', { class: 'primary', style: 'flex: 1', onclick: () => showExam(resume) }, resume.endsAt > Date.now() ? 'Devam et' : 'Sonucu gör'),
         h('button', { class: 'ghost', onclick: () => { if (confirm('Bu deneme silinsin mi? Cevapların kaydedilmez.')) { dropExam(); viewExamHub(); } } }, 'Bırak'))) : null,
-    lgs ? h('section', { class: 'stack' },
+    booklets.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Gerçek LGS soruları'),
       h('p', { class: 'small muted' }, 'Son üç yılın LGS soruları, sınavdaki sırasıyla ve süresiyle. Bu sorular günlük tekrarda hiç gelmez.'),
-      BOOKLETS.map(bookletCard)) : null,
+      booklets.map(bookletCard),
+      booklets.length < BOOKLETS.length ? h('p', { class: 'small muted' }, 'Diğer kitapçıklar, konuları okulda işlenince burada açılır.') : null) : null,
     h('section', { class: 'stack' },
       h('h2', {}, 'Karma deneme'),
       h('p', { class: 'small muted' }, lgs
-        ? 'Havuzdan, daha önce görmediğin sorularla; konular LGS\'de çıkma sıklığına göre seçilir.'
+        ? 'İşlediğin konulardan, daha önce görmediğin sorularla; her başlayışta yeni bir deneme. Konular LGS\'de çıkma sıklığına göre seçilir.'
         : 'İşlediğin konulardan, daha önce görmediğin 30 soru.'),
       lgs ? ['sozel', 'sayisal'].map((section) => h('div', { class: 'card stack', style: 'gap: 6px' },
         h('div', { class: 'spread' }, h('b', {}, `Karma · ${SECTION_NAMES[section]}`),
@@ -2064,7 +2070,8 @@ async function viewExamHub() {
         h('button', { class: 'block', onclick: () => startMixedExam(section) }, 'Başla')))
         : h('div', { class: 'card stack', style: 'gap: 6px' },
           h('div', { class: 'spread' }, h('b', {}, 'Karma deneme'), h('span', { class: 'small muted num' }, '30 soru')),
-          h('button', { class: 'block', onclick: () => startMixedExam(null) }, 'Başla'))),
+          h('button', { class: 'block', onclick: () => startMixedExam(null) }, 'Başla')),
+      lgs && !booklets.length ? h('p', { class: 'small muted' }, 'Gerçek LGS soruları bütün yılın konularını kapsadığı için konular okulda işlenince açılacak.') : null),
     past.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Çözdüğün denemeler'),
       past.map((p) => h('div', { class: 'card flat spread', style: 'padding: 12px' },
@@ -2293,9 +2300,9 @@ async function finishExam(exam, reason) {
       student_id: sid(), question_id: r.qn.id, track: 'deneme', answer: r.ans, correct: r.outcome === 'dogru',
       duration_sec: r.time, confident: r.guess ? false : null, confidence: r.guess ? 25 : null, voided: !r.ans,
     }))));
-    // Yanlış ve boşlar hata tekrarına: yarın o sorunun benzeri, sonra 2, 4, 14, 30 gün. Henüz işlenmemiş konular hariç.
-    const taught = new Set((await q(sb.from('topic_status').select('topic_id').eq('student_id', sid()).in('status', ['active', 'gap']))).map((t) => t.topic_id));
-    const misses = rows.filter((r) => r.outcome !== 'dogru' && r.qn.topic_id && taught.has(r.qn.topic_id));
+    // Yanlış ve boşların hepsi hata tekrarına, konusu henüz işlenmemiş olsa da: yarın o sorunun benzeri,
+    // sonra 2, 4, 14, 30 gün.
+    const misses = rows.filter((r) => r.outcome !== 'dogru' && r.qn.topic_id);
     if (misses.length) {
       await q(sb.from('items').insert(misses.map((r) => ({
         student_id: sid(), track: 'mistake', topic_id: r.qn.topic_id, question_id: r.qn.id, exam_question_id: eqId[r.qn.id],

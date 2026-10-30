@@ -84,6 +84,22 @@
         dropExam(); go('upload', 'replace'); await settle();
       } else check('Denemede geri tuşu', true, 'telefonda yarım deneme var, atlandı');
 
+      // Gerçek LGS kitapçığı yalnızca bütün soruları gelip hepsinin konusu işlenince görünür.
+      go('upload'); await settle();
+      const [bq, ts] = await Promise.all([
+        sb.from('questions').select('booklet, topic_id').in('booklet', BOOKLETS.map((x) => x[0])).eq('active', true),
+        sb.from('topic_status').select('topic_id').eq('student_id', sid()).in('status', ['active', 'gap']),
+      ]);
+      const openSet = new Set((ts.data || []).map((x) => x.topic_id));
+      const shown = new Set([...document.querySelectorAll('#app .card b')].map((x) => x.textContent));
+      const wrongBooklets = BOOKLETS.filter(([id, title, , n]) => {
+        const rows = (bq.data || []).filter((x) => x.booklet === id);
+        const due = isLgsStudent(state.student) && rows.length >= n && rows.every((x) => !x.topic_id || openSet.has(x.topic_id));
+        return due !== shown.has(title);
+      }).map((x) => x[1]);
+      check('Gerçek LGS kitapçığı konuları işlenince görünür', !bq.error && !ts.error && !wrongBooklets.length,
+        bq.error?.message || ts.error?.message || wrongBooklets.join(', '));
+
       // Kartlar: şaka, bilmece, bulmaca, fıkra ve şiir hatasız çizilir.
       let cardErr = null;
       try { for (let i = 0; i < 40; i++) { jokeCard(); poemCard('Mola'); } } catch (e) { cardErr = e.message; }
