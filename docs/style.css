@@ -261,6 +261,7 @@ nav.tabs svg { width: 22px; height: 22px; }
 .word-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .word-opt { min-height: 64px; font-size: 1.1rem; font-weight: 600; line-height: 1.25; white-space: normal; }
 .word-opt:disabled { opacity: 1; }
+.word-opt[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .word-opt.right { border-color: var(--green); background: var(--green-soft); }
 .word-opt.wrong { border-color: var(--red); background: var(--red-soft); }
 .word-meaning { font-size: 1.2rem; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }

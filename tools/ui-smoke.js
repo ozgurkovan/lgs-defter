@@ -46,6 +46,13 @@
           back !== wantBack && (back ? 'fazladan Geri' : 'Geri yok')].filter(Boolean).join('; '));
     }
 
+    // Kelime kartlarının sekmesi "İngilizce" adıyla Ayarlar'ın hemen solunda (velinin isteği).
+    if (role === 'student' && wordsPerDay(state.student) > 0) {
+      go(root); await settle();
+      const labels = [...document.querySelectorAll('nav.tabs button')].map((x) => x.textContent.trim());
+      check('İngilizce sekmesi Ayarlar\'ın solunda', labels.at(-2) === 'İngilizce' && labels.at(-1) === 'Ayarlar', labels.join(', '));
+    }
+
     // Geri: tarayıcı tuşu da üst çubuktaki düğme de bir önceki sayfaya döner.
     const [a, b] = role === 'student' ? ['topics', 'settings'] : ['questions', 'topics'];
     go(a); await settle(); go(b); await settle();
@@ -101,8 +108,9 @@
       check('Gerçek LGS kitapçığı konuları işlenince görünür', !bq.error && !ts.error && !wrongBooklets.length,
         bq.error?.message || ts.error?.message || wrongBooklets.join(', '));
 
-      // Kelime kartları: oyun soru çözme gibi açılır (alt menü gizli, dört şık); geri tuşu önce sorar, Kelime sayfasına
-      // döner. Kart cevaplanmaz, hiçbir şey yazılmaz.
+      // Kelime kartları: oyun soru çözme gibi açılır (alt menü gizli, dört şık); şık seçilince sorulardaki emin olma
+      // ölçeği çıkar, ölçek seçilmeden gönderilemez; geri tuşu önce sorar, Kelime sayfasına döner. Kart gönderilmez,
+      // hiçbir şey yazılmaz.
       if (wordsPerDay(state.student) > 0) {
         go('words'); await settle();
         const startBtn = [...document.querySelectorAll('#app button')].find((x) => /^(Başla|Devam et|\d+ kelime daha)$/.test(x.textContent));
@@ -110,8 +118,13 @@
           startBtn.click(); await settle();
           const inGame = state.session?.track === 'words' && history.state?.overlay === 'session' && !document.querySelector('nav.tabs')
             && document.querySelectorAll('.word-opt').length === 4 && !!document.querySelector('.word-big')?.textContent;
+          document.querySelector('.word-opt')?.click(); await wait(100);
+          const send = [...document.querySelectorAll('#app button.primary')].find((x) => x.textContent === 'Cevabı gönder');
+          const scale = document.querySelectorAll('.scale .conf').length === 4 && !!send && send.disabled && !send.closest('[hidden]');
           history.back(); await settle();
-          check('Kelime kartı açılır, geri tuşu Kelime sayfasına döner', inGame && !state.session && state.tab === 'words' && !history.state?.overlay);
+          check('Kelime kartı açılır, emin olma ölçeği çıkar, geri tuşu Kelime sayfasına döner',
+            inGame && scale && !state.session && state.tab === 'words' && !history.state?.overlay,
+            [!inGame && 'kart açılmadı', !scale && 'ölçek yok'].filter(Boolean).join('; '));
         } else check('Kelime kartı', true, 'çalışacak kelime yok, atlandı');
       }
 

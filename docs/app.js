@@ -329,8 +329,8 @@ function renderTabs() {
       : [['settings', 'Ayarlar', 'settings']])
     : role === 'teacher'
       ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
-      : [['home', 'Bugün', 'home'], wordsPerDay(state.student) > 0 ? ['words', 'Kelime', 'words'] : null, ['upload', 'Deneme', 'exam'],
-          ['send', 'Yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']].filter(Boolean);
+      : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'], ['topics', 'Konularım', 'topics'],
+          wordsPerDay(state.student) > 0 ? ['words', 'İngilizce', 'words'] : null, ['settings', 'Ayarlar', 'settings']].filter(Boolean);
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
       h('button', { 'aria-current': state.tab === id ? 'page' : null, onclick: () => go(id) }, icon(ic), label))));
@@ -2530,10 +2530,10 @@ async function setCovered(topicId, covered, rare = false) {
 
 /* Kelime kartları: okuldaki İngilizce dersinden ayrı, ilkokul için İngilizce kelime çalışması; ayrı sekmede,
    günlük plandaki derslere sayılmaz. Kelimeler docs/words.json'da, kolaydan zora gruplar hâlinde. Kartta İngilizce
-   kelime çıkar, çocuk dört Türkçe anlamdan birini seçer; iyice bildiği kelimelerde bazen tersi sorulur.
-   Bilemediği kelime oturumun sonunda bir kez daha, ertesi gün yine gelir; bildikçe kutusu ilerler, kelime
-   seyrekleşir (WORD_LADDER). İlk görüşte bildiği kelime 3 gün sonraya atlar. Günde kaç kart: veli ayarı
-   (profiles.daily_words); boşsa 1–4. sınıfa 10, diğerlerine kapalı. */
+   kelime çıkar, çocuk dört Türkçe anlamdan birini seçer ve sorulardaki gibi ne kadar emin olduğunu işaretler;
+   iyice bildiği kelimelerde bazen tersi sorulur. Bilemediği ya da emin olmadan bildiği kelime oturumun sonunda bir
+   kez daha gelir; emin bildikçe kutusu ilerler, kelime seyrekleşir (WORD_LADDER, saveWord). Günde kaç kart: veli
+   ayarı (profiles.daily_words); boşsa 1–4. sınıfa 10, diğerlerine kapalı. */
 const WORD_LADDER = [0, 1, 3, 7, 14, 30, 60]; // kutu → kaç gün sonra
 const WORD_LEARNED = 4; // iki haftalık aralığa ulaşan kelime öğrenilmiş sayılır
 const wordsPerDay = (p) => (p?.daily_words ?? (p?.grade && p.grade <= 4 ? 10 : 0));
@@ -2588,7 +2588,7 @@ async function viewWords() {
   const extra = queue.length ? [] : wordQueue(list, progress, answered, 5);
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
-      h('p', { class: 'label' }, 'Kelime'), h('h1', {}, 'Kelime kartları'),
+      h('p', { class: 'label' }, 'İngilizce'), h('h1', {}, 'Kelime kartları'),
       h('p', { class: 'muted' }, 'İngilizce kelimeler, kolaydan zora. Bilemediğin kelime yakında yine gelir; bildikçe daha seyrek gelir.')),
     h('section', { class: 'card stack', style: 'gap: 10px' },
       h('div', { class: 'spread' }, h('b', { class: 'num' }, `Bugün ${answered.size}/${goal}`),
@@ -2636,25 +2636,48 @@ function showWordCard(run, list, byWord) {
     showWordCard(run, list, byWord);
   };
   const feedback = h('div', { class: 'stack', hidden: true });
-  const btns = options.map((o) => h('button', { class: 'word-opt', onclick: () => pick(o) }, label(o)));
-  async function pick(o) {
+  // Sorulardaki gibi: şıkkı seçer, ne kadar emin olduğunu işaretler, sonra gönderir.
+  let selected = null, confidence = null;
+  const sendBtn = h('button', { class: 'primary block', disabled: true, onclick: () => submit() }, 'Cevabı gönder');
+  const confBtns = CONFIDENCE_LEVELS.map(([v, text]) =>
+    h('button', { class: 'conf', role: 'radio', 'aria-checked': 'false', onclick: (e) => {
+      confidence = v;
+      confBtns.forEach((b) => b.setAttribute('aria-checked', String(b === e.currentTarget)));
+      sendBtn.disabled = false;
+    } }, h('b', { class: 'num' }, `%${v}`), h('span', {}, text)));
+  const confirmRow = h('div', { class: 'stack', hidden: true },
+    h('p', { class: 'small muted' }, 'Bu cevaptan ne kadar eminsin?'),
+    h('div', { class: 'scale', role: 'radiogroup', 'aria-label': 'Emin olma ölçeği' }, confBtns),
+    sendBtn);
+  const btns = options.map((o) => h('button', { class: 'word-opt', 'aria-pressed': 'false', onclick: () => {
     if (done) return;
+    selected = o;
+    btns.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i] === o)));
+    confirmRow.hidden = false;
+  } }, label(o)));
+  async function submit() {
+    if (done || !selected || confidence == null) return;
     done = true;
-    const ok = o === w;
+    const ok = selected === w;
+    const sure = confidence >= 75;
+    confirmRow.hidden = true;
     btns.forEach((b) => { b.disabled = true; });
     btns[options.indexOf(w)].classList.add('right');
-    if (!ok) btns[options.indexOf(o)].classList.add('wrong');
+    if (!ok) btns[options.indexOf(selected)].classList.add('wrong');
     if (ok && !again) run.right++;
-    if (!ok && !again) run.cards.push({ w, again: true }); // bilemediği kelime oturumun sonunda bir kez daha
+    // Bilemediği ya da emin olmadan bildiği kelime oturumun sonunda bir kez daha gelir.
+    const repeat = !again && (!ok || !sure);
+    if (repeat) run.cards.push({ w, again: true });
     fill(feedback,
       h('p', { class: 'verdict ' + (ok ? 'ok' : 'no') }, ok ? WORD_PRAISE[Math.floor(Math.random() * WORD_PRAISE.length)] : 'Olmadı'),
       h('p', { class: 'word-meaning' }, w.emoji ? `${w.emoji} ` : '', h('b', { lang: 'en' }, w.en), ` = ${w.tr}`,
         canSpeak() ? h('button', { class: 'ghost small', 'aria-label': 'Dinle', onclick: () => speak(w.en) }, '🔊') : null),
-      !ok && !again ? h('p', { class: 'small muted' }, 'Bu kelime birazdan bir kez daha, yarın da yine gelecek.') : null,
+      repeat ? h('p', { class: 'small muted' }, ok ? 'Emin olmadığın için birazdan bir kez daha soracağım.'
+        : 'Bu kelime birazdan bir kez daha, yarın da yine gelecek.') : null,
       h('button', { class: 'primary block', onclick: next }, run.index + 1 < run.cards.length ? 'Sonraki kelime' : 'Bitir'));
     feedback.hidden = false;
-    await saveWord(w, ok, reverse, again, byWord);
-    if (ok) timer = setTimeout(() => { if (state.session === run) next(); }, 1200);
+    await saveWord(w, ok, confidence, reverse, again, byWord);
+    if (ok && sure) timer = setTimeout(() => { if (state.session === run) next(); }, 1200);
   }
   state.leaveOverlay = () => clearTimeout(timer);
   render(
@@ -2671,17 +2694,21 @@ function showWordCard(run, list, byWord) {
       !reverse && canSpeak() ? h('button', { class: 'ghost', 'aria-label': 'Dinle', onclick: () => speak(w.en) }, '🔊 Dinle') : null,
       h('p', { class: 'small muted' }, reverse ? 'İngilizcesi hangisi?' : 'Türkçesi hangisi?')),
     h('div', { class: 'word-opts' }, btns),
+    confirmRow,
     feedback);
 }
 
-// Cevap kaydı ve kutu: bilirse bir sonraki kutu (yeni kelime 2. kutudan başlar), bilemezse 1. kutu, yarın yine.
-// Oturumun sonunda tekrar sorulan kelimenin kutusu ilk cevapla belirlenmiştir; sadece cevap kaydedilir.
-async function saveWord(w, ok, reverse, again, byWord) {
+// Cevap kaydı ve kutu. Bilip emin olduğu (%75, %100) kelime bir kutu ilerler; yeni kelime "tamamen eminim"le 3 gün,
+// "büyük ölçüde eminim"le yarın gelir. Kararsız ya da tahminle bildiği kelime bir kutu geri, bilemediği 1. kutuya
+// (yarın) döner. Oturumun sonunda tekrar sorulan kelimenin kutusu ilk cevapla belirlenmiştir; sadece cevap kaydedilir.
+async function saveWord(w, ok, confidence, reverse, again, byWord) {
   const p = byWord.get(w.en);
   try {
-    await q(sb.from('word_answers').insert({ student_id: sid(), word: w.en, correct: ok, reverse }));
+    await q(sb.from('word_answers').insert({ student_id: sid(), word: w.en, correct: ok, confidence, reverse }));
     if (again) return;
-    const box = ok ? (p ? Math.min(WORD_LADDER.length - 1, p.box + 1) : 2) : 1;
+    const box = !ok ? 1
+      : confidence >= 75 ? (p ? Math.min(WORD_LADDER.length - 1, p.box + 1) : confidence === 100 ? 2 : 1)
+        : (p ? Math.max(1, p.box - 1) : 1);
     const row = { student_id: sid(), word: w.en, box, due_date: addDays(localDate(), WORD_LADDER[box]),
       right_count: (p?.right_count || 0) + (ok ? 1 : 0), wrong_count: (p?.wrong_count || 0) + (ok ? 0 : 1),
       updated_at: new Date().toISOString() };
@@ -2698,7 +2725,7 @@ function endWords(run) {
   render(
     h('section', { class: 'card stack', style: 'margin-top: 6vh; text-align: center' },
       h('h2', {}, run.right === run.firstTries ? 'Hepsini bildin! 🎉' : `${run.firstTries} kelimeden ${run.right} tanesini bildin`),
-      missed.length ? h('p', { class: 'muted' }, `Yarın yine gelecekler: ${missed.join(', ')}`) : null,
+      missed.length ? h('p', { class: 'muted' }, `Yakında yine gelecekler: ${missed.join(', ')}`) : null,
       h('button', { class: 'primary block', onclick: () => go('words') }, 'Tamam')),
     Math.random() < 0.5 ? jokeCard('Mola') : null);
 }
@@ -2710,7 +2737,7 @@ function wordBox() {
   (async () => {
     const [progress, answers, list] = await Promise.all([
       q(sb.from('word_progress').select('word, box, wrong_count').eq('student_id', sid())),
-      q(sb.from('word_answers').select('word, correct, answered_at').eq('student_id', sid()).gte('answered_at', addDays(localDate(), -6) + 'T00:00:00')),
+      q(sb.from('word_answers').select('word, correct, confidence, answered_at').eq('student_id', sid()).gte('answered_at', addDays(localDate(), -6) + 'T00:00:00')),
       loadWords(),
     ]);
     if (!progress.length && !answers.length) return;
@@ -2718,12 +2745,14 @@ function wordBox() {
     const today = localDate();
     const todayN = new Set(answers.filter((a) => localDate(new Date(a.answered_at)) === today).map((a) => a.word)).size;
     const right = answers.filter((a) => a.correct).length;
+    const unsure = answers.filter((a) => a.correct && a.confidence != null && a.confidence <= 50).length;
     const hard = progress.filter((p) => p.wrong_count > 0).sort((a, b) => b.wrong_count - a.wrong_count).slice(0, 6);
     fill(box,
       h('h2', {}, 'Kelime kartları'),
-      h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı kelime çalışması (Kelime sekmesi).'),
+      h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı kelime çalışması (çocuğun İngilizce sekmesi).'),
       h('p', {}, `Bugün ${todayN}/${wordsPerDay(state.student)} kart. Son 7 günde ${answers.length} cevap, `
-        + `%${answers.length ? Math.round((right / answers.length) * 100) : 0} doğru.`),
+        + `%${answers.length ? Math.round((right / answers.length) * 100) : 0} doğru`
+        + (unsure ? `; ${unsure} doğrusunda emin değildi (kararsız ya da tahmin).` : '.')),
       h('p', {}, `Öğrendiği: ${progress.filter((p) => p.box >= WORD_LEARNED).length} kelime · gördüğü: ${progress.length} / ${list.length}`),
       hard.length ? h('p', { class: 'small' }, h('b', {}, 'Zorlandıkları: '), hard.map((p) => `${p.word} (${tr[p.word] || '?'})`).join(', ')) : null);
     box.hidden = false;
@@ -2866,12 +2895,12 @@ function planSection(p) {
           + (st.due ? ` · bugün ${st.due} hata tekrarı` : '')),
         warn);
     });
-    // Kelime kartları ders dışıdır: okuldaki İngilizce'nin sayısından ayrı, Kelime sekmesinde. 0 sekmeyi kapatır.
+    // Kelime kartları ders dışıdır: okuldaki İngilizce'nin sayısından ayrı, çocuğun İngilizce sekmesinde. 0 sekmeyi kapatır.
     const wordsInput = h('input', { type: 'number', min: 0, max: 50, value: wordsPerDay(p), inputmode: 'numeric',
       'aria-label': 'Günlük kelime kartı sayısı', style: 'width: 76px' });
     const wordsRow = h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0 4px; border-top: 2px solid var(--rule)' },
       h('div', { class: 'spread' }, h('b', {}, 'Kelime kartları'), wordsInput),
-      h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı: Kelime sekmesinde İngilizce kelime kartları, kolaydan zora. '
+      h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı: çocuğun İngilizce sekmesinde kelime kartları, kolaydan zora. '
         + `Günde kaç kart gelsin? 0 yazarsan sekme kapanır. Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü.`));
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));

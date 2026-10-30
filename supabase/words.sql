@@ -30,6 +30,10 @@ create table if not exists public.word_answers (
 );
 create index if not exists word_answers_student_idx on public.word_answers(student_id, answered_at desc);
 alter table public.word_answers enable row level security;
+-- Emin olma ölçeği, sorulardaki gibi: 25 tahmin, 50 kararsız, 75 büyük ölçüde, 100 tamamen emin.
+alter table public.word_answers add column if not exists confidence int;
+alter table public.word_answers drop constraint if exists word_answers_confidence;
+alter table public.word_answers add constraint word_answers_confidence check (confidence is null or confidence in (25, 50, 75, 100));
 
 drop policy if exists word_progress_read on public.word_progress;
 create policy word_progress_read on public.word_progress for select to authenticated

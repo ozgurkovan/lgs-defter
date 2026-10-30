@@ -20,7 +20,7 @@ begin
   r := r || jsonb_build_object('cocuk_yazdi', true);
   update public.word_progress set box = 2, right_count = 1 where student_id = kid and word = 'zz-test';
   get diagnostics n = row_count; r := r || jsonb_build_object('cocuk_guncelledi', n);
-  insert into public.word_answers (student_id, word, correct) values (kid, 'zz-test', true) returning id into aid;
+  insert into public.word_answers (student_id, word, correct, confidence) values (kid, 'zz-test', true, 75) returning id into aid;
   r := r || jsonb_build_object('cevap_yazdi', aid is not null);
   begin insert into public.word_progress (student_id, word, box, due_date) values (sibling, 'zz-test', 1, current_date); r := r || '{"kardes_adina": "yazdi"}';
   exception when others then r := r || jsonb_build_object('kardes_adina', 'reddedildi'); end;

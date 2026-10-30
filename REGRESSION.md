@@ -76,18 +76,21 @@ Her maddenin yanında nasıl denendiği yazar:
 - Yazılan dize kaydedilir; veli raporda görür. Tamamlanan şiirler sıranın sonuna geçer.
 - Aynı kart art arda gelmez, ama hiçbir kart kalıcı olarak çıkmaz.
 
-**Kelime kartları** (ayrı "Kelime" sekmesi) [A], oynama [E]
+**Kelime kartları** (ayrı "İngilizce" sekmesi, Ayarlar'ın solunda) [A], oynama [E]
 - Okuldaki İngilizce dersinden ayrıdır, günlük plandaki ders sayılarına girmez.
 - 1–4. sınıfta açık, günde 10 kart. Veli sayıyı değiştirir ya da 0 ile kapatır; büyük sınıfa da açabilir.
 - Liste (`docs/words.json`): 386 kelime, 30 grup, kolaydan zora. Selamlaşma, renkler, sayılarla başlar; meslekler ve fiillerle biter.
 - Kart: İngilizce kelime ve altında dört Türkçe şık. Yanlış şıklar aynı gruptan seçilir.
   - İyice bildiği kelimede bazen tersi sorulur.
   - "🔊 Dinle" telefonun İngilizce sesiyle okur.
+  - Şık seçilince sorulardaki emin olma ölçeği çıkar (%25 tahmin … %100 tamamen emin); ölçek seçilmeden "Cevabı gönder" açılmaz. [A]
   - Cevaptan sonra emoji ve anlamı görünür.
 - Tekrar:
   - Bilemezse kelime aynı oturumun sonunda bir kez daha ve yarın gelir.
-  - Bilirse sonraki tekrar 3, 7, 14, 30, 60 gün sonradır; ilk görüşte bildiği kelime 3 gün sonraya atlar.
-  - 14 güne ulaşan kelime "öğrenildi" sayılır.
+  - Doğru ama kararsız ya da tahminse oturum sonunda bir kez daha gelir ve kutusu bir geri gider.
+  - Doğru ve emin (%75, %100) ise kutusu ilerler; sonraki tekrar 1, 3, 7, 14, 30, 60 gün sonradır.
+  - İlk görüşte "tamamen eminim" dediği kelime 3 gün sonraya atlar.
+  - 14 güne ulaşan kelime "öğrenildi" sayılır. Raporda emin olmadan bildiklerinin sayısı da görünür.
 - Günün kartları bitince "5 kelime daha".
 - Oyun sırasında alt menü gizlenir, geri tuşu önce sorar. Hızlı "Sonraki kelime" kart atlatmaz.
 - Altı sekmeli alt menü dar telefona da sığar. [E]
