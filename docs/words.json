@@ -1,0 +1,137 @@
+{
+  "about": "Kelime kartları: okuldaki İngilizce dersinden ayrı, ilkokul için kelime çalışması. Gruplar kolaydan zora sıralı; yeni kelimeler bu sırayla gelir. Her kelime [İngilizce, Türkçe, emoji]. İngilizce kelime kimliktir, çocuğun ilerlemesi ona bağlı: yazımını değiştirme. Yanlış şıklar aynı gruptan seçilir, bu yüzden bir grupta aynı anlama gelen iki kelime olmasın.",
+  "groups": [
+    { "name": "Selamlaşma", "words": [
+      ["hello", "merhaba", "👋"], ["goodbye", "hoşça kal", "👋"], ["good morning", "günaydın", "🌅"],
+      ["good night", "iyi geceler", "🌙"], ["please", "lütfen", "🙏"], ["thank you", "teşekkür ederim", "😊"],
+      ["yes", "evet", "✅"], ["no", "hayır", "❌"], ["sorry", "özür dilerim", "😔"]] },
+    { "name": "Renkler", "words": [
+      ["red", "kırmızı", "🔴"], ["blue", "mavi", "🔵"], ["yellow", "sarı", "🟡"], ["green", "yeşil", "🟢"],
+      ["black", "siyah", "⚫"], ["white", "beyaz", "⚪"], ["orange", "turuncu", "🟠"], ["purple", "mor", "🟣"],
+      ["pink", "pembe", "💗"], ["brown", "kahverengi", "🟤"], ["grey", "gri", ""]] },
+    { "name": "Sayılar 1–10", "words": [
+      ["one", "bir", "1️⃣"], ["two", "iki", "2️⃣"], ["three", "üç", "3️⃣"], ["four", "dört", "4️⃣"], ["five", "beş", "5️⃣"],
+      ["six", "altı", "6️⃣"], ["seven", "yedi", "7️⃣"], ["eight", "sekiz", "8️⃣"], ["nine", "dokuz", "9️⃣"], ["ten", "on", "🔟"]] },
+    { "name": "Evcil ve çiftlik hayvanları", "words": [
+      ["cat", "kedi", "🐱"], ["dog", "köpek", "🐶"], ["bird", "kuş", "🐦"], ["fish", "balık", "🐟"],
+      ["cow", "inek", "🐄"], ["horse", "at", "🐴"], ["duck", "ördek", "🦆"], ["rabbit", "tavşan", "🐰"],
+      ["sheep", "koyun", "🐑"], ["chicken", "tavuk", "🐔"], ["mouse", "fare", "🐭"], ["goat", "keçi", "🐐"]] },
+    { "name": "Aile ve arkadaşlar", "words": [
+      ["mother", "anne", "👩"], ["father", "baba", "👨"], ["sister", "kız kardeş", "👧"], ["brother", "erkek kardeş", "👦"],
+      ["baby", "bebek", "👶"], ["grandmother", "büyükanne", "👵"], ["grandfather", "büyükbaba", "👴"],
+      ["family", "aile", "👪"], ["friend", "arkadaş", "🤝"]] },
+    { "name": "Okul", "words": [
+      ["school", "okul", "🏫"], ["teacher", "öğretmen", "🧑‍🏫"], ["student", "öğrenci", "🧑‍🎓"], ["book", "kitap", "📖"],
+      ["notebook", "defter", "📓"], ["pen", "tükenmez kalem", "🖊️"], ["pencil", "kurşun kalem", "✏️"], ["eraser", "silgi", ""],
+      ["ruler", "cetvel", "📏"], ["bag", "çanta", "🎒"], ["desk", "sıra", ""], ["chair", "sandalye", "🪑"],
+      ["board", "tahta", ""], ["scissors", "makas", "✂️"], ["crayon", "pastel boya", "🖍️"]] },
+    { "name": "Vücudumuz", "words": [
+      ["head", "baş", ""], ["eye", "göz", "👁️"], ["ear", "kulak", "👂"], ["nose", "burun", "👃"], ["mouth", "ağız", "👄"],
+      ["tooth", "diş", "🦷"], ["hair", "saç", "💇"], ["face", "yüz", "😊"], ["hand", "el", "✋"], ["finger", "parmak", "☝️"],
+      ["arm", "kol", "💪"], ["leg", "bacak", "🦵"], ["foot", "ayak", "🦶"]] },
+    { "name": "Meyveler", "words": [
+      ["apple", "elma", "🍎"], ["banana", "muz", "🍌"], ["pear", "armut", "🍐"], ["grape", "üzüm", "🍇"],
+      ["strawberry", "çilek", "🍓"], ["cherry", "kiraz", "🍒"], ["lemon", "limon", "🍋"], ["watermelon", "karpuz", "🍉"],
+      ["peach", "şeftali", "🍑"], ["melon", "kavun", "🍈"]] },
+    { "name": "Yiyecek ve içecek", "words": [
+      ["bread", "ekmek", "🍞"], ["milk", "süt", "🥛"], ["water", "su", "💧"], ["egg", "yumurta", "🥚"],
+      ["cheese", "peynir", "🧀"], ["cake", "pasta", "🍰"], ["juice", "meyve suyu", "🧃"], ["tea", "çay", "🍵"],
+      ["soup", "çorba", "🍲"], ["rice", "pirinç", "🍚"], ["meat", "et", "🥩"], ["honey", "bal", "🍯"],
+      ["ice cream", "dondurma", "🍦"], ["carrot", "havuç", "🥕"], ["tomato", "domates", "🍅"], ["potato", "patates", "🥔"]] },
+    { "name": "Oyuncaklar", "words": [
+      ["ball", "top", "⚽"], ["doll", "oyuncak bebek", "🪆"], ["teddy bear", "oyuncak ayı", "🧸"], ["kite", "uçurtma", "🪁"],
+      ["puzzle", "yapboz", "🧩"], ["balloon", "balon", "🎈"], ["game", "oyun", "🎲"]] },
+    { "name": "Taşıtlar", "words": [
+      ["car", "araba", "🚗"], ["bus", "otobüs", "🚌"], ["train", "tren", "🚆"], ["plane", "uçak", "✈️"],
+      ["ship", "gemi", "🚢"], ["boat", "tekne", "⛵"], ["bicycle", "bisiklet", "🚲"], ["taxi", "taksi", "🚕"],
+      ["truck", "kamyon", "🚚"], ["motorbike", "motosiklet", "🏍️"], ["helicopter", "helikopter", "🚁"]] },
+    { "name": "Kıyafetler", "words": [
+      ["T-shirt", "tişört", "👕"], ["shirt", "gömlek", "👔"], ["dress", "elbise", "👗"], ["skirt", "etek", ""],
+      ["trousers", "pantolon", "👖"], ["shoes", "ayakkabı", "👟"], ["socks", "çorap", "🧦"], ["hat", "şapka", "👒"],
+      ["coat", "palto", "🧥"], ["jacket", "ceket", ""], ["scarf", "atkı", "🧣"], ["gloves", "eldiven", "🧤"], ["boots", "çizme", "👢"]] },
+    { "name": "Evimiz", "words": [
+      ["house", "ev", "🏠"], ["room", "oda", ""], ["door", "kapı", "🚪"], ["window", "pencere", ""], ["bed", "yatak", "🛏️"],
+      ["table", "masa", ""], ["sofa", "kanepe", "🛋️"], ["lamp", "lamba", "💡"], ["kitchen", "mutfak", "🍳"],
+      ["bathroom", "banyo", "🛁"], ["garden", "bahçe", "🌷"], ["wall", "duvar", "🧱"]] },
+    { "name": "Hava durumu", "words": [
+      ["sun", "güneş", "☀️"], ["rain", "yağmur", "🌧️"], ["snow", "kar", "❄️"], ["wind", "rüzgâr", "🌬️"], ["cloud", "bulut", "☁️"],
+      ["rainbow", "gökkuşağı", "🌈"], ["sunny", "güneşli", "🌞"], ["rainy", "yağmurlu", "☔"], ["snowy", "karlı", "⛄"],
+      ["windy", "rüzgârlı", "🍃"], ["cloudy", "bulutlu", "🌥️"], ["hot", "sıcak", "🥵"], ["cold", "soğuk", "🥶"]] },
+    { "name": "Doğa", "words": [
+      ["tree", "ağaç", "🌳"], ["flower", "çiçek", "🌸"], ["grass", "çimen", "🌱"], ["forest", "orman", "🌲"],
+      ["sea", "deniz", "🌊"], ["lake", "göl", ""], ["river", "nehir", "🏞️"], ["mountain", "dağ", "⛰️"],
+      ["sky", "gökyüzü", ""], ["star", "yıldız", "⭐"], ["moon", "ay", "🌙"], ["stone", "taş", ""]] },
+    { "name": "Vahşi hayvanlar", "words": [
+      ["lion", "aslan", "🦁"], ["tiger", "kaplan", "🐯"], ["elephant", "fil", "🐘"], ["monkey", "maymun", "🐒"],
+      ["bear", "ayı", "🐻"], ["giraffe", "zürafa", "🦒"], ["snake", "yılan", "🐍"], ["frog", "kurbağa", "🐸"],
+      ["turtle", "kaplumbağa", "🐢"], ["crocodile", "timsah", "🐊"], ["penguin", "penguen", "🐧"], ["owl", "baykuş", "🦉"],
+      ["butterfly", "kelebek", "🦋"], ["bee", "arı", "🐝"], ["spider", "örümcek", "🕷️"]] },
+    { "name": "Sayılar 11–100", "words": [
+      ["eleven", "on bir", ""], ["twelve", "on iki", ""], ["thirteen", "on üç", ""], ["fourteen", "on dört", ""],
+      ["fifteen", "on beş", ""], ["sixteen", "on altı", ""], ["seventeen", "on yedi", ""], ["eighteen", "on sekiz", ""],
+      ["nineteen", "on dokuz", ""], ["twenty", "yirmi", ""], ["thirty", "otuz", ""], ["forty", "kırk", ""],
+      ["fifty", "elli", ""], ["sixty", "altmış", ""], ["seventy", "yetmiş", ""], ["eighty", "seksen", ""],
+      ["ninety", "doksan", ""], ["one hundred", "yüz", "💯"]] },
+    { "name": "Hareketler", "words": [
+      ["run", "koşmak", "🏃"], ["walk", "yürümek", "🚶"], ["jump", "zıplamak", ""], ["swim", "yüzmek", "🏊"],
+      ["climb", "tırmanmak", "🧗"], ["fly", "uçmak", "🕊️"], ["dance", "dans etmek", "💃"], ["sing", "şarkı söylemek", "🎤"],
+      ["play", "oynamak", "🎮"], ["sleep", "uyumak", "😴"], ["eat", "yemek", "🍽️"], ["drink", "içmek", "🥤"],
+      ["read", "okumak", "📖"], ["write", "yazmak", "✍️"], ["draw", "resim çizmek", "🖍️"], ["listen", "dinlemek", "🎧"],
+      ["look", "bakmak", "👀"], ["cook", "yemek pişirmek", "🍳"], ["ride", "binmek", "🚲"]] },
+    { "name": "Duygular", "words": [
+      ["happy", "mutlu", "😊"], ["sad", "üzgün", "😢"], ["angry", "kızgın", "😠"], ["scared", "korkmuş", "😨"],
+      ["tired", "yorgun", "🥱"], ["hungry", "aç", "😋"], ["thirsty", "susamış", ""], ["bored", "sıkılmış", "😒"],
+      ["excited", "heyecanlı", "🤩"], ["sleepy", "uykulu", "😪"], ["surprised", "şaşırmış", "😮"]] },
+    { "name": "Nasıl bir şey?", "words": [
+      ["big", "büyük", "🐘"], ["small", "küçük", "🐭"], ["tall", "uzun boylu", "🦒"], ["short", "kısa", ""],
+      ["long", "uzun", "🐍"], ["fast", "hızlı", "🐆"], ["slow", "yavaş", "🐢"], ["new", "yeni", "✨"], ["old", "eski", ""],
+      ["beautiful", "güzel", "🌸"], ["clean", "temiz", "🧼"], ["dirty", "kirli", ""], ["good", "iyi", "👍"], ["bad", "kötü", "👎"],
+      ["strong", "güçlü", "💪"], ["heavy", "ağır", "🏋️"], ["easy", "kolay", ""], ["difficult", "zor", ""],
+      ["full", "dolu", ""], ["empty", "boş", ""]] },
+    { "name": "Günler", "words": [
+      ["Monday", "pazartesi", ""], ["Tuesday", "salı", ""], ["Wednesday", "çarşamba", ""], ["Thursday", "perşembe", ""],
+      ["Friday", "cuma", ""], ["Saturday", "cumartesi", ""], ["Sunday", "pazar", ""]] },
+    { "name": "Zaman ve mevsimler", "words": [
+      ["spring", "ilkbahar", "🌷"], ["summer", "yaz", "🏖️"], ["autumn", "sonbahar", "🍂"], ["winter", "kış", "⛄"],
+      ["morning", "sabah", "🌅"], ["afternoon", "öğleden sonra", ""], ["evening", "akşam", "🌆"], ["night", "gece", "🌃"],
+      ["today", "bugün", ""], ["tomorrow", "yarın", ""], ["yesterday", "dün", ""], ["week", "hafta", ""],
+      ["month", "ay", ""], ["year", "yıl", ""]] },
+    { "name": "Yerler", "words": [
+      ["hospital", "hastane", "🏥"], ["zoo", "hayvanat bahçesi", "🦓"], ["library", "kütüphane", "📚"],
+      ["playground", "oyun parkı", ""], ["bakery", "fırın", "🥖"], ["pharmacy", "eczane", "💊"], ["mosque", "cami", "🕌"],
+      ["museum", "müze", "🏛️"], ["cinema", "sinema", "🎬"], ["shop", "dükkân", "🏪"], ["street", "sokak", ""],
+      ["city", "şehir", "🏙️"], ["village", "köy", "🏡"], ["farm", "çiftlik", "🚜"]] },
+    { "name": "Meslekler", "words": [
+      ["doctor", "doktor", "🧑‍⚕️"], ["nurse", "hemşire", ""], ["police officer", "polis", "👮"], ["firefighter", "itfaiyeci", "🧑‍🚒"],
+      ["farmer", "çiftçi", "🧑‍🌾"], ["chef", "aşçı", "🧑‍🍳"], ["driver", "şoför", ""], ["dentist", "diş hekimi", "🦷"],
+      ["vet", "veteriner", ""], ["singer", "şarkıcı", "🎤"], ["painter", "ressam", "🎨"], ["waiter", "garson", ""],
+      ["engineer", "mühendis", "👷"]] },
+    { "name": "Nerede?", "words": [
+      ["in", "içinde", ""], ["on", "üstünde", ""], ["under", "altında", ""], ["next to", "yanında", ""],
+      ["behind", "arkasında", ""], ["in front of", "önünde", ""], ["between", "arasında", ""], ["left", "sol", "⬅️"],
+      ["right", "sağ", "➡️"], ["up", "yukarı", "⬆️"], ["down", "aşağı", "⬇️"]] },
+    { "name": "Soru kelimeleri", "words": [
+      ["what", "ne", ""], ["where", "nerede", ""], ["who", "kim", ""], ["when", "ne zaman", ""], ["why", "neden", ""],
+      ["how", "nasıl", ""], ["how many", "kaç tane", ""], ["which", "hangi", ""]] },
+    { "name": "Aylar", "words": [
+      ["January", "ocak", ""], ["February", "şubat", ""], ["March", "mart", ""], ["April", "nisan", ""],
+      ["May", "mayıs", ""], ["June", "haziran", ""], ["July", "temmuz", ""], ["August", "ağustos", ""],
+      ["September", "eylül", ""], ["October", "ekim", ""], ["November", "kasım", ""], ["December", "aralık", ""]] },
+    { "name": "Spor ve hobiler", "words": [
+      ["football", "futbol", "⚽"], ["basketball", "basketbol", "🏀"], ["volleyball", "voleybol", "🏐"], ["tennis", "tenis", "🎾"],
+      ["swimming", "yüzme", "🏊"], ["chess", "satranç", "♟️"], ["music", "müzik", "🎵"], ["painting", "resim yapmak", "🎨"],
+      ["camping", "kamp", "🏕️"], ["fishing", "balık tutmak", "🎣"], ["skating", "paten kaymak", "⛸️"], ["cycling", "bisiklete binmek", "🚴"]] },
+    { "name": "Daha çok fiil", "words": [
+      ["open", "açmak", ""], ["close", "kapatmak", ""], ["give", "vermek", "🎁"], ["take", "almak", ""],
+      ["buy", "satın almak", "🛒"], ["wash", "yıkamak", "🧼"], ["brush", "fırçalamak", ""], ["help", "yardım etmek", "🤝"],
+      ["carry", "taşımak", ""], ["catch", "yakalamak", ""], ["throw", "atmak", ""], ["build", "inşa etmek", "🧱"],
+      ["find", "bulmak", "🔍"], ["learn", "öğrenmek", "🧠"], ["teach", "öğretmek", ""], ["win", "kazanmak", "🏆"],
+      ["lose", "kaybetmek", ""], ["wait", "beklemek", "⏳"], ["visit", "ziyaret etmek", ""], ["love", "sevmek", "❤️"],
+      ["know", "bilmek", ""], ["think", "düşünmek", "🤔"]] },
+    { "name": "Nasıl biri?", "words": [
+      ["kind", "nazik", ""], ["funny", "komik", "😂"], ["clever", "zeki", "🧠"], ["brave", "cesur", "🦁"], ["lazy", "tembel", "🦥"],
+      ["friendly", "arkadaş canlısı", "🤗"], ["quiet", "sessiz", "🤫"], ["noisy", "gürültülü", "📢"], ["shy", "utangaç", "🙈"],
+      ["careful", "dikkatli", "⚠️"], ["dangerous", "tehlikeli", "☠️"], ["delicious", "lezzetli", "😋"], ["expensive", "pahalı", "💰"],
+      ["cheap", "ucuz", "🏷️"], ["early", "erken", "🐓"], ["late", "geç", "⏰"], ["hard-working", "çalışkan", "🐝"]] }
+  ]
+}

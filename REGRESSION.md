@@ -71,6 +71,22 @@ Her maddenin yanında nasıl denendiği yazar:
 - Yazılan dize kaydedilir; veli raporda görür. Tamamlanan şiirler sıranın sonuna geçer.
 - Aynı kart art arda gelmez, ama hiçbir kart kalıcı olarak çıkmaz.
 
+**Kelime kartları** (ayrı "Kelime" sekmesi) [A], oynama [E]
+- Okuldaki İngilizce dersinden ayrıdır, günlük plandaki ders sayılarına girmez.
+- 1–4. sınıfta açık, günde 10 kart. Veli sayıyı değiştirir ya da 0 ile kapatır; büyük sınıfa da açabilir.
+- Liste (`docs/words.json`): 386 kelime, 30 grup, kolaydan zora. Selamlaşma, renkler, sayılarla başlar; meslekler ve fiillerle biter.
+- Kart: İngilizce kelime ve altında dört Türkçe şık. Yanlış şıklar aynı gruptan seçilir.
+  - İyice bildiği kelimede bazen tersi sorulur.
+  - "🔊 Dinle" telefonun İngilizce sesiyle okur.
+  - Cevaptan sonra emoji ve anlamı görünür.
+- Tekrar:
+  - Bilemezse kelime aynı oturumun sonunda bir kez daha ve yarın gelir.
+  - Bilirse sonraki tekrar 3, 7, 14, 30, 60 gün sonradır; ilk görüşte bildiği kelime 3 gün sonraya atlar.
+  - 14 güne ulaşan kelime "öğrenildi" sayılır.
+- Günün kartları bitince "5 kelime daha".
+- Oyun sırasında alt menü gizlenir, geri tuşu önce sorar. Hızlı "Sonraki kelime" kart atlatmaz.
+- Altı sekmeli alt menü dar telefona da sığar. [E]
+
 **Yanlışların nedeni** [E]
 - Deneme yanlışlarında önce öğrenci nedenini seçer, sonra Claude'un yorumunu ve çözümü görür. Bitince açıldığı sayfaya döner.
 
@@ -114,6 +130,10 @@ Her maddenin yanında nasıl denendiği yazar:
 - Birlikte bakılacaklar ("Birlikte baktık" ile listeden çıkar).
 - Gün gün çalışma: konu konu doğru ve yanlış, süre, "anladı mı?".
 - Bildirdiği sorular (kendi açıklamasıyla) ve tamamladığı şiirler.
+- Kelime kartları kutusu:
+  - bugün, son 7 günün doğru oranı;
+  - öğrendiği ve zorlandığı kelimeler;
+  - hiç kart çözmediyse görünmez. [E]
 - Denemeler tablosu, özel derste çalışılacaklar (eksik konu notu, YouTube), zayıf konular.
 - Yanlışların nereden geldiği, derslere göre, soru tipine göre, kavram yanılgıları.
 - Son 14 gün, önümüzdeki 7 gün, yüklemeler ve saatlik görevin en son çalıştığı saat.
@@ -126,6 +146,7 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Ayarlar** [E]
 - Ders ders günlük soru sayısı; bugün ve son 7 günde harcanan süre; hata tekrarı sınırı aşıyorsa uyarı ve "X yap".
+- Kelime kartları: günde kaç kart (0 kapalı). Ders sayılarından ayrı bir satırda, bugün kaç kart çözdüğüyle. [A]
 - Sınıf (1–8), bir üst sınıfın konuları, LGS tarihi (8. sınıf).
 - Seyrek konu katsayısı: 1, 1,5, 2, 3 ya da 0 (tekrar etme).
 - Aile:
@@ -155,6 +176,10 @@ Her maddenin yanında nasıl denendiği yazar:
 - Birlikte baktık: veli ve o dersin öğretmeni işaretler.
 - Şiir dizeleri: çocuk yazar; veli ve Türkçe öğretmeni okur.
 - Soru ekle: öğrenci ve velisi gönderir; kardeşi adına gönderilemez.
+- Kelime kartları:
+  - çocuk kendi kutusunu ve cevabını yazar, kardeşi adına yazamaz;
+  - günlük sayıyı veli ayarlar, çocuk değiştiremez;
+  - veli ve İngilizce öğretmeni okur; başka öğretmen ve kardeş göremez.
 - Aile dışından biri hiçbir şey görmez.
 - Test araçları şifresiz giriş bağlantısını yalnızca üç test hesabına üretir (IrfTest, Test Veli, Test Öğretmen).
   Başka bir ad ya da adres verilirse durur, Supabase'e hiç gitmez; hesap açılmaz.

@@ -26,8 +26,9 @@
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], topics: [], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
-            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile'], together: ['birlikte bakılacaklar'] }
+            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
+    if (role === 'student' && wordsPerDay(state.student) > 0) pages.words = ['kelime kartları'];
     // Öğretmen mesaj bırakamaz, aileyi yönetemez.
     if (role === 'teacher') {
       go('report'); await settle();
@@ -99,6 +100,20 @@
       }).map((x) => x[1]);
       check('Gerçek LGS kitapçığı konuları işlenince görünür', !bq.error && !ts.error && !wrongBooklets.length,
         bq.error?.message || ts.error?.message || wrongBooklets.join(', '));
+
+      // Kelime kartları: oyun soru çözme gibi açılır (alt menü gizli, dört şık); geri tuşu önce sorar, Kelime sayfasına
+      // döner. Kart cevaplanmaz, hiçbir şey yazılmaz.
+      if (wordsPerDay(state.student) > 0) {
+        go('words'); await settle();
+        const startBtn = [...document.querySelectorAll('#app button')].find((x) => /^(Başla|Devam et|\d+ kelime daha)$/.test(x.textContent));
+        if (startBtn) {
+          startBtn.click(); await settle();
+          const inGame = state.session?.track === 'words' && history.state?.overlay === 'session' && !document.querySelector('nav.tabs')
+            && document.querySelectorAll('.word-opt').length === 4 && !!document.querySelector('.word-big')?.textContent;
+          history.back(); await settle();
+          check('Kelime kartı açılır, geri tuşu Kelime sayfasına döner', inGame && !state.session && state.tab === 'words' && !history.state?.overlay);
+        } else check('Kelime kartı', true, 'çalışacak kelime yok, atlandı');
+      }
 
       // Kartlar: şaka, bilmece, bulmaca, fıkra ve şiir hatasız çizilir.
       let cardErr = null;

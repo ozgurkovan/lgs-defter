@@ -300,6 +300,7 @@ const ICONS = {
   upload: 'M12 16V4m0 0-5 5m5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3',
   exam: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm0-12v4l2.5 2.5M10 2h4M19 6l1.5-1.5',
   topics: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11',
+  words: 'M8 3h10a2 2 0 0 1 2 2v10M4 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM7.5 11.5h5M7.5 15h3',
   report: 'M4 20V10m6 10V4m6 16v-7m4 7H2',
   questions: 'M9 6h11M9 12h11M9 18h11M4.5 6l1 1 2-2M4.5 12l1 1 2-2M4.5 18l1 1 2-2',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L14.5 3h-5l-.4 2.6a7.6 7.6 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2 1.2l.4 2.6h5l.4-2.6a7.6 7.6 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z',
@@ -328,7 +329,8 @@ function renderTabs() {
       : [['settings', 'Ayarlar', 'settings']])
     : role === 'teacher'
       ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
-      : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']];
+      : [['home', 'Bugün', 'home'], wordsPerDay(state.student) > 0 ? ['words', 'Kelime', 'words'] : null, ['upload', 'Deneme', 'exam'],
+          ['send', 'Yükle', 'upload'], ['topics', 'Konularım', 'topics'], ['settings', 'Ayarlar', 'settings']].filter(Boolean);
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
       h('button', { 'aria-current': state.tab === id ? 'page' : null, onclick: () => go(id) }, icon(ic), label))));
@@ -389,7 +391,7 @@ const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', 'upload', 'send', 'paper', 'ask', 'topics', 'settings', 'reasons', 'together']
+  ? ['home', 'words', 'upload', 'send', 'paper', 'ask', 'topics', 'settings', 'reasons', 'together']
   : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
@@ -447,7 +449,7 @@ function go(tab, how = 'push') {
     home: viewHome, upload: () => (state.profile?.role === 'student' ? viewExamHub() : viewUpload('deneme')),
     send: viewSend, paper: () => viewUpload('deneme'), ask: () => viewUpload('soru'), book: () => viewUpload('kitap'),
     topics: viewTopics, settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
-    together: viewTogether,
+    together: viewTogether, words: viewWords,
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
   return true;
@@ -2524,6 +2526,211 @@ async function setCovered(topicId, covered, rare = false) {
   }
 }
 
+// ---------------------------------------------------------------- kelime kartları
+
+/* Kelime kartları: okuldaki İngilizce dersinden ayrı, ilkokul için İngilizce kelime çalışması; ayrı sekmede,
+   günlük plandaki derslere sayılmaz. Kelimeler docs/words.json'da, kolaydan zora gruplar hâlinde. Kartta İngilizce
+   kelime çıkar, çocuk dört Türkçe anlamdan birini seçer; iyice bildiği kelimelerde bazen tersi sorulur.
+   Bilemediği kelime oturumun sonunda bir kez daha, ertesi gün yine gelir; bildikçe kutusu ilerler, kelime
+   seyrekleşir (WORD_LADDER). İlk görüşte bildiği kelime 3 gün sonraya atlar. Günde kaç kart: veli ayarı
+   (profiles.daily_words); boşsa 1–4. sınıfa 10, diğerlerine kapalı. */
+const WORD_LADDER = [0, 1, 3, 7, 14, 30, 60]; // kutu → kaç gün sonra
+const WORD_LEARNED = 4; // iki haftalık aralığa ulaşan kelime öğrenilmiş sayılır
+const wordsPerDay = (p) => (p?.daily_words ?? (p?.grade && p.grade <= 4 ? 10 : 0));
+const WORD_PRAISE = ['Aferin! 🎉', 'Süper! ⭐', 'Harika! 👏', 'Doğru! 🙌', 'Bravo! 🌟'];
+let wordList = null;
+async function loadWords() {
+  if (!wordList) {
+    const res = await fetch(`words.json?v=${APP_VERSION}`);
+    if (!res.ok) throw new Error('Kelime listesi yüklenemedi');
+    const { groups } = await res.json();
+    wordList = groups.flatMap((g, group) => g.words.map(([en, tr, emoji]) => ({ en, tr, emoji, group })));
+  }
+  return wordList;
+}
+const dayStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
+const canSpeak = () => 'speechSynthesis' in window && typeof SpeechSynthesisUtterance === 'function';
+function speak(text) {
+  if (!canSpeak()) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-GB';
+  u.rate = 0.85;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+// Bugünün kartları: önce günü gelen tekrarlar (en eskisi önce), kalan yer listedeki sıradaki yeni kelimelerle dolar.
+function wordQueue(list, progress, answeredToday, n) {
+  const today = localDate();
+  const byWord = new Map(list.map((w) => [w.en, w]));
+  const due = progress.filter((p) => p.due_date <= today && !answeredToday.has(p.word) && byWord.has(p.word))
+    .sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : a.box - b.box));
+  const picks = due.slice(0, n).map((p) => byWord.get(p.word));
+  const started = new Set(progress.map((p) => p.word));
+  for (const w of list) {
+    if (picks.length >= n) break;
+    if (!started.has(w.en) && !answeredToday.has(w.en)) picks.push(w);
+  }
+  return picks;
+}
+
+async function viewWords() {
+  loading();
+  const goal = wordsPerDay(state.student);
+  const [list, progress, todayRows] = await Promise.all([
+    loadWords(),
+    q(sb.from('word_progress').select('word, box, due_date, right_count, wrong_count').eq('student_id', sid())),
+    q(sb.from('word_answers').select('word').eq('student_id', sid()).gte('answered_at', dayStart())),
+  ]);
+  const answered = new Set(todayRows.map((r) => r.word));
+  const learned = progress.filter((p) => p.box >= WORD_LEARNED).length;
+  const queue = wordQueue(list, progress, answered, Math.max(0, goal - answered.size));
+  const extra = queue.length ? [] : wordQueue(list, progress, answered, 5);
+  render(
+    h('header', { class: 'stack', style: 'gap: 4px' },
+      h('p', { class: 'label' }, 'Kelime'), h('h1', {}, 'Kelime kartları'),
+      h('p', { class: 'muted' }, 'İngilizce kelimeler, kolaydan zora. Bilemediğin kelime yakında yine gelir; bildikçe daha seyrek gelir.')),
+    h('section', { class: 'card stack', style: 'gap: 10px' },
+      h('div', { class: 'spread' }, h('b', { class: 'num' }, `Bugün ${answered.size}/${goal}`),
+        h('span', { class: 'small muted' }, `Öğrendiğin kelime: ${learned}`)),
+      h('div', { class: 'progress' }, h('i', { style: `width: ${Math.min(100, (answered.size / Math.max(1, goal)) * 100)}%` })),
+      !goal ? h('p', { class: 'muted' }, 'Kelime kartları kapalı; velin Ayarlar\'dan açabilir.')
+        : queue.length ? h('button', { class: 'primary block', onclick: () => runWords(queue, list, progress) }, answered.size ? 'Devam et' : 'Başla')
+          : h('p', {}, 'Bugünlük bu kadar, aferin! 🎉 Yarın yeni kelimeler gelecek.'),
+      goal && extra.length ? h('button', { class: 'block', onclick: () => runWords(extra, list, progress) }, `${extra.length} kelime daha`) : null),
+    h('p', { class: 'small muted', style: 'text-align: center' }, `${list.length} kelimenin ${progress.length} tanesini gördün.`));
+}
+
+// Kart oyunu, soru çözme oturumu gibi açılır: alt menü gizlenir, geri tuşu önce sorar (state.session).
+function runWords(queue, list, progress) {
+  const run = { track: 'words', cards: queue.map((w) => ({ w, again: false })), index: 0, right: 0, firstTries: queue.length };
+  state.session = run;
+  pushOverlay('session');
+  showWordCard(run, list, new Map(progress.map((p) => [p.word, p])));
+}
+
+function showWordCard(run, list, byWord) {
+  if (run.index >= run.cards.length) return endWords(run);
+  const { w, again } = run.cards[run.index];
+  const p = byWord.get(w.en);
+  // İyice bildiği kelimede bazen tersi: Türkçe çıkar, İngilizcesini seçer.
+  const reverse = !again && (p?.box || 0) >= 3 && Math.random() < 0.5;
+  const label = (x) => (reverse ? x.en : x.tr);
+  // Yanlış şıklar aynı gruptan (renkler, hayvanlar…); grupta yeterli yoksa komşu gruplardan.
+  const same = list.filter((x) => x.group === w.group && x.en !== w.en);
+  const pool = same.length >= 3 ? same : list.filter((x) => x.en !== w.en && Math.abs(x.group - w.group) <= 1);
+  const distract = [];
+  for (const x of shuffle([...pool])) {
+    if (distract.length === 3) break;
+    if (label(x) !== label(w) && !distract.some((d) => label(d) === label(x))) distract.push(x);
+  }
+  const options = shuffle([w, ...distract]);
+  // Doğru cevapta kart kendiliğinden geçer; çocuk o arada "Sonraki kelime"ye basarsa ikinci geçiş olmasın
+  // (yoksa bir sonraki kart görünmeden atlanır).
+  let done = false, advanced = false, timer = null;
+  const next = () => {
+    if (advanced) return;
+    advanced = true;
+    clearTimeout(timer);
+    run.index++;
+    showWordCard(run, list, byWord);
+  };
+  const feedback = h('div', { class: 'stack', hidden: true });
+  const btns = options.map((o) => h('button', { class: 'word-opt', onclick: () => pick(o) }, label(o)));
+  async function pick(o) {
+    if (done) return;
+    done = true;
+    const ok = o === w;
+    btns.forEach((b) => { b.disabled = true; });
+    btns[options.indexOf(w)].classList.add('right');
+    if (!ok) btns[options.indexOf(o)].classList.add('wrong');
+    if (ok && !again) run.right++;
+    if (!ok && !again) run.cards.push({ w, again: true }); // bilemediği kelime oturumun sonunda bir kez daha
+    fill(feedback,
+      h('p', { class: 'verdict ' + (ok ? 'ok' : 'no') }, ok ? WORD_PRAISE[Math.floor(Math.random() * WORD_PRAISE.length)] : 'Olmadı'),
+      h('p', { class: 'word-meaning' }, w.emoji ? `${w.emoji} ` : '', h('b', { lang: 'en' }, w.en), ` = ${w.tr}`,
+        canSpeak() ? h('button', { class: 'ghost small', 'aria-label': 'Dinle', onclick: () => speak(w.en) }, '🔊') : null),
+      !ok && !again ? h('p', { class: 'small muted' }, 'Bu kelime birazdan bir kez daha, yarın da yine gelecek.') : null,
+      h('button', { class: 'primary block', onclick: next }, run.index + 1 < run.cards.length ? 'Sonraki kelime' : 'Bitir'));
+    feedback.hidden = false;
+    await saveWord(w, ok, reverse, again, byWord);
+    if (ok) timer = setTimeout(() => { if (state.session === run) next(); }, 1200);
+  }
+  state.leaveOverlay = () => clearTimeout(timer);
+  render(
+    h('div', { class: 'qhead stack', style: 'gap: 8px' },
+      h('div', { class: 'spread' },
+        h('button', { class: 'ghost', onclick: () => { clearTimeout(timer); go('words'); } }, '← Ara ver'),
+        h('span', { class: 'small muted num' }, `${run.index + 1}/${run.cards.length}`)),
+      h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': run.cards.length, 'aria-valuenow': run.index },
+        h('i', { style: `width: ${(run.index / run.cards.length) * 100}%` }))),
+    h('section', { class: 'card word-card' },
+      again ? h('span', { class: 'tag amber' }, 'Bir daha') : null,
+      h('p', { class: 'word-big', lang: reverse ? 'tr' : 'en' }, reverse ? w.tr : w.en),
+      // Ters soruda dinlemek cevabı söyler; dinleme cevaptan sonra.
+      !reverse && canSpeak() ? h('button', { class: 'ghost', 'aria-label': 'Dinle', onclick: () => speak(w.en) }, '🔊 Dinle') : null,
+      h('p', { class: 'small muted' }, reverse ? 'İngilizcesi hangisi?' : 'Türkçesi hangisi?')),
+    h('div', { class: 'word-opts' }, btns),
+    feedback);
+}
+
+// Cevap kaydı ve kutu: bilirse bir sonraki kutu (yeni kelime 2. kutudan başlar), bilemezse 1. kutu, yarın yine.
+// Oturumun sonunda tekrar sorulan kelimenin kutusu ilk cevapla belirlenmiştir; sadece cevap kaydedilir.
+async function saveWord(w, ok, reverse, again, byWord) {
+  const p = byWord.get(w.en);
+  try {
+    await q(sb.from('word_answers').insert({ student_id: sid(), word: w.en, correct: ok, reverse }));
+    if (again) return;
+    const box = ok ? (p ? Math.min(WORD_LADDER.length - 1, p.box + 1) : 2) : 1;
+    const row = { student_id: sid(), word: w.en, box, due_date: addDays(localDate(), WORD_LADDER[box]),
+      right_count: (p?.right_count || 0) + (ok ? 1 : 0), wrong_count: (p?.wrong_count || 0) + (ok ? 0 : 1),
+      updated_at: new Date().toISOString() };
+    await q(sb.from('word_progress').upsert(row));
+    byWord.set(w.en, row);
+  } catch (e) {
+    toast('Kaydedilemedi; internetini kontrol et.');
+  }
+}
+
+function endWords(run) {
+  const missed = [...new Set(run.cards.filter((c) => c.again).map((c) => c.w.en))];
+  state.session = null; // sonuç ekranında geri tuşu sormadan Kelime sayfasına döner
+  render(
+    h('section', { class: 'card stack', style: 'margin-top: 6vh; text-align: center' },
+      h('h2', {}, run.right === run.firstTries ? 'Hepsini bildin! 🎉' : `${run.firstTries} kelimeden ${run.right} tanesini bildin`),
+      missed.length ? h('p', { class: 'muted' }, `Yarın yine gelecekler: ${missed.join(', ')}`) : null,
+      h('button', { class: 'primary block', onclick: () => go('words') }, 'Tamam')),
+    Math.random() < 0.5 ? jokeCard('Mola') : null);
+}
+
+/* Rapordaki kelime kartları özeti (veli ve İngilizce öğretmeni): bugün, son 7 gün, öğrendiği ve zorlandığı
+   kelimeler. Okuldaki İngilizce dersinden ayrıdır. Hiç kart çözmediyse görünmez. */
+function wordBox() {
+  const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
+  (async () => {
+    const [progress, answers, list] = await Promise.all([
+      q(sb.from('word_progress').select('word, box, wrong_count').eq('student_id', sid())),
+      q(sb.from('word_answers').select('word, correct, answered_at').eq('student_id', sid()).gte('answered_at', addDays(localDate(), -6) + 'T00:00:00')),
+      loadWords(),
+    ]);
+    if (!progress.length && !answers.length) return;
+    const tr = Object.fromEntries(list.map((w) => [w.en, w.tr]));
+    const today = localDate();
+    const todayN = new Set(answers.filter((a) => localDate(new Date(a.answered_at)) === today).map((a) => a.word)).size;
+    const right = answers.filter((a) => a.correct).length;
+    const hard = progress.filter((p) => p.wrong_count > 0).sort((a, b) => b.wrong_count - a.wrong_count).slice(0, 6);
+    fill(box,
+      h('h2', {}, 'Kelime kartları'),
+      h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı kelime çalışması (Kelime sekmesi).'),
+      h('p', {}, `Bugün ${todayN}/${wordsPerDay(state.student)} kart. Son 7 günde ${answers.length} cevap, `
+        + `%${answers.length ? Math.round((right / answers.length) * 100) : 0} doğru.`),
+      h('p', {}, `Öğrendiği: ${progress.filter((p) => p.box >= WORD_LEARNED).length} kelime · gördüğü: ${progress.length} / ${list.length}`),
+      hard.length ? h('p', { class: 'small' }, h('b', {}, 'Zorlandıkları: '), hard.map((p) => `${p.word} (${tr[p.word] || '?'})`).join(', ')) : null);
+    box.hidden = false;
+  })().catch(() => {});
+  return box;
+}
+
 // ---------------------------------------------------------------- ayarlar
 
 function viewSettings() {
@@ -2562,6 +2769,7 @@ function viewSettings() {
       !isParent ? h('div', { class: 'stack', style: 'gap: 4px' },
         h('p', { class: 'label' }, `Günlük plan · ${planTotal(plan)} soru`),
         h('p', { class: 'small muted' }, studentSubjects(p).filter((s) => plan[s]).map((s) => `${SUBJECTS[s].name} ${plan[s]}`).join(' · ')),
+        wordsPerDay(p) ? h('p', { class: 'small muted' }, `Kelime kartları: günde ${wordsPerDay(p)} kart`) : null,
         h('p', { class: 'small muted' }, 'Bu sayıları velin ayarlıyor.')) : null,
       h('button', { class: 'primary block', onclick: async () => {
         const upd = { lgs_date: lgs.value || p.lgs_date };
@@ -2615,10 +2823,11 @@ function planSection(p) {
   const box = h('section', { class: 'card stack' }, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yükleniyor…'));
   (async () => {
     const today = localDate();
-    const [rows, due] = await Promise.all([
+    const [rows, due, wordRows] = await Promise.all([
       q(sb.from('reviews').select('duration_sec, answered_at, questions(subject)').eq('student_id', p.id).eq('voided', false)
         .gte('answered_at', addDays(today, -6) + 'T00:00:00')),
       q(sb.from('items').select('support, topics(subject)').eq('student_id', p.id).eq('track', 'mistake').eq('state', 'active').lte('due_date', today)),
+      q(sb.from('word_answers').select('word').eq('student_id', p.id).gte('answered_at', dayStart())),
     ]);
     const stat = Object.fromEntries(subjects.map((s) => [s, { n: 0, sec: 0, week: 0, due: 0 }]));
     for (const r of rows) {
@@ -2657,15 +2866,23 @@ function planSection(p) {
           + (st.due ? ` · bugün ${st.due} hata tekrarı` : '')),
         warn);
     });
+    // Kelime kartları ders dışıdır: okuldaki İngilizce'nin sayısından ayrı, Kelime sekmesinde. 0 sekmeyi kapatır.
+    const wordsInput = h('input', { type: 'number', min: 0, max: 50, value: wordsPerDay(p), inputmode: 'numeric',
+      'aria-label': 'Günlük kelime kartı sayısı', style: 'width: 76px' });
+    const wordsRow = h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0 4px; border-top: 2px solid var(--rule)' },
+      h('div', { class: 'spread' }, h('b', {}, 'Kelime kartları'), wordsInput),
+      h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı: Kelime sekmesinde İngilizce kelime kartları, kolaydan zora. '
+        + `Günde kaç kart gelsin? 0 yazarsan sekme kapanır. Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü.`));
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
-      const upd = { daily_by_subject: by, daily_questions: planTotal(by) };
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: Math.min(50, Math.max(0, Math.round(+wordsInput.value || 0))) };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;
       Object.assign(p, upd);
       subjects.forEach((s) => { inputs[s].value = by[s]; });
+      wordsInput.value = upd.daily_words;
       update();
       toast('Kaydedildi. Yeni sayılar bugünden geçerli.');
     } }, 'Kaydet');
@@ -2675,7 +2892,7 @@ function planSection(p) {
       h('p', {}, `Bugün ${sum('n')} soru çözdü, ${fmtMinutes(sum('sec'))}. Son 7 günde ${fmtMinutes(sum('week'))}`
         + (days ? `, çalıştığı ${days} günde ortalama ${fmtMinutes(sum('week') / days)}.` : '.')),
       h('p', { class: 'small muted' }, 'Her dersten günde en fazla kaç soru gelsin? Önce hata tekrarları, sonra konu tekrarları gelir; kalan sayı en zayıf konulardan ek çalışmayla dolar. Süre, soruyu açtığı andan şıkkı seçtiği ana kadar ölçülür.'),
-      rowsEl, totalLine, save);
+      rowsEl, totalLine, wordsRow, save);
   })().catch(() => fill(box, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yüklenemedi, sayfayı yenile.')));
   return box;
 }
@@ -3123,7 +3340,7 @@ async function viewReport() {
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
     tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
-    reportedBox(), poemBox(),
+    reportedBox(), poemBox(), wordBox(),
     h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
 }

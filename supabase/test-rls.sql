@@ -11,7 +11,9 @@ begin
     'profiles', (select count(*) from public.profiles),
     'questions', (select count(*) from public.questions),
     'topics', (select count(*) from public.topics),
-    'links', (select count(*) from public.family_links)
+    'links', (select count(*) from public.family_links),
+    'word_progress', (select count(*) from public.word_progress),
+    'word_answers', (select count(*) from public.word_answers)
   ) into r;
   perform set_config('role', 'postgres', true);
   return r;
