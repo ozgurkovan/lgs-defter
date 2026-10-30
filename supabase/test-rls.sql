@@ -13,7 +13,8 @@ begin
     'topics', (select count(*) from public.topics),
     'links', (select count(*) from public.family_links),
     'word_progress', (select count(*) from public.word_progress),
-    'word_answers', (select count(*) from public.word_answers)
+    'word_answers', (select count(*) from public.word_answers),
+    'books', (select count(*) from public.books)
   ) into r;
   perform set_config('role', 'postgres', true);
   return r;

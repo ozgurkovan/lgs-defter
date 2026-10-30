@@ -391,7 +391,7 @@ const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', 'words', 'upload', 'send', 'paper', 'ask', 'topics', 'settings', 'reasons', 'together']
+  ? ['home', 'words', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'settings', 'reasons', 'together']
   : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
@@ -448,6 +448,7 @@ function go(tab, how = 'push') {
     // soru gönderme ("ask": yapamadığı ya da beğendiği sorular).
     home: viewHome, upload: () => (state.profile?.role === 'student' ? viewExamHub() : viewUpload('deneme')),
     send: viewSend, paper: () => viewUpload('deneme'), ask: () => viewUpload('soru'), book: () => viewUpload('kitap'),
+    read: () => viewUpload('okuma'), // ilkokul: okuduğu kitabın sayfaları
     topics: viewTopics, settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
     together: viewTogether, words: viewWords,
   };
@@ -683,13 +684,17 @@ async function buildSession(track, remaining) {
   if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0, deferred: 0 };
 
   const topicIds = [...new Set(items.map((i) => i.topic_id))];
-  const [pool, seenRows, missRows, reserved] = await Promise.all([
-    q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
+  const [pool, seenRows, missRows, reserved, books] = await Promise.all([
+    q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam, book_id')
       .in('topic_id', topicIds).eq('active', true).eq('exam_only', false)), // gerçek LGS soruları denemeye saklı
     q(sb.from('reviews').select('question_id').eq('student_id', sid())),
     q(sb.from('exam_questions').select('topic_id, styles').eq('student_id', sid()).neq('outcome', 'dogru').in('topic_id', topicIds)),
     reservedVariants(),
+    topicIds.some((t) => t.endsWith('.kitap-okuma')) ? q(sb.from('books').select('id, exam_date').eq('student_id', sid())) : [],
   ]);
+  // Sınavı geçmiş kitabın hataları da gelmez (görev de o maddeleri bekletir).
+  const pastBooks = new Set(books.filter((b) => b.exam_date && b.exam_date < today).map((b) => b.id));
+  const bookOf = new Map(pool.filter((p) => p.book_id).map((p) => [p.id, p.book_id]));
   const seen = new Set(seenRows.map((r) => r.question_id));
   const missedStyles = {};
   for (const r of missRows) {
@@ -712,6 +717,7 @@ async function buildSession(track, remaining) {
   const basePerItem = track === 'mistake' ? 1 : TOPIC_QUESTIONS_PER_REVIEW;
   const started = new Set(); // bu oturumda en az bir maddesi alınan dersler
   for (const it of items) {
+    if (pastBooks.has(bookOf.get(it.question_id))) continue;
     // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur.
     const want = basePerItem + (it.support || 0);
     // Tekrar yarım kalmasın: maddenin soruları dersin kalan hakkına sığmıyorsa madde ertesi güne kalır.
@@ -723,10 +729,11 @@ async function buildSession(track, remaining) {
     const styles = missedStyles[it.topic_id] || new Set();
     const fresh = shuffle(pool.filter((p) => p.topic_id === it.topic_id && !seen.has(p.id) && !used.has(p.id)));
     // Hata maddesi önce yanlış yaptığı sorunun benzerlerini alır; başka hata maddelerine ayrılmış benzerlere
-    // (konu tekrarında da) dokunulmaz. Benzer yoksa konudan, kaçırdığı tarzlara yakın bir soru gelir.
+    // (konu tekrarında da) dokunulmaz. Benzer yoksa konudan, kaçırdığı tarzlara yakın bir soru gelir. Kitap soruları
+    // yalnızca kendi benzerleri olarak gelir (kitabın günlük sorularını önden harcamasın, başka kitaba karışmasın).
     const own = { q: new Set([it.question_id].filter(Boolean)), e: new Set([it.exam_question_id].filter(Boolean)) };
     const variants = fresh.filter((p) => isVariantOf(p, own));
-    const candidates = fresh.filter((p) => !isVariantOf(p, reserved))
+    const candidates = fresh.filter((p) => !p.book_id && !isVariantOf(p, reserved))
       .sort((a, b) => overlap(b.styles, styles) - overlap(a.styles, styles));
     if (!variants.length && !candidates.length) { shortage++; continue; }
     let picked = pickVaried(variants, want);
@@ -806,9 +813,37 @@ function examOrder(entries, order = SUBJECT_ORDER) {
 
 // ---------------------------------------------------------------- öğrenci: bugün
 
+/* Okuduğu kitabın soruları (ilkokul, source 'okuma'): sınav tarihine kadar her gün, sınavdan sonra hiç. Günlük sayı
+   kalan soruyu sınava kalan güne böler, en az 10 (sınav tarihi yoksa 10). Sorular kitabın sayfa sırasıyla gelir
+   (görev sayfa sırasıyla yazar). Kitap soruları günlük plandaki ders sayılarına girmez; yanlışlar hata tekrarına girer. */
+async function loadBookWork() {
+  const today = localDate();
+  const books = (await q(sb.from('books').select('id, title, exam_date').eq('student_id', sid())))
+    .filter((b) => !b.exam_date || b.exam_date >= today);
+  if (!books.length) return [];
+  const [qs, done] = await Promise.all([
+    q(sb.from('questions').select('id, book_id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution, created_at')
+      .in('book_id', books.map((b) => b.id)).eq('active', true).is('variant_of', null).order('created_at')),
+    q(sb.from('reviews').select('question_id, answered_at').eq('student_id', sid()).eq('track', 'book')),
+  ]);
+  const answered = new Set(done.map((r) => r.question_id));
+  const answeredToday = new Set(done.filter((r) => localDate(new Date(r.answered_at)) === today).map((r) => r.question_id));
+  return books.map((b) => {
+    const mine = qs.filter((x) => x.book_id === b.id);
+    const open = mine.filter((x) => !answered.has(x.id));
+    const doneToday = mine.filter((x) => answeredToday.has(x.id)).length;
+    const examIn = b.exam_date ? daysBetween(today, b.exam_date) : null;
+    const perDay = examIn == null ? 10 : Math.max(10, Math.ceil((open.length + doneToday) / Math.max(1, examIn)));
+    const entries = open.slice(0, Math.max(0, perDay - doneToday)).map((question) => ({
+      item: { id: null, track: 'book', topic_id: question.topic_id, topics: { subject: 'turkce', name: b.title, sort: 0 } }, question,
+    }));
+    return { book: b, total: mine.length, open: open.length, examIn, entries };
+  });
+}
+
 async function viewHome() {
   loading();
-  const [todayCount, reasons, replies, togetherRows, messages, poemLog] = await Promise.all([
+  const [todayCount, reasons, replies, togetherRows, messages, poemLog, bookWork] = await Promise.all([
     q(sb.from('reviews').select('id, track, correct, questions(subject)').eq('student_id', sid()).eq('voided', false).gte('answered_at', localDate() + 'T00:00:00')),
     q(sb.from('exam_questions').select('id').eq('student_id', sid()).neq('outcome', 'dogru')
       .is('student_reason', null).not('diagnosis_cause', 'is', null)),
@@ -820,14 +855,17 @@ async function viewHome() {
     // Tamamladığı şiirler (aynı şiir sık sorulmasın); okunamazsa ana sayfa yine açılır.
     sb.from('poem_lines').select('poem_key, created_at').eq('student_id', sid()).order('created_at', { ascending: false }).limit(300)
       .then(({ data }) => data || [], () => []),
+    // İlkokulda okuduğu kitabın soruları; okunamazsa ana sayfa yine açılır.
+    (state.student?.grade || 8) <= 4 ? loadBookWork().catch(() => []) : [],
   ]);
   state.poemLog = poemLog;
   // Günlük plan derse göre soru sayısıdır. Önce hata tekrarları, sonra konu tekrarları hakkı kullanır;
-  // kalan hak ek çalışmayla dolar.
+  // kalan hak ek çalışmayla dolar. Kitap soruları bu sayılara girmez.
   const plan = dailyPlan(state.student);
   const dailyTarget = planTotal(plan);
   const remaining = { ...plan };
-  todayCount.forEach((r) => { const s = r.questions?.subject; if (s in remaining) remaining[s]--; });
+  const planCount = todayCount.filter((r) => r.track !== 'book');
+  planCount.forEach((r) => { const s = r.questions?.subject; if (s in remaining) remaining[s]--; });
   const mistake = await buildSession('mistake', remaining);
   const topic = await buildSession('topic', remaining);
   const dueNow = mistake.entries.length + topic.entries.length;
@@ -865,8 +903,18 @@ async function viewHome() {
   const extraTail = extra.entries.length ? h('div', { class: 'subtask stack', style: 'gap: 8px' },
     h('div', { class: 'spread' }, h('b', {}, 'Ek çalışma'),
       h('span', { class: 'small muted num' }, `${extra.entries.length} soru · yaklaşık ${Math.max(1, Math.round(extra.seconds / 60))} dakika`)),
-    h('p', { class: 'small muted' }, `Günlük hedef ${dailyTarget} soru, bugün ${todayCount.length}. Tekrarlardan sonra hedefi tamamlamak için; en zayıf konularından başlıyor.`),
+    h('p', { class: 'small muted' }, `Günlük hedef ${dailyTarget} soru, bugün ${planCount.length}. Tekrarlardan sonra hedefi tamamlamak için; en zayıf konularından başlıyor.`),
     h('button', { class: dueNow ? 'block' : 'primary block', onclick: () => runSession('extra', extra) }, 'Ek çalışmaya başla')) : null;
+  // Okuduğu kitapların soruları konu tekrarı kartının altında (ana sayfaya yeni kart eklenmez).
+  const bookTails = bookWork.map((w) => h('div', { class: 'subtask stack', style: 'gap: 8px' },
+    h('div', { class: 'spread' }, h('b', {}, `📚 ${w.book.title}`),
+      w.examIn != null ? h('span', { class: 'small muted' }, w.examIn === 0 ? 'Sınav bugün' : w.examIn === 1 ? 'Sınav yarın' : `Sınava ${w.examIn} gün`) : null),
+    !w.total ? h('p', { class: 'small muted' }, 'Sayfaların geldi; sorular hazırlanıyor.')
+      : w.entries.length
+        ? [h('p', { class: 'small muted' }, `Bugün ${w.entries.length} soru · bu kitapta ${w.open} soru kaldı`),
+           h('button', { class: 'block', onclick: () => runSession('book', { entries: w.entries, seconds: 0 }) }, 'Kitap sorularına başla')]
+        : h('p', { class: 'small muted' }, w.open ? `Bugünkü kitap soruları tamam ✓ (${w.open} soru kaldı)` : 'Bu kitabın bütün sorularını çözdün 🎉')));
+  const topicTail = [extraTail, ...bookTails].filter(Boolean);
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
@@ -900,7 +948,7 @@ async function viewHome() {
       return card;
     }),
     sessionCard('mistake', 'Hata tekrarı', mistake, { lead: reasonsLead, tail: togetherTail }),
-    sessionCard('topic', 'Konu tekrarı', topic, { tail: extraTail }),
+    sessionCard('topic', 'Konu tekrarı', topic, { tail: topicTail.length ? topicTail : null }),
   );
 }
 
@@ -1021,11 +1069,13 @@ function showQuestion() {
     // Yanlışta kendi beyanı istenir (isteğe bağlı): veli raporunda "yanlışı anladı mı?" sorusunu cevaplar.
     // "Anlamadım" derse konu anlatımı bağlantısı açılır.
     let understoodRow = null;
-    const yt = h('a', { class: 'btn', hidden: !help || null, href: youtubeSearch(item.topics?.name || SUBJECTS[subject]?.name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı');
+    // Kitap sorusunda konu anlatımı yok; kitabın o bölümüne bakılır.
+    const yt = item.track === 'book' ? null
+      : h('a', { class: 'btn', hidden: !help || null, href: youtubeSearch(item.topics?.name || SUBJECTS[subject]?.name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı');
     if (!correct && !help) {
       const btns = [[true, 'Anladım'], [false, 'Anlamadım']].map(([v, label]) => h('button', { class: 'chip', 'aria-pressed': 'false', onclick: async (e) => {
         btns.forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
-        yt.hidden = v;
+        if (yt) yt.hidden = v;
         // "Anlamadım" dediği yanlış da birlikte bakılacaklara girer.
         const mine = ss.together.find((t) => t.question === question);
         if (!v && !mine) ss.together.push({ question, answer: selected, correct, kind: 'notUnderstood', topic: item.topics?.name });
@@ -1060,13 +1110,15 @@ function showQuestion() {
       }).select('id').single());
       const rv = await reviewSaved;
       reviewId = rv.id;
-      // Konu tekrarında ya da ek çalışmada yanlış (ya da "birlikte bakalım"): o soru hata tekrarına girer.
-      // Yarın o sorunun değiştirilmiş hâli ya da benzeri gelir (saatlik görev yazar), sonra 2, 4, 14, 30 gün.
-      if (!correct && (entry.extra || item.track === 'topic')) {
+      // Konu tekrarında, ek çalışmada ya da kitap sorusunda yanlış (ya da "birlikte bakalım"): o soru hata tekrarına
+      // girer. Yarın o sorunun değiştirilmiş hâli ya da benzeri gelir (saatlik görev yazar; kitap sorusunda kitabın aynı
+      // sayfalarından), sonra 2, 4, 14, 30 gün. Kitabın sınavı geçince kitap hataları da gelmez.
+      if (!correct && (entry.extra || item.track === 'topic' || item.track === 'book')) {
         const mi = await q(sb.from('items').insert({
           student_id: sid(), track: 'mistake', topic_id: item.topic_id, question_id: question.id,
           step: 0, interval_days: 1, due_date: addDays(localDate(), 1),
-          note: help ? 'Birlikte bakalım dedi' : entry.extra ? 'Ek çalışmada yanlış' : 'Konu tekrarında yanlış',
+          note: help ? 'Birlikte bakalım dedi' : entry.extra ? 'Ek çalışmada yanlış'
+            : item.track === 'book' ? `Kitap sorusunda yanlış: ${item.topics?.name || ''}` : 'Konu tekrarında yanlış',
         }).select('id').single());
         mistakeItemId = mi.id;
       }
@@ -1232,7 +1284,7 @@ function showSessionEnd() {
   state.session = null;
   render(
     h('section', { class: 'card', style: `margin-top: ${together.length ? 16 : 80}px; text-align: center` },
-      h('p', { class: 'label' }, { mistake: 'Hata tekrarı bitti', topic: 'Konu tekrarı bitti', extra: 'Ek çalışma bitti' }[track]),
+      h('p', { class: 'label' }, { mistake: 'Hata tekrarı bitti', topic: 'Konu tekrarı bitti', extra: 'Ek çalışma bitti', book: 'Kitap soruları bitti' }[track]),
       h('p', { class: 'task' }, h('span', { class: 'big num' }, `${stats.correct} / ${stats.total}`)),
       h('p', { class: 'muted' }, stats.correct === stats.total ? 'Hepsi doğru. Bu konular bir süre rahat.' :
         'Yanlış yaptıkların yakında farklı sorularla tekrar gelecek.'),
@@ -1837,6 +1889,21 @@ async function viewUpload(kind) {
   loading();
   activePicker = null;
   const exams = kind === 'deneme' ? await q(sb.from('exams').select('*').eq('student_id', sid()).order('exam_date', { ascending: false })) : [];
+  // Okuduğu kitap: sınavı geçmemiş kitaplarından biri ya da yeni kitap (adı ve biliyorsa sınav tarihi).
+  const books = kind === 'okuma' ? (await q(sb.from('books').select('id, title, exam_date').eq('student_id', sid()).order('created_at', { ascending: false })))
+    .filter((b) => !b.exam_date || b.exam_date >= localDate()) : [];
+  const bookSel = h('select', { id: 'book' },
+    books.map((b) => h('option', { value: b.id, selected: b.id === state.readBook || null }, b.exam_date ? `${b.title} · sınav ${fmtDate(b.exam_date)}` : b.title)),
+    h('option', { value: '__new', selected: !books.length || null }, '+ Yeni kitap'));
+  const bookTitle = h('input', { id: 'book-title', placeholder: 'Örn. Küçük Prens', maxlength: 120 });
+  const bookExam = h('input', { id: 'book-exam', type: 'date', min: localDate() });
+  const bookNew = h('div', { class: 'stack', hidden: bookSel.value !== '__new' },
+    h('label', { class: 'field' }, 'Kitabın adı', bookTitle),
+    h('label', { class: 'field' }, 'Kitap sınavı ne zaman? (biliyorsan)', bookExam),
+    h('p', { class: 'small muted' }, 'Sorular sınava kadar her gün gelir; sınavdan sonra bu kitaptan soru gelmez.'));
+  bookSel.addEventListener('change', () => { bookNew.hidden = bookSel.value !== '__new'; refresh(); });
+  bookTitle.addEventListener('input', () => refresh());
+  state.readBook = null;
   const photos = [];
   let timeNote = null, sent = false;
   leaveGuard = () => photos.length > 0 && !sent;
@@ -1861,7 +1928,8 @@ async function viewUpload(kind) {
     timeChips.forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget)));
   } }, t));
   const noteInput = h('textarea', { id: 'book-note', rows: 2, placeholder: kind === 'soru'
-    ? 'Örn. 1. soru: B ile C arasında kaldım, B\'yi işaretledim. Hangi test ya da kitap? (isteğe bağlı)' : 'Hangi kitap, hangi konu? (isteğe bağlı)' });
+    ? 'Örn. 1. soru: B ile C arasında kaldım, B\'yi işaretledim. Hangi test ya da kitap? (isteğe bağlı)'
+    : kind === 'okuma' ? 'Kitabı bitirdiysen yaz: "Kitap bitti". (isteğe bağlı)' : 'Hangi kitap, hangi konu? (isteğe bağlı)' });
 
   const status = h('p', { class: 'small muted', hidden: true });
   const sendBtn = h('button', { class: 'primary block', disabled: true, onclick: send }, 'Gönder');
@@ -1869,6 +1937,13 @@ async function viewUpload(kind) {
   const missingNote = h('p', { class: 'small muted' });
 
   function refresh() {
+    if (kind === 'okuma') {
+      const bookOk = bookSel.value && (bookSel.value !== '__new' || bookTitle.value.trim());
+      const missing = [!bookOk && 'kitabın adını yaz', !photos.length && 'sayfaların fotoğraflarını ekle'].filter(Boolean);
+      sendBtn.disabled = !!missing.length;
+      missingNote.textContent = missing.length ? 'Göndermek için: ' + missing.join(', ') + '.' : '';
+      return;
+    }
     if (kind !== 'deneme') {
       sendBtn.disabled = !photos.length;
       missingNote.textContent = photos.length ? '' : kind === 'soru' ? 'Göndermek için en az bir soru fotoğrafı ekle.' : 'Göndermek için en az bir sayfa ekle.';
@@ -1899,14 +1974,23 @@ async function viewUpload(kind) {
           await q(sb.from('exams').update({ time_note: timeNote }).eq('id', examId));
         }
       }
-      // Deneme ve gönderilen sorular öğrenciye aittir; kitap sayfaları herkesin kullandığı ortak havuza gider.
+      let bookId = null;
+      if (kind === 'okuma') {
+        bookId = bookSel.value;
+        if (bookId === '__new') {
+          const b = await q(sb.from('books').insert({ student_id: sid(), title: bookTitle.value.trim(), exam_date: bookExam.value || null, created_by: state.user.id })
+            .select('id').single());
+          bookId = b.id;
+        }
+      }
+      // Deneme, gönderilen sorular ve okuduğu kitap öğrenciye aittir; kitap sayfaları herkesin kullandığı ortak havuza gider.
       const own = kind !== 'kitap';
       const sub = await q(sb.from('submissions').insert({
-        kind, exam_id: examId, student_id: own ? sid() : null, uploaded_by: state.user.id,
+        kind, exam_id: examId, book_id: bookId, student_id: own ? sid() : null, uploaded_by: state.user.id,
         note: kind !== 'deneme' ? noteInput.value.trim() || null : null,
       }).select().single());
       const folder = own ? `${sid()}/${sub.id}` : `books/${sub.id}`;
-      const order = { kitapcik: 0, cevap_anahtari: 1, optik: 2, kitap_sayfa: 0, yapamadim: 0, begendim: 1 };
+      const order = { kitapcik: 0, cevap_anahtari: 1, optik: 2, kitap_sayfa: 0, yapamadim: 0, begendim: 1, okuma: 0 };
       const sorted = [...photos].sort((a, b) => order[a.role] - order[b.role]);
       let n = 0;
       for (const p of sorted) {
@@ -1922,9 +2006,11 @@ async function viewUpload(kind) {
       sent = true;
       photos.forEach((p) => URL.revokeObjectURL(p.preview));
       render(h('section', { class: 'card', style: 'margin-top: 10vh; text-align: center' },
-        h('h2', {}, kind === 'kitap' ? 'Sayfaları aldım' : 'Sorularını aldım'),
+        h('h2', {}, kind === 'kitap' ? 'Sayfaları aldım' : kind === 'okuma' ? 'Kitap sayfalarını aldım' : 'Sorularını aldım'),
         h('p', { class: 'muted' }, kind === 'kitap'
           ? 'Bir saat içinde soruları ayırıp soru havuzuna ekleyeceğim.'
+          : kind === 'okuma'
+            ? 'Bir saat içinde sayfaları okuyup sorularını hazırlayacağım. Sorular Bugün sayfasında, konu tekrarının altında gelecek; sınavına kadar her gün biraz.'
           : kind === 'soru'
             ? 'Bir saat içinde çözümlerini yazacağım; Yükle sekmesinde "Gönderdiğin sorular" altında göreceksin. Yapamadıkların yarından itibaren benzerleriyle hata tekrarında gelecek.'
             : 'Bir saat içinde işleyeceğim. Yanlışlarının nedenini seçme görevi ana sayfaya düşecek, ilk tekrarları yarın gelecek.'),
@@ -1950,6 +2036,19 @@ async function viewUpload(kind) {
         'fotoğrafı çekmeden önce kâğıdın üstüne kalemle ya da aşağıdaki Not kısmına numarasıyla (1. soru: …).'),
       photoPicker('Yapamadığım sorular', 'Çözümünü takıldığın yerden anlatırım; benzerleri hata tekrarında gelir.', 'yapamadim', photos, refresh),
       photoPicker('Beğendiğim sorular', 'Bu tarzda yeni sorular yazarım.', 'begendim', photos, refresh),
+      h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
+      sendBtn, missingNote, status);
+    refresh();
+    return;
+  }
+  if (kind === 'okuma') {
+    render(
+      h('header', { class: 'stack', style: 'gap: 4px' },
+        h('p', { class: 'label' }, 'Okuduğum kitap'), h('h1', {}, 'Kitap sayfalarını gönder'),
+        h('p', { class: 'muted' }, 'Okuduğun sayfaların fotoğrafını çek. Kitaptan sorular hazırlayacağım; böylece kitabı okuyup anladığını göreceğiz.')),
+      h('section', { class: 'card stack' }, h('label', { class: 'field' }, 'Hangi kitap?', bookSel), bookNew),
+      photoPicker('Kitabın sayfaları', 'Sırayla çek, ilk okuduğun sayfadan başla. Yazılar net okunsun, sayfa numarası görünsün. Bölüm bölüm de gönderebilirsin.',
+        'okuma', photos, refresh),
       h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
       sendBtn, missingNote, status);
     refresh();
@@ -2090,14 +2189,21 @@ async function viewExamHub() {
 }
 
 // Yüklemenin listede görünen adı.
-const subLabel = (s) => s.exams?.name || { kitap: 'Kitap sayfaları', soru: 'Gönderilen sorular' }[s.kind] || 'Yükleme';
+const subLabel = (s) => s.exams?.name || (s.books?.title && `📚 ${s.books.title}`)
+  || { kitap: 'Kitap sayfaları', soru: 'Gönderilen sorular', okuma: 'Okuduğum kitap' }[s.kind] || 'Yükleme';
 
-/* Öğrencinin Yükle sekmesi: tek tek soru gönderme (testte yapamadığı ya da beğendiği sorular) ve kâğıt deneme.
-   Altta gönderdiği soruların çözümleri (görev işledikten sonra) ve son yüklemelerin durumu. */
+/* Öğrencinin Yükle sekmesi: tek tek soru gönderme (testte yapamadığı ya da beğendiği sorular), ilkokulda okuduğu
+   kitabın sayfaları ve kâğıt deneme. Altta gönderdiği soruların çözümleri (görev işledikten sonra) ve son yüklemelerin
+   durumu. */
 async function viewSend() {
   loading();
-  const subs = await q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name)')
-    .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(8));
+  const primary = (state.student?.grade || 8) <= 4;
+  const [subs, myBooks] = await Promise.all([
+    q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name), books(title)')
+      .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(8)),
+    primary ? q(sb.from('books').select('id, title, exam_date').eq('student_id', sid()).order('created_at', { ascending: false })) : [],
+  ]);
+  const today = localDate();
   const done = subs.filter((s) => s.kind === 'soru' && s.status === 'done').map((s) => s.id);
   const added = done.length ? await q(sb.from('questions')
     .select('id, subject, stem, image_path, choices, answer, hint, solution, source_note, submission_id, topics(name)')
@@ -2113,6 +2219,16 @@ async function viewSend() {
       h('p', { class: 'small muted' }, 'Testte yapamadığın ya da çok beğendiğin bir soru mu var? Fotoğrafını çek, gönder. ' +
         'Bir saat içinde çözümünü yazarım; yapamadıkların benzerleriyle hata tekrarına girer, beğendiklerinin benzerleri de gelir.'),
       h('button', { class: 'primary block', onclick: () => go('ask') }, 'Soru ekle')),
+    // İlkokul: okuduğu kitabın sayfaları. Sorular sınav tarihine kadar Bugün'de, konu tekrarının altında gelir.
+    primary ? h('section', { class: 'card stack', style: 'gap: 8px' },
+      h('h2', {}, 'Okuduğum kitap'),
+      h('p', { class: 'small muted' }, 'Okuduğun kitabın sayfalarını fotoğrafla. Kitaptan sorular hazırlarım; sınavına kadar her gün Bugün sayfasında gelir.'),
+      h('button', { class: 'block', onclick: () => { state.readBook = null; go('read'); } }, 'Kitap sayfalarını gönder'),
+      myBooks.map((b) => h('div', { class: 'spread', style: 'padding-top: 8px; border-top: 1px solid var(--rule)' },
+        h('div', {}, h('div', {}, `📚 ${b.title}`),
+          h('div', { class: 'small muted' }, !b.exam_date ? 'Sınav tarihi yok' : b.exam_date < today ? `Sınavı geçti (${fmtDate(b.exam_date)})` : `Sınav ${fmtDate(b.exam_date)}`)),
+        !b.exam_date || b.exam_date >= today
+          ? h('button', { class: 'ghost small', onclick: () => { state.readBook = b.id; go('read'); } }, 'Sayfa ekle') : null))) : null,
     h('section', { class: 'card stack', style: 'gap: 8px' },
       h('h2', {}, 'Kâğıt deneme'),
       h('p', { class: 'small muted' }, 'Kâğıt üzerinde bir deneme mi çözdün? Fotoğraflarını gönder, ben notlandırayım.'),
@@ -2369,7 +2485,8 @@ function showExamResult(exam, rows, results, reason, saved) {
 async function viewTopics() {
   loading();
   const [topics, statuses, items] = await Promise.all([
-    q(sb.from('topics').select('*').in('grade', studentGrades(state.student))),
+    // "Kitap okuma" konusu okuduğu kitabın sorularınındır; Konular'da işaretlenmez.
+    q(sb.from('topics').select('*').in('grade', studentGrades(state.student)).not('id', 'like', '%.kitap-okuma')),
     q(sb.from('topic_status').select('*').eq('student_id', sid())),
     q(sb.from('items').select('topic_id, track, step, state, due_date, note').eq('student_id', sid())),
   ]);
@@ -2755,6 +2872,56 @@ function wordBox() {
         + (unsure ? `; ${unsure} doğrusunda emin değildi (kararsız ya da tahmin).` : '.')),
       h('p', {}, `Öğrendiği: ${progress.filter((p) => p.box >= WORD_LEARNED).length} kelime · gördüğü: ${progress.length} / ${list.length}`),
       hard.length ? h('p', { class: 'small' }, h('b', {}, 'Zorlandıkları: '), hard.map((p) => `${p.word} (${tr[p.word] || '?'})`).join(', ')) : null);
+    box.hidden = false;
+  })().catch(() => {});
+  return box;
+}
+
+/* Okuduğu kitaplar (veli ve Türkçe öğretmeni): yüklediği sayfa, hazır soru, çözdüğü ve doğru oranı. Veli sınav
+   tarihini buradan değiştirir; sınav geçince o kitaptan soru gelmez. Hiç kitap yoksa görünmez. */
+function booksBox() {
+  const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
+  (async () => {
+    const books = await q(sb.from('books').select('id, title, exam_date').eq('student_id', sid()).order('created_at', { ascending: false }));
+    if (!books.length) return;
+    const ids = books.map((b) => b.id);
+    const [qs, revs, subs] = await Promise.all([
+      q(sb.from('questions').select('id, book_id').in('book_id', ids).eq('active', true).is('variant_of', null)),
+      q(sb.from('reviews').select('question_id, correct').eq('student_id', sid()).eq('track', 'book').eq('voided', false)),
+      q(sb.from('submissions').select('book_id, status, submission_photos(count)').in('book_id', ids)),
+    ]);
+    const bookOfQ = new Map(qs.map((x) => [x.id, x.book_id]));
+    const today = localDate();
+    const parent = state.profile.role === 'parent';
+    fill(box,
+      h('h2', {}, 'Okuduğu kitaplar'),
+      h('p', { class: 'small muted' }, 'Kitaptan sorular sınav tarihine kadar her gün gelir; sınavdan sonra o kitaptan soru gelmez.'),
+      books.map((b) => {
+        const total = qs.filter((x) => x.book_id === b.id).length;
+        const mine = revs.filter((r) => bookOfQ.get(r.question_id) === b.id);
+        const right = mine.filter((r) => r.correct).length;
+        const mySubs = subs.filter((s) => s.book_id === b.id);
+        const pages = mySubs.reduce((n, s) => n + (s.submission_photos?.[0]?.count || 0), 0);
+        const waiting = mySubs.some((s) => s.status === 'submitted' || s.status === 'processing');
+        const past = b.exam_date && b.exam_date < today;
+        let date = null;
+        if (parent) {
+          date = h('input', { type: 'date', value: b.exam_date || '', 'aria-label': `${b.title} sınav tarihi`, style: 'width: auto; min-height: 40px; padding: 6px 10px' });
+          date.addEventListener('change', async () => {
+            try {
+              await q(sb.from('books').update({ exam_date: date.value || null }).eq('id', b.id));
+              toast('Sınav tarihi kaydedildi.');
+            } catch (e) { toast('Kaydedilemedi, tekrar dene.'); }
+          });
+        }
+        return h('div', { class: 'stack', style: 'gap: 4px; padding-top: 8px; border-top: 1px solid var(--rule)' },
+          h('div', { class: 'spread' }, h('b', {}, `📚 ${b.title}`),
+            past ? h('span', { class: 'tag' }, 'Sınavı geçti') : waiting ? h('span', { class: 'tag amber' }, 'Sorular hazırlanıyor') : null),
+          h('p', { class: 'small' }, `${pages} sayfa · ${total} soru hazır · ${mine.length} soru çözdü`
+            + (mine.length ? `, %${Math.round((right / mine.length) * 100)} doğru` : '')),
+          parent ? h('label', { class: 'row small' }, 'Sınav tarihi', date)
+            : h('p', { class: 'small muted' }, b.exam_date ? `Sınav ${fmtDate(b.exam_date)}` : 'Sınav tarihi yok'));
+      }));
     box.hidden = false;
   })().catch(() => {});
   return box;
@@ -3177,7 +3344,7 @@ async function viewReport() {
     q(sb.from('items').select('*').eq('student_id', s)),
     q(sb.from('reviews').select('id, item_id, question_id, track, answer, correct, understood, needs_help, together_at, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, topic_id)')
       .eq('student_id', s).eq('voided', false).gte('answered_at', addDays(localDate(), -30))),
-    q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name)').or(`student_id.eq.${s},student_id.is.null`).neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
+    q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name), books(title)').or(`student_id.eq.${s},student_id.is.null`).neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
     q(sb.from('job_runs').select('*').order('started_at', { ascending: false }).limit(1)),
   ]);
   const [feedbackRows, togetherRows] = await Promise.all([
@@ -3369,7 +3536,7 @@ async function viewReport() {
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
     tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
-    reportedBox(), poemBox(), wordBox(),
+    reportedBox(), poemBox(), wordBox(), booksBox(),
     h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
 }

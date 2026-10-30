@@ -95,6 +95,22 @@ Her maddenin yanında nasıl denendiği yazar:
 - Oyun sırasında alt menü gizlenir, geri tuşu önce sorar. Hızlı "Sonraki kelime" kart atlatmaz.
 - Altı sekmeli alt menü dar telefona da sığar. [E]
 
+**Okuduğum kitap** (ilkokul, Yükle sekmesi) [A], gönderme ve sorular [E]
+- Çocuk okuduğu kitabın sayfalarını fotoğraflar. Genelde hikâye kitabı olur, ama her tür kitap gönderilebilir.
+  - Kitap seçilir ya da yeni kitap eklenir: adı ve biliyorsa sınav tarihi.
+  - Bölüm bölüm gönderilebilir. "Kitap bitti" notu yazılabilir.
+- Görev sayfaları okur ve kitap başına en az 100 anlama sorusu yazar (`job/INSTRUCTIONS.md` 1f).
+  - Sayfa sırasıyla yazar.
+  - 1–3. sınıfa üç şık, 4. sınıfa dört şık.
+- Sorular Bugün'de, Konu tekrarı kartının altında "📚 Kitap" satırında gelir. Ana sayfaya yeni kart eklenmez.
+  - Her gün en az 10 soru gelir. Kalan sorular sınava kalan günlere bölünür; sınav tarihi yoksa günde 10.
+  - Sorulardaki emin olma ölçeği burada da var. Kitap soruları günlük plandaki ders sayılarına girmez.
+- Yanlış ya da "birlikte bakalım" denen soru hata tekrarına girer. Benzerleri kitabın aynı sayfalarından yazılır.
+- Sınav tarihi geçince o kitaptan hiç soru gelmez, hata tekrarındaki soruları da gelmez.
+  - Uygulama bu soruları atlar; görev de hata maddelerini bekletir.
+  - Sınav tarihini sonradan yalnızca veli değiştirir.
+- "Kitap okuma" konusu Konular sayfasında görünmez.
+
 **Yanlışların nedeni** [E]
 - Deneme yanlışlarında önce öğrenci nedenini seçer, sonra Claude'un yorumunu ve çözümü görür. Bitince açıldığı sayfaya döner.
 
@@ -142,6 +158,11 @@ Her maddenin yanında nasıl denendiği yazar:
   - bugün, son 7 günün doğru oranı;
   - öğrendiği ve zorlandığı kelimeler;
   - hiç kart çözmediyse görünmez. [E]
+- Okuduğu kitaplar kutusu:
+  - sayfa sayısı, hazır soru, çözdüğü soru ve doğru oranı;
+  - "Sorular hazırlanıyor" ve "Sınavı geçti" etiketleri;
+  - veli sınav tarihini buradan değiştirir;
+  - hiç kitap yoksa görünmez. [E]
 - Denemeler tablosu, özel derste çalışılacaklar (eksik konu notu, YouTube), zayıf konular.
 - Yanlışların nereden geldiği, derslere göre, soru tipine göre, kavram yanılgıları.
 - Son 14 gün, önümüzdeki 7 gün, yüklemeler ve saatlik görevin en son çalıştığı saat.
@@ -170,6 +191,7 @@ Her maddenin yanında nasıl denendiği yazar:
 - Haftası gelen konuları açar.
 - Kâğıt denemeleri notlandırır: teşhis, kırpılmış soru, konu durumu, hata maddeleri.
 - Kitap sayfalarından havuza soru ekler. Öğrencinin gönderdiği soruları işler (1e).
+- Okuduğu kitabın sayfalarından anlama soruları yazar (1f). Sınavı geçmiş kitabın hata maddelerini bekletir (1c).
 - Uygulama içi deneme yanlışlarına teşhis yazar ve her hata maddesine benzer sorular yazar.
 - MEB kitapçıklarını aktarır. Bunlar aile içi kullanım içindir, hiçbir yerde yayımlanmaz.
 - Soru havuzunu doldurur: boş konular önce gelir, sık çıkan konular önde.
@@ -184,6 +206,10 @@ Her maddenin yanında nasıl denendiği yazar:
 - Birlikte baktık: veli ve o dersin öğretmeni işaretler.
 - Şiir dizeleri: çocuk yazar; veli ve Türkçe öğretmeni okur.
 - Soru ekle: öğrenci ve velisi gönderir; kardeşi adına gönderilemez.
+- Okuduğu kitap:
+  - çocuk kendi kitabını ekler ve sayfalarını gönderir, kardeşi adına ekleyemez;
+  - sınav tarihini sonradan yalnızca veli değiştirir;
+  - veli ve Türkçe öğretmeni görür; başka öğretmen ve kardeş göremez (`test-books.sql`).
 - Kelime kartları:
   - çocuk kendi kutusunu ve cevabını yazar, kardeşi adına yazamaz;
   - günlük sayıyı veli ayarlar, çocuk değiştiremez;

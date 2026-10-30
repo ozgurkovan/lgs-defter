@@ -181,6 +181,48 @@ For every photo (usually one question each):
 6. Patch the submission `done` with a short, warm Turkish `result_note` to her, for example "2 soru
    eklendi. Çözümleri 'Gönderdiğin sorular'da; yapamadığının benzerleri yarın hata tekrarında."
 
+### 1f. A book a child read (`kind = okuma`, has `student_id` and `book_id`)
+
+Primary-school children (grades 1–4) photograph the pages of a book they read, from the app's
+"Yükle → Okuduğum kitap". These are usually story books, but any book is possible. The school often
+holds a test on the book; its date is `books.exam_date` (`books?id=eq.<book_id>`), and it may be empty.
+
+The questions are there to make sure the child really read and understood the book. The app asks
+them every day until the exam date, at least 10 a day, and never after the exam. A book can arrive in
+several uploads, a few chapters at a time; the child may write "Kitap bitti" in the note.
+
+The pages are the family's own book. Keep the photos and the text in this private app, never anywhere
+public, and do not copy long passages into questions.
+
+1. Read every photo in `sort` order and note the printed page numbers. If a photo is unreadable, skip
+   it and say so in `result_note` ("12. sayfa bulanık, tekrar çekip gönder").
+2. Count the questions the book already has (`questions?book_id=eq.<book_id>&variant_of=is.null&select=id`).
+   The target is **at least 100 questions per book**:
+   - Write about 3 questions per page of this upload. Once the book has 100, write about 1 per page for
+     further pages.
+   - If the book is finished (the note says so, or the story clearly ends) and it is still under 100,
+     add questions over all its pages until it reaches 100.
+   - Never pad with trivial or repeated questions. If a short picture book cannot carry 100 good
+     questions, stop where quality stops and say so in `result_note`.
+3. Ask what shows reading and understanding: who, what, where, when, why; the order of events; cause
+   and effect; how a character felt and why; the meaning of a word in its sentence; the main idea of a
+   part; a simple inference ("Sence Ayşe neden sustu?"). Every question must be answerable from the
+   pages. No page-number trivia, and nothing a child who skipped the book could guess.
+   - Grades 1–3: three choices A–C. Grade 4: four choices A–D. One correct answer, plausible wrong ones
+     taken from the story itself.
+   - Short sentences at the child's reading level.
+   - `hint` points back to the part of the story ("Ali'nin ormana neden gittiğini hatırla").
+   - `solution` explains with the story in one or two sentences, quoting at most a few words.
+4. Insert the questions in page order (the app asks them in that order) with:
+   - `source='okuma'`, `book_id`, `submission_id`;
+   - `subject='turkce'`, `topic_id='g<grade>.turkce.kitap-okuma'` for the child's grade;
+   - `styles=['okuma']`, `source_note='Sayfa 12'` (or `'Sayfa 12–13'`);
+   - `target_seconds=60`, `verified=true`.
+   Do not open the kitap-okuma topic for the child (no `topic_status`, no `topic` item). These questions
+   reach the child only as the book's daily questions and, when missed, through hata tekrarı.
+5. Patch the submission `done` with a warm Turkish `result_note` to the child, for example "14 sayfadan
+   42 soru hazırladım. Sınavına kadar her gün Bugün sayfasında, konu tekrarının altında gelecek."
+
 ## 1b2. Mock exams taken in the app (every run)
 
 Students can now take timed mock exams inside the app (`exams.kind = 'uygulama'`: a real LGS paper
@@ -196,8 +238,8 @@ That is what puts the "nedenlerini seç" task on the student's home screen. Upda
 ## 1c. Similar questions for mistakes (every run, before section 2)
 
 Every wrong answer becomes a `mistake` item: deneme mistakes carry `exam_question_id`, and wrong answers
-(or "Bunu birlikte bakalım" skips) in topic reviews and extra practice carry `question_id`, as do the
-questions a student sent because she could not solve them (1e). Its reviews
+(or "Bunu birlikte bakalım" skips) in topic reviews, extra practice and book questions (1f) carry
+`question_id`, as do the questions a student sent because she could not solve them (1e). Its reviews
 (next day, then 2, 4, 14, 30 days) should show changed versions of that very question, never the
 question itself. Find the items that need them:
 ```
@@ -218,6 +260,19 @@ Set `variant_of` = the source `question_id` (or `variant_of_exam` = the `exam_qu
 grade rules apply (primary school: short sentences, three choices A–C up to grade 3). Matematik and
 Fen: solve each variant twice. Spread correct answers over the letters. Write up to 40 variants per
 run, nearest `due_date` first; they do not count against the limit in section 2.
+
+Book questions (the source question has a `book_id`, 1f) need different variants. Write them from the
+same pages of that book: re-read the photos of its submission. Ask about the same moment of the story
+from another side, not the same question with new names. Give them the same `book_id`, `topic_id` and
+`subject`, with `source='okuma'` and `source_note='Hata tekrarı benzeri, sayfa 12'`.
+
+Skip the mistakes of a book whose `exam_date` is past.
+
+Every run, also pause the mistakes of books whose exam is over, so that they stop coming:
+- find such books with `books?exam_date=lt.<today>&select=id`;
+- find their questions with `questions?book_id=in.(...)&select=id`;
+- patch `items?track=eq.mistake&state=eq.active&question_id=in.(...)` with
+  `{"state":"paused","note":"Kitap sınavı geçti"}`.
 
 ## 1d. MEB booklets (every run until all are done)
 

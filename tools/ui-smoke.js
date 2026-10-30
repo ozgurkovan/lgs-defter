@@ -29,6 +29,11 @@
             book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
     if (role === 'student' && wordsPerDay(state.student) > 0) pages.words = ['kelime kartları'];
+    // İlkokul: okuduğu kitabın sayfaları Yükle sekmesinden gönderilir.
+    if (role === 'student' && (state.student?.grade || 8) <= 4) {
+      pages.send = [...pages.send, 'okuduğum kitap'];
+      pages.read = ['kitap sayfalarını gönder', 'hangi kitap?', 'kitabın sayfaları'];
+    }
     // Öğretmen mesaj bırakamaz, aileyi yönetemez.
     if (role === 'teacher') {
       go('report'); await settle();
@@ -44,6 +49,12 @@
       check(`Sayfa: ${tab}`, state.tab === tab && !broken && !missing.length && back === wantBack,
         [state.tab !== tab && `açılan ${state.tab}`, broken && 'hata kutusu', missing.length && 'eksik: ' + missing.join(', '),
           back !== wantBack && (back ? 'fazladan Geri' : 'Geri yok')].filter(Boolean).join('; '));
+    }
+
+    // Okuduğum kitap yalnızca ilkokulda.
+    if (role === 'student' && (state.student?.grade || 8) > 4) {
+      go('send'); await settle();
+      check('İlkokul dışında "Okuduğum kitap" görünmez', !pageText().includes('okuduğum kitap'));
     }
 
     // Kelime kartlarının sekmesi "İngilizce" adıyla Ayarlar'ın hemen solunda (velinin isteği).
