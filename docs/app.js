@@ -739,18 +739,20 @@ function examOrder(entries, order = SUBJECT_ORDER) {
 
 async function viewHome() {
   loading();
-  const [todayCount, reasons, subs, replies, togetherRows, messages] = await Promise.all([
+  const [todayCount, reasons, replies, togetherRows, messages, poemLog] = await Promise.all([
     q(sb.from('reviews').select('id, track, correct, questions(subject)').eq('student_id', sid()).eq('voided', false).gte('answered_at', localDate() + 'T00:00:00')),
     q(sb.from('exam_questions').select('id').eq('student_id', sid()).neq('outcome', 'dogru')
       .is('student_reason', null).not('diagnosis_cause', 'is', null)),
-    q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name)')
-      .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(4)),
     q(sb.from('question_feedback').select('id, kind, verdict, response, questions(stem, subject)')
       .eq('student_id', sid()).not('response', 'is', null).eq('response_seen', false).order('checked_at')),
     loadTogether(),
     // Veliden gelen, henüz okunmamış mesajlar (tatlı bir söz ya da şaka).
     q(sb.from('family_messages').select('id, body, signature, created_at').eq('student_id', sid()).is('seen_at', null).order('created_at')),
+    // Tamamladığı şiirler (aynı şiir sık sorulmasın); okunamazsa ana sayfa yine açılır.
+    sb.from('poem_lines').select('poem_key, created_at').eq('student_id', sid()).order('created_at', { ascending: false }).limit(300)
+      .then(({ data }) => data || [], () => []),
   ]);
+  state.poemLog = poemLog;
   // Günlük plan derse göre soru sayısıdır. Önce hata tekrarları, sonra konu tekrarları hakkı kullanır;
   // kalan hak ek çalışmayla dolar.
   const plan = dailyPlan(state.student);
@@ -767,27 +769,43 @@ async function viewHome() {
   const hello = hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar';
   const name = state.profile.display_name || '';
 
-  const sessionCard = (track, title, s) => {
+  // Ana sayfa sade: selam, bir mesaj ya da şaka, sonra yalnızca hata tekrarı ve konu tekrarı. Yanlışların nedenini
+  // seçme ve birlikte bakılacaklar hata tekrarı kartında, ek çalışma konu tekrarı kartında, son yüklemeler Deneme
+  // sekmesinde. lead: ana düğmeden önce gelen iş (öncelikli), tail: kartın altındaki ek bölüm.
+  const sessionCard = (track, title, s, { lead = null, tail = null } = {}) => {
     const n = s.entries.length;
     const doneToday = todayCount.filter((r) => r.track === track).length;
-    return h('section', { class: 'card task' + (n ? '' : ' done') },
+    return h('section', { class: 'card task' + (n || lead || tail ? '' : ' done') },
       h('div', { class: 'spread' }, h('p', { class: 'label' }, title),
         doneToday ? h('span', { class: 'tag green' }, `Bugün ${doneToday} soru çözdün`) : null),
+      lead,
       n
         ? [h('div', { class: 'row' }, h('span', { class: 'big num' }, n), h('span', { class: 'muted' }, `soru · yaklaşık ${Math.max(1, Math.round(s.seconds / 60))} dakika`)),
-           h('button', { class: 'primary block', onclick: () => runSession(track, s) }, 'Başla')]
+           h('button', { class: lead ? 'block' : 'primary block', onclick: () => runSession(track, s) }, 'Başla')]
         : h('p', { class: 'muted' }, doneToday ? 'Bugünlük bu kadar. Aferin.' : 'Bugün tekrar edilecek soru yok.'),
       s.shortage ? h('p', { class: 'small muted' }, `${s.shortage} konu için yeni soru hazırlanıyor, yarın gelecek.`) : null,
-      s.deferred ? h('p', { class: 'small muted' }, `${s.deferred} soru günlük sınıra takıldı, yarın gelecek. Velin sınırı Ayarlar'dan artırabilir.`) : null);
+      s.deferred ? h('p', { class: 'small muted' }, `${s.deferred} soru günlük sınıra takıldı, yarın gelecek. Velin sınırı Ayarlar'dan artırabilir.`) : null,
+      tail);
   };
+  const reasonsLead = reasons.length ? h('div', { class: 'note small stack', style: 'gap: 8px; border-left: 4px solid var(--red); margin: 8px 0' },
+    h('p', {}, h('b', { style: 'color: var(--red)' }, 'Önce bu: '), `${reasons.length} yanlışın nedenini seç. Her soruya bir dokunuş; sonra benim yorumumu da görebilirsin.`),
+    h('button', { class: 'primary block', onclick: () => go('reasons') }, 'Nedenleri seç')) : null;
+  const togetherTail = togetherRows.length ? h('div', { class: 'subtask spread' },
+    h('span', { class: 'small' }, `Birlikte bakılacak ${togetherRows.length} soru var.`),
+    h('button', { class: 'ghost small', onclick: () => go('together') }, 'Listeyi aç')) : null;
+  const extraTail = extra.entries.length ? h('div', { class: 'subtask stack', style: 'gap: 8px' },
+    h('div', { class: 'spread' }, h('b', {}, 'Ek çalışma'),
+      h('span', { class: 'small muted num' }, `${extra.entries.length} soru · yaklaşık ${Math.max(1, Math.round(extra.seconds / 60))} dakika`)),
+    h('p', { class: 'small muted' }, `Günlük hedef ${dailyTarget} soru, bugün ${todayCount.length}. Tekrarlardan sonra hedefi tamamlamak için; en zayıf konularından başlıyor.`),
+    h('button', { class: dueNow ? 'block' : 'primary block', onclick: () => runSession('extra', extra) }, 'Ek çalışmaya başla')) : null;
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })),
       h('h1', {}, playfulGreeting(name) || (name ? `${hello}, ${name}` : hello)),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null),
-    // Ara sıra (üç girişte bir kadar) bir fıkra ya da şaka; gün yorucu geçmesin.
-    !messages.length && Math.random() < 0.3 ? jokeCard() : null,
+    // Mesaj yoksa ara sıra (üç girişte bir kadar) bir fıkra, bilmece ya da şiir; gün yorucu geçmesin.
+    !messages.length && !replies.length && Math.random() < 0.3 ? jokeCard() : null,
     messages.map((m) => {
       const card = h('section', { class: 'card msg-card' },
         h('p', { class: 'label' }, m.signature ? `${m.signature} yazdı` : 'Sana bir mesaj var'),
@@ -798,45 +816,22 @@ async function viewHome() {
         } }, 'Okudum ❤'));
       return card;
     }),
-    reasons.length
-      ? h('section', { class: 'card', style: 'border-color: var(--red)' },
-          h('p', { class: 'label', style: 'color: var(--red)' }, 'Önce bu'),
-          h('h2', {}, `${reasons.length} yanlışın nedenini seç`),
-          h('p', { class: 'muted small' }, 'Her soruya bir dokunuş. Sonra benim yorumumu da görebilirsin.'),
-          h('button', { class: 'primary block', onclick: () => go('reasons') }, 'Nedenleri seç'))
-      : null,
-    sessionCard('mistake', 'Hata tekrarı', mistake),
-    sessionCard('topic', 'Konu tekrarı', topic),
-    extra.entries.length ? h('section', { class: 'card task' },
-      h('div', { class: 'spread' }, h('p', { class: 'label' }, 'Ek çalışma'),
-        h('span', { class: 'small muted num' }, `Günlük hedef ${dailyTarget} soru · bugün ${todayCount.length}`)),
-      h('div', { class: 'row' }, h('span', { class: 'big num' }, extra.entries.length),
-        h('span', { class: 'muted' }, `soru · yaklaşık ${Math.max(1, Math.round(extra.seconds / 60))} dakika`)),
-      h('p', { class: 'small muted' }, 'Tekrarlardan sonra hedefi tamamlamak için. En zayıf konularından başlıyor.'),
-      h('button', { class: dueNow ? 'block' : 'primary block', onclick: () => runSession('extra', extra) }, 'Başla')) : null,
-    togetherBox(togetherRows),
-    replies.length ? h('section', { class: 'stack' },
-      h('p', { class: 'label' }, 'Bildirdiğin sorular'),
-      replies.map((r) => {
-        const card = h('div', { class: 'card' },
-          h('div', { class: 'row' },
-            r.questions?.subject ? subjTag(r.questions.subject) : null,
-            h('span', { class: 'tag ' + (r.verdict === 'soru_hatali' ? 'green' : '') }, r.verdict === 'soru_hatali' ? 'Haklıydın' : 'Kontrol ettim')),
-          r.questions?.stem ? h('p', { class: 'small muted' }, r.questions.stem.slice(0, 120) + (r.questions.stem.length > 120 ? '…' : '')) : null,
-          h('div', { class: 'note teacher' }, r.response),
-          h('button', { class: 'ghost small', onclick: async () => {
-            await sb.from('question_feedback').update({ response_seen: true }).eq('id', r.id);
-            card.remove();
-          } }, 'Okudum'));
-        return card;
-      })) : null,
-    subs.length ? h('section', { class: 'stack' },
-      h('p', { class: 'label' }, 'Son yüklemeler'),
-      subs.map((s) => h('div', { class: 'card flat', style: 'padding: 12px' },
-        h('div', { class: 'spread' },
-          h('span', {}, s.exams?.name || (s.kind === 'kitap' ? 'Kitap sayfaları' : 'Yükleme')),
-          statusTag(s.status)),
-        s.result_note && s.status !== 'submitted' ? h('p', { class: 'small muted' }, s.result_note) : null))) : null,
+    // "Soruda sorun var" bildirimlerine gelen cevaplar da birer mesaj gibi; "Okudum" deyince kapanır.
+    replies.map((r) => {
+      const card = h('section', { class: 'card msg-card' },
+        h('div', { class: 'spread' }, h('p', { class: 'label' }, 'Bildirdiğin soruya baktım'),
+          h('span', { class: 'tag ' + (r.verdict === 'soru_hatali' ? 'green' : '') }, r.verdict === 'soru_hatali' ? 'Haklıydın' : 'Kontrol ettim')),
+        r.questions?.stem ? h('p', { class: 'small muted' }, r.questions.subject ? [subjTag(r.questions.subject), ' '] : null,
+          r.questions.stem.slice(0, 120) + (r.questions.stem.length > 120 ? '…' : '')) : null,
+        h('div', { class: 'note teacher' }, r.response),
+        h('button', { class: 'ghost small', onclick: async () => {
+          await sb.from('question_feedback').update({ response_seen: true }).eq('id', r.id);
+          card.remove();
+        } }, 'Okudum'));
+      return card;
+    }),
+    sessionCard('mistake', 'Hata tekrarı', mistake, { lead: reasonsLead, tail: togetherTail }),
+    sessionCard('topic', 'Konu tekrarı', topic, { tail: extraTail }),
   );
 }
 
@@ -1295,14 +1290,16 @@ const FIKRALAR = [
   ['Nasreddin Hoca\'ya yaşını sormuşlar: "Kırk." On yıl sonra yine sormuşlar: "Kırk." "Hocam, on yıl önce de kırk demiştin!"',
     'Hoca: "Ben sözümden dönmem!"'],
 ];
-// Kart sırası: üçte biri "şiiri sen tamamla", dörtte biri fıkra, kalanı kısa şaka, bilmece ya da bulmaca; her çocuk
-// kendi seviyesindekileri görür. Seçim her seferinde rastgele; görülen bir daha gelmez diye bir kural yok.
+// Kart sırası: üçte biri "şiiri sen tamamla" (bütün şiirleri tamamladıysa daha seyrek), dörtte biri fıkra, kalanı
+// kısa şaka, bilmece ya da bulmaca; her çocuk kendi seviyesindekileri görür. Aynı şey art arda sorulmasın diye bu
+// cihazda yakın zamanda gösterilenler sıranın sonuna atılır; hiçbir kart kalıcı olarak elenmez.
 function jokeCard(prefix) {
   const r = Math.random();
-  if (r < 0.33) return poemCard(prefix);
-  const fikra = r < 0.58;
+  const poemShare = poemsOpen().length ? 0.33 : 0.15;
+  if (r < poemShare) return poemCard(prefix);
+  const fikra = r < poemShare + 0.25;
   const list = fikra ? FIKRALAR : jokesFor(state.student);
-  const pick = list[Math.floor(Math.random() * list.length)];
+  const pick = pickFresh(list, (x) => (fikra ? 'f:' : 'j:') + x[0].slice(0, 40));
   const [question, answer] = pick;
   const kind = fikra ? 'Bir fıkra' : JOKE_LABEL[pick[2]] || 'Bir şaka';
   const punch = h('p', { class: 'msg', hidden: true }, answer);
@@ -1316,67 +1313,67 @@ function jokeCard(prefix) {
 // durduğu için telifli modern çocuk şiirleri giremez: halk ürünleri, Yunus Emre, Âkif, Rıza Tevfik ve Defter için
 // yazılmış şiirler var. pair: gizli dizenin kafiyelendiği dize sonları; yoksa (nakaratlı şiirler) kafiye ölçülmez.
 const POEMS = [
-  { show: ['Dandini dandini dastana,', 'Danalar girmiş bostana,', 'Kov bostancı danayı,'], hide: ['Yemesin lahanayı.'],
+  { id: 'dandini', show: ['Dandini dandini dastana,', 'Danalar girmiş bostana,', 'Kov bostancı danayı,'], hide: ['Yemesin lahanayı.'],
     pair: ['danayı'], rhyme: 'dastana – bostana, danayı – lahanayı', by: 'Ninni (anonim)',
     note: 'Ninnileri anneler bebeklerini uyuturken söyler; kimin yazdığı bilinmez, yüzyıllardır dilden dile gelir. Dize sonları ikişer ikişer aynı seslerle bittiği için beşik sallanır gibi tatlı bir ritim oluşuyor. Bir de düşün: koca danalar bostana dalmış, lahanaları yiyor… Ninni bile komik!' },
-  { show: ['Bir varmış, bir yokmuş;', 'Evvel zaman içinde,', 'Kalbur saman içinde;', 'Develer tellal iken,'], hide: ['Pireler berber iken…'],
+  { id: 'masal', show: ['Bir varmış, bir yokmuş;', 'Evvel zaman içinde,', 'Kalbur saman içinde;', 'Develer tellal iken,'], hide: ['Pireler berber iken…'],
     pair: ['tellal iken'], rhyme: 'içinde – içinde, tellal iken – berber iken', by: 'Masal tekerlemesi (anonim)',
     ask: 'Masalcı nasıl devam ediyor? Sen de "iken" ile biten komik bir dize uydur!',
     note: 'Masalcılar masala böyle başlar. "İçinde, içinde… iken, iken…" tekrarları sözü davul gibi ritimli yapıyor. Deve tellal (eskiden sokakta bağırarak duyuru yapan kişi), pire berber olur mu hiç? Olmaz! Masalcı daha ilk cümlede "Şimdi hayal dünyasına giriyoruz" diye göz kırpıyor.' },
-  { show: ['Şu köşe yaz köşesi,', 'Şu köşe kış köşesi,'], hide: ['Ortada su şişesi!'],
+  { id: 'su-kose', show: ['Şu köşe yaz köşesi,', 'Şu köşe kış köşesi,'], hide: ['Ortada su şişesi!'],
     pair: ['köşesi'], rhyme: 'köşesi – köşesi – şişesi', by: 'Tekerleme (anonim)',
     ask: 'Üçüncü dizeyi sen uydur: sonu "köşesi" gibi "-şesi" ile bitsin!',
     tip: 'Şimdi üç kere söyle, her seferinde biraz daha hızlı. Dilin dolaşmazsa diksiyonun süper!',
     note: 'Tekerlemeler, hızlı söyleyince dil dolaştıran sözlerdir. Burada dize sonları hep "-şesi" ile bitiyor ve içlerinde bolca "ş" sesi var; dil bu yüzden sürçüyor. Spikerler ve hitabet ustaları da diksiyon çalışırken tekerleme söyler!' },
-  { show: ['Korkma, sönmez bu şafaklarda yüzen al sancak;', 'Sönmeden yurdumun üstünde tüten en son ocak.', 'O benim milletimin yıldızıdır, parlayacak;'],
+  { id: 'istiklal-1', show: ['Korkma, sönmez bu şafaklarda yüzen al sancak;', 'Sönmeden yurdumun üstünde tüten en son ocak.', 'O benim milletimin yıldızıdır, parlayacak;'],
     hide: ['O benimdir, o benim milletimindir ancak.'],
     pair: ['sancak', 'ocak', 'parlayacak'], rhyme: 'sancak – ocak – parlayacak – ancak', by: 'Mehmet Âkif Ersoy, İstiklâl Marşı',
     ask: 'Bunu biliyorsun! Son dizeyi hatırla; yaz ya da ayağa kalkıp gür bir sesle söyle.',
     note: 'Dört dizenin dördü de "-ak" sesiyle bitiyor; bu güçlü ses marşı gür ve kararlı yapıyor. Anlamı: Korkma! Bu yurtta tek bir ocak bile tütüyorsa bayrağımız sönmeyecek; o, milletimin yıldızıdır ve hep parlayacak. Âkif bunu Kurtuluş Savaşı sürerken yazdı; Meclis 12 Mart 1921\'de millî marşımız olarak kabul etti.' },
-  { show: ['Çatma, kurban olayım, çehreni ey nazlı hilâl!', 'Kahraman ırkıma bir gül! Ne bu şiddet, bu celâl?', 'Sana olmaz dökülen kanlarımız sonra helâl…'],
+  { id: 'istiklal-2', show: ['Çatma, kurban olayım, çehreni ey nazlı hilâl!', 'Kahraman ırkıma bir gül! Ne bu şiddet, bu celâl?', 'Sana olmaz dökülen kanlarımız sonra helâl…'],
     hide: ['Hakkıdır, Hakk\'a tapan milletimin istiklâl!'],
     pair: ['hilâl', 'celâl', 'helâl'], rhyme: 'hilâl – celâl – helâl – istiklâl', by: 'Mehmet Âkif Ersoy, İstiklâl Marşı',
     ask: 'İkinci kıtanın son dizesini hatırlıyor musun? Yaz ya da sesli söyle.',
     note: 'Âkif bayrakla konuşuyor: "Kaşlarını çatma ey nazlı hilal, kahraman milletime bir gülümse!" (Çehre: yüz, celâl: öfke.) Bayrağa insan gibi seslenmeye kişileştirme denir; şiire sıcaklık katar. Dizelerin hepsi uzun "-âl" sesiyle bitiyor; marşı söylerken sesimiz bu yüzden yükselip uzuyor. Son dize: Allah\'a inanan milletimin bağımsızlığı (istiklâl) onun hakkıdır.' },
-  { show: ['Gelin tanış olalım,', 'İşi kolay kılalım,', 'Sevelim, sevilelim,'], hide: ['Dünya kimseye kalmaz.'],
+  { id: 'yunus-tanis', show: ['Gelin tanış olalım,', 'İşi kolay kılalım,', 'Sevelim, sevilelim,'], hide: ['Dünya kimseye kalmaz.'],
     rhyme: 'olalım – kılalım – sevilelim', by: 'Yunus Emre',
     ask: 'Son dize, şiirin her dörtlüğünün sonunda tekrarlanan bir söz. Sence Yunus ne demiş olabilir?',
     note: 'İlk üç dize "-lım, -lim" sesleriyle kafiyeli; dördüncüsü her dörtlüğün sonunda tekrarlanan bir nakarat. Anlamı: Gelin tanışalım, işleri birbirimize kolaylaştıralım, sevelim ve sevilelim; dünya kimseye kalmaz, kavgaya değmez. Yunus bunu 700 yıl kadar önce yazdı ve hâlâ aynı tatlılıkla okunuyor: sade sözle büyük bir şey anlatmak işte böyle olur.' },
-  { show: ['Söz ola kese savaşı,', 'Söz ola kestire başı,', 'Söz ola ağulu aşı'], hide: ['Bal ile yağ ede bir söz.'],
+  { id: 'yunus-soz', show: ['Söz ola kese savaşı,', 'Söz ola kestire başı,', 'Söz ola ağulu aşı'], hide: ['Bal ile yağ ede bir söz.'],
     rhyme: 'savaşı – başı – aşı', by: 'Yunus Emre', level: 'buyuk',
     ask: 'Yunus sözün gücünü anlatıyor. Bir söz, zehirli yemeği (ağulu aş) neye çevirir? Son dizeyi sen tamamla.',
     note: 'Hitabetin özü bu dörtlükte: Bir söz savaşı bitirir, bir söz baş kestirir; bir söz de zehirli yemeği bal ile yağa çevirir. Yani söz çok güçlüdür; ne söylediğin kadar nasıl söylediğin de önemli. "Savaşı – başı – aşı" kafiyesi dizeleri zincir gibi bağlıyor; her dizenin başındaki "Söz ola" tekrarı da çekiç gibi vuruyor.' },
-  { show: ['Dolap niçin inilersin?', 'Derdim vardır inilerim,', 'Ben Mevlâ\'ya âşık oldum,'], hide: ['Anın için inilerim.'],
+  { id: 'yunus-dolap', show: ['Dolap niçin inilersin?', 'Derdim vardır inilerim,', 'Ben Mevlâ\'ya âşık oldum,'], hide: ['Anın için inilerim.'],
     pair: ['inilerim'], rhyme: 'inilerim – inilerim (aynı sözün tekrarı: redif)', by: 'Yunus Emre', level: 'buyuk',
     ask: 'Yunus su dolabına "Neden inliyorsun?" diye soruyor, dolap da cevap veriyor. Dolabın son sözünü sen söyle!',
     note: 'Su dolabı, eskiden dereden su çeken büyük tahta çarktır; dönerken inler gibi gıcırdar. Yunus onu konuşturuyor: "Derdim var, Allah\'ı (Mevlâ) çok sevdim, onun için (anın için) inliyorum." Cansız bir varlığı insan gibi konuşturmaya kişileştirme ve konuşturma denir; Türkçe sorularında sık çıkar! "İnilerim" tekrarı, dolabın gıcırtısı gibi kulakta yankılanıyor.' },
-  { show: ['Uçun kuşlar, uçun, doğduğum yere;', 'Şimdi dağlarında mor sümbül vardır.', 'Ormanlar koynunda bir gizli dere,'],
+  { id: 'ucun-kuslar', show: ['Uçun kuşlar, uçun, doğduğum yere;', 'Şimdi dağlarında mor sümbül vardır.', 'Ormanlar koynunda bir gizli dere,'],
     hide: ['Dikenler içinde sarı gül vardır.'],
     pair: ['mor sümbül vardır'], rhyme: 'yere – dere, sümbül vardır – sarı gül vardır', by: 'Rıza Tevfik Bölükbaşı, Uçun Kuşlar', level: 'buyuk',
     note: 'Şair uzaklarda; doğduğu yerlere kuşlarla selam gönderiyor, özlemini kuşların kanadına yüklemiş. "Yere – dere" ve "sümbül – gül" kafiyeleri dizelere şarkı gibi bir akış veriyor; her seferinde tekrarlanan "vardır" sözüne redif denir. Dikenler arasında açan sarı gül de ayrı bir güzellik: zor yerde bile güzellik var.' },
-  { show: ['Ey şehid oğlu şehid, isteme benden makber,'], hide: ['Sana âgûşunu açmış duruyor Peygamber.'],
+  { id: 'akif-canakkale', show: ['Ey şehid oğlu şehid, isteme benden makber,'], hide: ['Sana âgûşunu açmış duruyor Peygamber.'],
     pair: ['makber'], rhyme: 'makber – Peygamber', by: 'Mehmet Âkif Ersoy, Çanakkale Şehitlerine', level: 'buyuk',
     ask: 'Âkif şehide "Benden mezar (makber) isteme" diyor. Neden? İkinci dizeyi sen tamamla; sonu "-ber" ile bitsin.',
     note: 'Âkif, Çanakkale\'de şehit düşen askere "Senin için bir mezar yapamam, çünkü Peygamber sana kucağını (âgûş) açmış bekliyor" diyor: hiçbir mezar o şerefe yetmez. "Makber – Peygamber" kafiyesi iki dizeyi bir anıt gibi birbirine kenetliyor. Çanakkale İnkılap Tarihi\'nde de var; bu beyit orada da işine yarar.' },
-  { show: ['Her kitapta bir kapı var,', 'Ardında yaz, ardında kar;', 'Bir sayfada sıcak bir çöl,'], hide: ['Bir sayfada deniz, rüzgâr.'],
+  { id: 'kitap-kapisi', show: ['Her kitapta bir kapı var,', 'Ardında yaz, ardında kar;', 'Bir sayfada sıcak bir çöl,'], hide: ['Bir sayfada deniz, rüzgâr.'],
     pair: ['kapı var', 'kar'], rhyme: 'var – kar – rüzgâr', by: 'Defter için yazıldı',
     note: 'Şiir kitabı bir kapıya benzetiyor (benzetme): açınca yazına da kışına da, çölüne de denizine de gidiyorsun. "Var – kar – rüzgâr" aynı "-ar" sesiyle bitiyor, dizeler birbirine tıkır tıkır oturuyor. Okudukça dünyan büyür!' },
-  { show: ['İki kardeş, iki kanat,', 'Birlikte uçmak ne rahat!', 'Biri düşse öbürü var,'], hide: ['Onunla güzel bu hayat.'],
+  { id: 'iki-kanat', show: ['İki kardeş, iki kanat,', 'Birlikte uçmak ne rahat!', 'Biri düşse öbürü var,'], hide: ['Onunla güzel bu hayat.'],
     pair: ['kanat', 'rahat'], rhyme: 'kanat – rahat – hayat', by: 'Defter için yazıldı',
     note: 'Şiir kardeşleri bir kuşun iki kanadına benzetiyor: kuş tek kanatla uçamaz! Biri düşerse öbürü tutar. "Kanat – rahat – hayat" aynı "-at" sesiyle bitiyor; kısa ve sevimli bir şarkı gibi.' },
-  { show: ['Bir yanlışım oldu bugün,', 'Ne kızgınım ne de üzgün;', 'Yanlış bana yol gösterdi,'], hide: ['Doğruyu buldum öbür gün.'],
+  { id: 'yanlisim', show: ['Bir yanlışım oldu bugün,', 'Ne kızgınım ne de üzgün;', 'Yanlış bana yol gösterdi,'], hide: ['Doğruyu buldum öbür gün.'],
     pair: ['bugün', 'üzgün'], rhyme: 'bugün – üzgün – gün', by: 'Defter için yazıldı',
     note: 'Yanlışlar da öğretmendir: yanlışını gören, ertesi gün doğruyu bulur. Bu defterin sırrı da tam olarak bu! "Bugün – üzgün – gün" aynı "-ün" sesiyle bitiyor; şiir kısa ama dediği büyük.' },
-  { show: ['Dalda kalmış son bir yaprak,', 'Rüzgâr esti: "Haydi, bırak!"', 'Yaprak süzüldü korkmadan,'], hide: ['Toprağa yorgan olacak.'],
+  { id: 'son-yaprak', show: ['Dalda kalmış son bir yaprak,', 'Rüzgâr esti: "Haydi, bırak!"', 'Yaprak süzüldü korkmadan,'], hide: ['Toprağa yorgan olacak.'],
     pair: ['yaprak', 'bırak'], rhyme: 'yaprak – bırak – olacak', by: 'Defter için yazıldı',
     note: 'Yaprak korkmadan düşüyor, çünkü bir görevi var: kışın toprağı örten bir yorgan olacak. Şair yaprağa insan gibi cesaret vermiş (kişileştirme). Fen bilgisi de haklı çıkarıyor: dökülen yapraklar toprağı korur, çürüyünce de besler. "Yaprak – bırak – olacak" hep "-ak" ile bitiyor.' },
-  { show: ['Miyav dedi minik kedi,', 'Sabahtan beri bekledi;', 'Mama kabı boş kalınca,'], hide: ['Bana bakıp: "Hani?" dedi.'],
+  { id: 'miyav', show: ['Miyav dedi minik kedi,', 'Sabahtan beri bekledi;', 'Mama kabı boş kalınca,'], hide: ['Bana bakıp: "Hani?" dedi.'],
     pair: ['kedi', 'bekledi'], rhyme: 'kedi – bekledi – dedi', by: 'Defter için yazıldı', level: 'kucuk',
     note: 'Kedi tek bir kelimeyle derdini anlatıyor: "Hani?" Kısa ve net bir söz bazen uzun bir konuşmadan güçlüdür; buna "az ve öz" denir. "Kedi – bekledi – dedi" kafiyesi şiire zıplayan bir ritim veriyor.' },
-  { show: ['Bir yağmur yağdı geçen gün,', 'Çiçeklere oldu düğün;', 'Papatyalar içti suyu,'], hide: ['Gökkuşağı çıktı o gün.'],
+  { id: 'yagmur', show: ['Bir yağmur yağdı geçen gün,', 'Çiçeklere oldu düğün;', 'Papatyalar içti suyu,'], hide: ['Gökkuşağı çıktı o gün.'],
     pair: ['geçen gün', 'düğün'], rhyme: 'gün – düğün – gün', by: 'Defter için yazıldı', level: 'kucuk',
     note: 'Şiir yağmuru çiçeklerin düğünü gibi anlatıyor: susamış çiçekler için yağmur bir bayram! Yağmurdan sonra güneş açınca damlalar ışığı renklere ayırır ve gökkuşağı çıkar. "Gün – düğün – gün" aynı "-ün" sesiyle bitiyor.' },
-  { show: ['Damla damla dolar göller,', 'Adım adım biter yollar;', 'Her gün biraz çalışırsan,'], hide: ['Yaza açar bütün güller.'],
+  { id: 'damla', show: ['Damla damla dolar göller,', 'Adım adım biter yollar;', 'Her gün biraz çalışırsan,'], hide: ['Yaza açar bütün güller.'],
     pair: ['göller', 'yollar'], rhyme: 'göller – yollar – güller', by: 'Defter için yazıldı', level: 'buyuk',
     note: 'Damla damla göl olur, adım adım yol biter: büyük işler küçük ama her gün yapılan emeklerle olur. "Yaza" sözcüğüne dikkat: LGS haziranda! Her gün biraz çalışan, yazın emeğinin güllerini toplar. "Göller – yollar – güller" kafiyesi de dizeleri birbirine bağlıyor.' },
 ];
@@ -1395,19 +1392,41 @@ function sharedEnd(a, b) {
   while (i < a.length && i < b.length && a[a.length - 1 - i] === b[b.length - 1 - i]) i++;
   return a.slice(a.length - i).trim();
 }
-function poemFeedback(poem, said) {
+// Sonuç (aynen, kafiyeli, kafiyesiz, serbest) raporda da görünür; serbest: nakaratlı şiir, kafiye ölçülmez.
+function poemCheck(poem, said) {
   const mine = poemNorm(said);
   const real = poemNorm(poem.hide.join(' '));
-  if (mine === real || (mine.length >= 8 && real.includes(mine))) return 'Aslını aynen bildin! 🌟';
-  if (!poem.pair) return 'Kendi dizeni yazdın, bravo! Şimdi aslıyla karşılaştır: hangisi sana daha güzel geldi?';
+  if (mine === real || (mine.length >= 8 && real.includes(mine))) return { result: 'aynen', text: 'Aslını aynen bildin! 🌟' };
+  if (!poem.pair) return { result: 'serbest', text: 'Kendi dizeni yazdın, bravo! Şimdi aslıyla karşılaştır: hangisi sana daha güzel geldi?' };
   const shared = poem.pair.map((p) => sharedEnd(mine, poemNorm(p))).sort((a, b) => b.length - a.length)[0];
   return shared.replace(/ /g, '').length >= 2
-    ? `Senin dizen de “…${shared}” sesiyle bitiyor: kafiyeli! Tam bir şair gibi düşünmüşsün 👏`
-    : 'Güzel deneme! Kafiye için son sesleri öncekilere benzetmeyi dene. Bak, şair nasıl yapmış:';
+    ? { result: 'kafiyeli', text: `Senin dizen de “…${shared}” sesiyle bitiyor: kafiyeli! Tam bir şair gibi düşünmüşsün 👏` }
+    : { result: 'kafiyesiz', text: 'Güzel deneme! Kafiye için son sesleri öncekilere benzetmeyi dene. Bak, şair nasıl yapmış:' };
 }
+
+// Bu cihazda son gösterilen kartlar, öğrenciye göre (eskiden yeniye). Taze kart kalmadıysa en uzun zamandır
+// gösterilmeyen yarıdan seçilir.
+function pickFresh(list, keyOf) {
+  const store = 'defter.recentCards.' + sid();
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem(store) || '[]'); } catch (e) { /* tarayıcı izin vermiyor */ }
+  const age = (x) => recent.indexOf(keyOf(x));
+  const fresh = list.filter((x) => age(x) < 0);
+  const pool = fresh.length ? fresh : [...list].sort((a, b) => age(a) - age(b)).slice(0, Math.ceil(list.length / 2));
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  try { localStorage.setItem(store, JSON.stringify([...recent.filter((k) => k !== keyOf(pick)), keyOf(pick)].slice(-30))); } catch (e) { /* önemli değil */ }
+  return pick;
+}
+// Çocuğun dize yazarak tamamladığı şiirler ana sayfa açılırken state.poemLog'a yüklenir (yeniden eskiye).
+const poemsOpen = () => { const done = new Set((state.poemLog || []).map((l) => l.poem_key)); return poemsFor(state.student).filter((p) => !done.has(p.id)); };
 function poemCard(prefix) {
-  const list = poemsFor(state.student);
-  const poem = list[Math.floor(Math.random() * list.length)];
+  // Önce hiç tamamlamadığı şiirler; hepsini tamamladıysa en uzun zamandır yazmadıkları.
+  const log = state.poemLog || [];
+  const lastWritten = (id) => { const i = log.findIndex((l) => l.poem_key === id); return i < 0 ? Infinity : i; };
+  const open = poemsOpen();
+  const all = poemsFor(state.student);
+  const poem = pickFresh(open.length ? open
+    : [...all].sort((a, b) => lastWritten(b.id) - lastWritten(a.id)).slice(0, Math.ceil(all.length / 2)), (p) => 'p:' + p.id);
   const gap = h('span', { class: 'poem-gap' }, '……………… ?');
   const mine = h('input', { type: 'text', maxlength: 120, autocomplete: 'off', placeholder: 'Senin dizen (yaz ya da sesli söyle)',
     onkeydown: (e) => { if (e.key === 'Enter') reveal.click(); } });
@@ -1415,9 +1434,16 @@ function poemCard(prefix) {
   const after = h('div', { class: 'stack', style: 'gap: 8px', hidden: true });
   const reveal = h('button', { class: 'ghost small', onclick: () => {
     const said = mine.value.trim();
+    const check = said ? poemCheck(poem, said) : null;
     gap.replaceWith(h('strong', { class: 'poem-new' }, poem.hide.join('\n')));
     ask.remove(); mine.remove(); reveal.remove();
-    fill(after, said ? h('p', { class: 'note small' }, `Senin dizen: “${said}”\n${poemFeedback(poem, said)}`) : null,
+    // Yazdığı dize kaydedilir: veli raporda görür, bu şiir de sıranın sonuna geçer.
+    if (check && state.profile?.role === 'student') {
+      (state.poemLog ||= []).unshift({ poem_key: poem.id, created_at: new Date().toISOString() });
+      sb.from('poem_lines').insert({ student_id: sid(), poem_key: poem.id, line: said.slice(0, 200), result: check.result })
+        .then(({ error }) => { if (error) console.warn('Şiir dizesi kaydedilemedi:', error.message); });
+    }
+    fill(after, check ? h('p', { class: 'note small' }, `Senin dizen: “${said}”\n${check.text}`) : null,
       h('p', { class: 'small' }, h('strong', {}, 'Kafiye: '), poem.rhyme),
       h('p', { class: 'small' }, poem.note),
       h('p', { class: 'small muted' }, '🎤 ' + (poem.tip || POEM_TIPS[Math.floor(Math.random() * POEM_TIPS.length)])));
@@ -1510,7 +1536,37 @@ function reportedBox() {
   return box;
 }
 
-// Rapordaki ve öğrenci ana sayfasındaki özet kartı; liste ayrı sayfada açılır.
+/* "Şiiri sen tamamla" kartlarında çocuğun yazdığı son dizeler, altında şiirin aslı. Veli ve Türkçe öğretmeni
+   görür (veritabanı da öyle izin verir). Hiç yoksa kart görünmez. */
+function poemBox() {
+  const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
+  (async () => {
+    const rows = await q(sb.from('poem_lines').select('poem_key, line, result, created_at')
+      .eq('student_id', sid()).order('created_at', { ascending: false }).limit(10));
+    if (!rows.length) return;
+    const byId = Object.fromEntries(POEMS.map((p) => [p.id, p]));
+    const tag = { aynen: ['Aslını bildi', 'green'], kafiyeli: ['Kafiyeli', 'green'], kafiyesiz: ['Kafiyesiz', ''], serbest: ['Kendi sözü', ''] };
+    fill(box,
+      h('h2', {}, 'Tamamladığı şiirler'),
+      h('p', { class: 'small muted' }, 'Son dizesi gizli şiirlere kendi yazdığı dizeler; altında şiirin aslı.'),
+      rows.map((r) => {
+        const p = byId[r.poem_key];
+        const [label, color] = tag[r.result] || [r.result, ''];
+        return h('div', { class: 'stack', style: 'gap: 4px; padding: 8px 0; border-top: 1px solid var(--rule)' },
+          h('div', { class: 'spread' },
+            h('span', { class: 'small muted' }, new Date(r.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+              + (p ? ` · ${p.by}` : '')),
+            h('span', { class: 'tag ' + color }, label)),
+          p ? h('p', { class: 'small muted', style: 'white-space: pre-line; font-style: italic' }, p.show.join('\n')) : null,
+          h('p', {}, h('b', {}, 'Onun dizesi: '), r.line),
+          p ? h('p', { class: 'small' }, h('b', {}, 'Aslı: '), p.hide.join(' ')) : null);
+      }));
+    box.hidden = false;
+  })().catch(() => {});
+  return box;
+}
+
+// Rapordaki özet kartı (öğrenci ana sayfasında hata tekrarı kartının altında tek satır); liste ayrı sayfada açılır.
 function togetherBox(rows) {
   if (!rows.length) return null;
   const n = (k) => rows.filter((r) => togetherKind(r) === k).length;
@@ -1874,10 +1930,13 @@ const examNet = (rs) => rs.reduce((s, r) => s + r.correct - r.wrong / 3, 0);
 async function viewExamHub() {
   loading();
   const lgs = isLgsStudent(state.student);
-  const [bookletRows, past] = await Promise.all([
+  const [bookletRows, past, subs] = await Promise.all([
     lgs ? q(sb.from('questions').select('booklet').in('booklet', BOOKLETS.map((b) => b[0])).eq('active', true)) : [],
     q(sb.from('exams').select('id, name, booklet, exam_date, time_note, exam_results(correct, wrong, blank)')
       .eq('student_id', sid()).eq('kind', 'uygulama').order('created_at', { ascending: false }).limit(12)),
+    // Son yüklemeler (eskiden ana sayfadaydı): kâğıt denemenin işlenip işlenmediği burada görünür.
+    q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name)')
+      .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(4)),
   ]);
   const count = {};
   bookletRows.forEach((r) => { count[r.booklet] = (count[r.booklet] || 0) + 1; });
@@ -1932,7 +1991,13 @@ async function viewExamHub() {
         h('b', { class: 'num' }, `net ${fmtNet(examNet(p.exam_results || []))}`)))) : null,
     h('section', { class: 'card flat stack', style: 'gap: 6px' },
       h('p', { class: 'small muted' }, 'Kâğıt üzerinde bir deneme mi çözdün? Fotoğraflarını gönder, ben notlandırayım.'),
-      h('button', { class: 'block', onclick: () => go('paper') }, 'Kâğıt denemeyi yükle')));
+      h('button', { class: 'block', onclick: () => go('paper') }, 'Kâğıt denemeyi yükle'),
+      subs.length ? [h('p', { class: 'label', style: 'margin-top: 6px' }, 'Son yüklemeler'),
+        subs.map((s) => h('div', { class: 'stack', style: 'gap: 2px; padding-top: 6px; border-top: 1px solid var(--rule)' },
+          h('div', { class: 'spread' },
+            h('span', {}, s.exams?.name || (s.kind === 'kitap' ? 'Kitap sayfaları' : 'Yükleme')),
+            statusTag(s.status)),
+          s.result_note && s.status !== 'submitted' ? h('p', { class: 'small muted' }, s.result_note) : null))] : null));
 }
 
 async function startBookletExam(id, title, section) {
@@ -2919,7 +2984,7 @@ async function viewReport() {
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
     tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
-    reportedBox(),
+    reportedBox(), poemBox(),
     h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
     gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
 }
