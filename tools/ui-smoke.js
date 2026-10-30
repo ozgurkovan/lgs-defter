@@ -128,7 +128,8 @@
         if (startBtn) {
           startBtn.click(); await settle();
           const inGame = state.session?.track === 'words' && history.state?.overlay === 'session' && !document.querySelector('nav.tabs')
-            && document.querySelectorAll('.word-opt').length === 4 && !!document.querySelector('.word-big')?.textContent;
+            && document.querySelectorAll('.word-opt').length === 4
+            && (!!document.querySelector('.word-big')?.textContent || !!document.querySelector('.listen-big')); // dinleme kartında yazı yok
           document.querySelector('.word-opt')?.click(); await wait(100);
           const send = [...document.querySelectorAll('#app button.primary')].find((x) => x.textContent === 'Cevabı gönder');
           const scale = document.querySelectorAll('.scale .conf').length === 4 && !!send && send.disabled && !send.closest('[hidden]');

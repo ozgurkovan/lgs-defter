@@ -12,9 +12,10 @@ const code = [
   pick('function localDate', 'function fmtDate'),
   pick('function gradeItem', '/* Bugünün oturumunu'),
   pick('/* Sorular sınavdaki gibi', '// ---------------------------------------------------------------- öğrenci: bugün'),
-  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal };',
+  pick('/* Tekrar zamanı: FSRS', 'const wordsPerDay'),
+  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale };',
 ].join('\n');
-const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal } = new Function(code)();
+const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale } = new Function(code)();
 
 // Soru süreleri LGS oturum sürelerine eşit olmalı: sözel 50 soru / 75 dk, sayısal 40 soru / 80 dk.
 const counts = { turkce: 20, inkilap: 10, din: 10, ingilizce: 10, matematik: 20, fen: 20 };
@@ -112,5 +113,34 @@ check('3+4. sınıf 40 soru tam', planTotal(dailyPlan({ grade: 3, extra_grades: 
 // 3. sınıf + 4. sınıf konuları açık: Sosyal ve Din de plana girer.
 const g34 = dailyPlan({ grade: 3, extra_grades: [4], daily_questions: 20 });
 check('3. sınıf + 4. sınıf dersleri', Object.keys(g34).join(',') === 'turkce,matematik,hayat,fen,sosyal,ingilizce,din', JSON.stringify(g34));
+
+// Kelime kartları (FSRS). Her tekrar, kelimenin günü geldiğinde yapılmış sayılır (geçen gün = önceki aralık).
+const chain = (grades) => {
+  let st = null;
+  return grades.map((g) => { st = nextWordState(st, g, st ? wordDays(st.stability) : 0); return { ...st, days: wordDays(st.stability) }; });
+};
+// İlk görüş: tamamen emin 110 gün ("yes" sürekli gelmesin), büyük ölçüde emin 4 gün, kararsız ya da yanlış yarın.
+const first = (g) => wordDays(nextWordState(null, g, 0).stability);
+check('kelime: ilk görüş aralıkları', first(4) === 110 && first(3) === 4 && first(2) === 1 && first(1) === 1,
+  `tamamen ${first(4)}, büyük ölçüde ${first(3)}, kararsız ${first(2)}, yanlış ${first(1)} gün`);
+// Bildikçe aralık açılır, üst sınır yok.
+const good = chain([3, 3, 3, 3, 3, 3, 3, 3]).map((x) => x.days);
+check('kelime: bildikçe açılır, üst sınır yok', good.every((g, i) => !i || g > good[i - 1]) && good.at(-1) > 730, good.join(' → ') + ' gün');
+const yes = chain([4, 4, 4]).map((x) => x.days);
+check('kelime: "yes" gibi bilinen kelime hızla seyrekleşir', yes[0] === 110 && yes[1] > 365 && yes[2] > yes[1], yes.join(' → ') + ' gün');
+// Yanlış o kelimenin sınırını gösterir: aralık sınırın altına çekilir, kelime zorlaşır, sonra yeniden açılır.
+const known = chain([3, 3, 3, 3, 3]).at(-1);
+const lapsed = nextWordState(known, 1, known.days);
+const regrow = nextWordState(lapsed, 3, wordDays(lapsed.stability));
+check('kelime: unutunca aralık sınırın altına çekilir', wordDays(lapsed.stability) < known.days / 4 && lapsed.difficulty > known.difficulty,
+  `${known.days} gün → unuttu → ${wordDays(lapsed.stability)} gün, zorluk ${known.difficulty.toFixed(1)} → ${lapsed.difficulty.toFixed(1)}`);
+check('kelime: unuttuktan sonra yeniden açılır', wordDays(regrow.stability) > wordDays(lapsed.stability),
+  `${wordDays(lapsed.stability)} → ${wordDays(regrow.stability)} gün`);
+// Çocuğun hafızası: tahminden çabuk unutuyorsa katsayı 1'in altında, iyi hatırlıyorsa üstünde; az veriyle 1.
+const synth = (n, after, rate) => Array.from({ length: n }, (_, i) => ({ stability_before: 10, elapsed_days: 10 * after, correct: i < n * rate }));
+const kForget = fitWordScale(synth(60, 1, 0.6)), kGood = fitWordScale(synth(60, 3, 1)), kFew = fitWordScale(synth(5, 1, 0));
+check('kelime: hafıza katsayısı', kForget < 0.8 && kGood > 1.2 && kFew === 1,
+  `çabuk unutan ×${kForget.toFixed(2)}, iyi hatırlayan ×${kGood.toFixed(2)}, az veri ×${kFew}`);
+check('kelime: seviye (kart türü için)', nextWordBox(0, true, 100) === 2 && nextWordBox(5, true, 50) === 4 && nextWordBox(9, false, 100) === 1);
 
 process.exit(fails ? 1 : 0);

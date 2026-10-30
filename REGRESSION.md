@@ -88,9 +88,23 @@ Her maddenin yanında nasıl denendiği yazar:
 - Tekrar:
   - Bilemezse kelime aynı oturumun sonunda bir kez daha ve yarın gelir.
   - Doğru ama kararsız ya da tahminse oturum sonunda bir kez daha gelir ve kutusu bir geri gider.
-  - Doğru ve emin (%75, %100) ise kutusu ilerler; sonraki tekrar 1, 3, 7, 14, 30, 60 gün sonradır.
-  - İlk görüşte "tamamen eminim" dediği kelime 3 gün sonraya atlar.
-  - 14 güne ulaşan kelime "öğrenildi" sayılır. Raporda emin olmadan bildiklerinin sayısı da görünür.
+  - Tekrar zamanını FSRS hesaplar. Her kelimenin kararlılığı ve zorluğu tutulur. Kelime unutulmadan önce, hatırlama
+    olasılığı %90'a düşerken gelir. [O, `test-schedule.mjs`]
+    - Bildikçe aralık açılır, üst sınır yoktur (örnek: 4 → 15 → 49 → 146 → 393 → 973 gün).
+    - Yanlış cevap o kelimenin sınırını gösterir. Aralık sınırın altına çekilir (393 gün → 13 gün), kelime zorlaşır,
+      sonra yeniden ama daha yavaş açılır.
+    - Emin olma ölçeği nottur: yanlış, kararsız ya da tahmin, büyük ölçüde emin, tamamen emin.
+  - Çocuğun hafızası öğrenilir. Tekrar cevaplarında modelin tahmininden iyi mi kötü mü hatırladığına göre bütün
+    aralıklar bir katsayıyla çarpılır. 10 cevaptan önce katsayı 1'dir; az veriyle 1'e yakın kalır. Raporda görünür. [O]
+  - İlk görüşte "tamamen eminim" dediği kelime zaten biliniyor sayılır: 110 gün sonra gelir, sonra yaklaşık 2 yıl,
+    13 yıl. Böylece "yes" gibi kelimeler sürekli gelmez. "Büyük ölçüde eminim" 4 gün sonra gelir. [O]
+  - Kart türü:
+    - yeni kelime yazılı gelir;
+    - bildiği kelime ikinci kez gelince yalnızca dinleme kartı olur: yazı görünmez, kelime kendiliğinden okunur,
+      Türkçesini seçer;
+    - daha iyi bildiği kelimelerde yazılı, ters ve dinleme karışık gelir. [E]
+  - Kararlılığı 3 haftayı aşan kelime "öğrenildi" sayılır.
+  - Raporda emin olmadan bildiklerinin ve dinleyerek bildiklerinin sayısı da görünür.
 - Günün kartları bitince "5 kelime daha".
 - Oyun sırasında alt menü gizlenir, geri tuşu önce sorar. Hızlı "Sonraki kelime" kart atlatmaz.
 - Altı sekmeli alt menü dar telefona da sığar. [E]

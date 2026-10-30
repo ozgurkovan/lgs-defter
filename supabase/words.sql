@@ -11,7 +11,7 @@ alter table public.profiles add constraint daily_words_range check (daily_words 
 create table if not exists public.word_progress (
   student_id uuid not null references public.profiles(id) on delete cascade,
   word text not null check (char_length(word) between 1 and 40),
-  box int not null check (box between 1 and 9),
+  box int not null,
   due_date date not null,
   right_count int not null default 0 check (right_count >= 0),
   wrong_count int not null default 0 check (wrong_count >= 0),
@@ -19,6 +19,9 @@ create table if not exists public.word_progress (
   primary key (student_id, word)
 );
 alter table public.word_progress enable row level security;
+-- Kutunun üst sınırı yok sayılır: 8. kutu 2 yıl, sonra her kutu iki katı (4, 8, 16 yıl…). 30 pratikte hiç dolmaz.
+alter table public.word_progress drop constraint if exists word_progress_box_check;
+alter table public.word_progress add constraint word_progress_box_check check (box between 1 and 30);
 
 create table if not exists public.word_answers (
   id uuid primary key default gen_random_uuid(),
@@ -34,6 +37,16 @@ alter table public.word_answers enable row level security;
 alter table public.word_answers add column if not exists confidence int;
 alter table public.word_answers drop constraint if exists word_answers_confidence;
 alter table public.word_answers add constraint word_answers_confidence check (confidence is null or confidence in (25, 50, 75, 100));
+-- Tekrar zamanı FSRS ile (app.js): kelimenin kararlılığı (gün) ve zorluğu (1–10). Cevaba o anki kararlılık ve son
+-- tekrardan bu yana geçen gün yazılır; çocuğun hafıza katsayısı bunlardan öğrenilir.
+alter table public.word_progress add column if not exists stability real;
+alter table public.word_progress add column if not exists difficulty real;
+alter table public.word_answers add column if not exists stability_before real;
+alter table public.word_answers add column if not exists elapsed_days int;
+-- Kartın türü: yazılı (İngilizce yazılı), ters (Türkçe → İngilizce), dinleme (yazı yok, kelimeyi duyar).
+alter table public.word_answers add column if not exists mode text;
+alter table public.word_answers drop constraint if exists word_answers_mode;
+alter table public.word_answers add constraint word_answers_mode check (mode is null or mode in ('yazili', 'ters', 'dinleme'));
 
 drop policy if exists word_progress_read on public.word_progress;
 create policy word_progress_read on public.word_progress for select to authenticated

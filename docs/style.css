@@ -258,6 +258,8 @@ nav.tabs svg { width: 22px; height: 22px; }
 /* Kelime kartları: büyük kelime, altında iki sütun dört şık */
 .word-card { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding-block: 28px; }
 .word-big { font-family: var(--font-display); font-size: 2.2rem; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+/* Dinleme kartı: kelime yazılmaz, büyük bir dinle düğmesi */
+.listen-big { width: 96px; height: 96px; min-height: 96px; border-radius: 50%; padding: 0; font-size: 2.6rem; }
 .word-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .word-opt { min-height: 64px; font-size: 1.1rem; font-weight: 600; line-height: 1.25; white-space: normal; }
 .word-opt:disabled { opacity: 1; }

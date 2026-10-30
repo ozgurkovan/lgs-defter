@@ -2648,11 +2648,66 @@ async function setCovered(topicId, covered, rare = false) {
 /* Kelime kartları: okuldaki İngilizce dersinden ayrı, ilkokul için İngilizce kelime çalışması; ayrı sekmede,
    günlük plandaki derslere sayılmaz. Kelimeler docs/words.json'da, kolaydan zora gruplar hâlinde. Kartta İngilizce
    kelime çıkar, çocuk dört Türkçe anlamdan birini seçer ve sorulardaki gibi ne kadar emin olduğunu işaretler;
-   iyice bildiği kelimelerde bazen tersi sorulur. Bilemediği ya da emin olmadan bildiği kelime oturumun sonunda bir
-   kez daha gelir; emin bildikçe kutusu ilerler, kelime seyrekleşir (WORD_LADDER, saveWord). Günde kaç kart: veli
+   iyice bildiği kelimelerde bazen tersi ya da yalnızca dinlemesi sorulur. Bilemediği ya da emin olmadan bildiği kelime
+   oturumun sonunda bir kez daha gelir. Ne zaman tekrar geleceğini FSRS hesaplar (aşağıda). Günde kaç kart: veli
    ayarı (profiles.daily_words); boşsa 1–4. sınıfa 10, diğerlerine kapalı. */
-const WORD_LADDER = [0, 1, 3, 7, 14, 30, 60]; // kutu → kaç gün sonra
-const WORD_LEARNED = 4; // iki haftalık aralığa ulaşan kelime öğrenilmiş sayılır
+
+/* Tekrar zamanı: FSRS (Free Spaced Repetition Scheduler 4.5; Anki'nin de kullandığı yöntem). Her kelimenin kararlılığı
+   (stability: hatırlama olasılığının %90'a düşmesine kadar geçen gün) ve zorluğu (difficulty, 1–10) tutulur. Kelime,
+   unutmadan önce, hatırlama olasılığı %90'a düşerken gelir.
+   - Bildikçe kararlılık büyür, aralık açılır; üst sınır yok.
+   - Yanlış cevap o kelimenin sınırını gösterir: kararlılık düşer, aralık o sınırın altına çekilir, sonra yeniden açılır.
+     Sık unutulan kelimenin zorluğu artar, aralığı daha yavaş açılır.
+   - Çocuğun kendi hafızası da öğrenilir (fitWordScale): geçmiş cevaplarında modelin tahmininden iyi mi kötü mü
+     hatırladığına göre bütün aralıklar bir katsayıyla çarpılır.
+   Emin olma ölçeği FSRS notudur: yanlış 1, doğru ama kararsız ya da tahmin 2, büyük ölçüde emin 3, tamamen emin 4.
+   İlk görüşte tamamen emin bildiği kelimeyi ("yes") zaten biliyor sayar: ilk kararlılık 110 gün (FSRS'te 13,8). */
+const FSRS_W = [0.4872, 1.4003, 3.7145, 110, 5.1618, 1.2298, 0.8975, 0.031, 1.6474, 0.1367, 1.0461, 2.1072, 0.0793, 0.3246, 1.587, 0.2272, 2.8755];
+const FSRS_FACTOR = 19 / 81; // hatırlama eğrisi R(t) = (1 + FACTOR·t/S)^-0,5; t = S iken %90
+const wordGrade = (ok, confidence) => (!ok ? 1 : confidence <= 50 ? 2 : confidence === 75 ? 3 : 4);
+const recallChance = (days, stability) => (1 + (FSRS_FACTOR * days) / stability) ** -0.5;
+// prev: { stability, difficulty } ya da ilk görüşte null; days: son tekrardan bu yana geçen gün.
+function nextWordState(prev, grade, days) {
+  const w = FSRS_W;
+  const clampD = (d) => Math.min(10, Math.max(1, d));
+  if (!prev?.stability) return { stability: w[grade - 1], difficulty: clampD(w[4] - (grade - 3) * w[5]) };
+  const { stability: s, difficulty: d } = prev;
+  const r = recallChance(Math.max(0, days), s);
+  const stability = grade === 1
+    ? Math.min(s, w[11] * d ** -w[12] * ((s + 1) ** w[13] - 1) * Math.exp(w[14] * (1 - r)))
+    : s * (1 + Math.exp(w[8]) * (11 - d) * s ** -w[9] * (Math.exp(w[10] * (1 - r)) - 1)
+      * (grade === 2 ? w[15] : 1) * (grade === 4 ? w[16] : 1));
+  return { stability, difficulty: clampD(w[7] * w[4] + (1 - w[7]) * (d - w[6] * (grade - 3))) };
+}
+// Kaç gün sonra: kararlılık × çocuğun hafıza katsayısı (en az 1 gün; üst sınır yok, yalnızca tarih taşmasın diye 100 yıl).
+const wordDays = (stability, scale = 1) => Math.min(36500, Math.max(1, Math.round(stability * scale)));
+/* Çocuğun hafıza katsayısı: daha önce gördüğü kelimelerdeki cevapları (cevap anındaki kararlılık ve geçen gün) için
+   modelin tahminiyle gerçekte hatırlayıp hatırlamadığını karşılaştırır, en olası katsayıyı bulur (0,25–4). Az veriyle
+   1'e yakın kalır (n / (n + 50) ağırlık); 10 cevaptan azsa 1. */
+function fitWordScale(rows) {
+  const data = rows.filter((r) => r.stability_before > 0 && r.elapsed_days != null);
+  if (data.length < 10) return 1;
+  let best = 0, bestLL = -Infinity;
+  for (let lk = -1.4; lk <= 1.4001; lk += 0.05) {
+    let ll = 0;
+    for (const r of data) {
+      const p = Math.min(0.999, Math.max(0.001, recallChance(r.elapsed_days, r.stability_before * Math.exp(lk))));
+      ll += r.correct ? Math.log(p) : Math.log(1 - p);
+    }
+    if (ll > bestLL) { bestLL = ll; best = lk; }
+  }
+  return Math.exp((data.length / (data.length + 50)) * best);
+}
+// Eski kayıtlar (kararlılığı olmayan): kutu numarasının o zamanki aralığı başlangıç kararlılığı sayılır.
+const LEGACY_WORD_DAYS = [0, 1, 3, 7, 14, 30, 60, 110, 280, 730];
+const wordLearned = (p) => (p.stability ? p.stability >= 21 : p.box >= 4); // 3 haftayı aşan kararlılık: öğrenildi
+// Kelimenin seviyesi (yalnızca kart türünü seçmek için): emin doğru cevapta bir artar, kararsız doğruda bir azalır,
+// yanlışta 1. İlk görüşte emin bildiği kelime 2'den başlar.
+function nextWordBox(box, ok, confidence) {
+  if (!ok) return 1;
+  if (confidence >= 75) return box ? Math.min(30, box + 1) : 2;
+  return box ? Math.max(1, box - 1) : 1;
+}
 const wordsPerDay = (p) => (p?.daily_words ?? (p?.grade && p.grade <= 4 ? 10 : 0));
 const WORD_PRAISE = ['Aferin! 🎉', 'Süper! ⭐', 'Harika! 👏', 'Doğru! 🙌', 'Bravo! 🌟'];
 let wordList = null;
@@ -2694,13 +2749,15 @@ function wordQueue(list, progress, answeredToday, n) {
 async function viewWords() {
   loading();
   const goal = wordsPerDay(state.student);
-  const [list, progress, todayRows] = await Promise.all([
+  const [list, progress, answers] = await Promise.all([
     loadWords(),
-    q(sb.from('word_progress').select('word, box, due_date, right_count, wrong_count').eq('student_id', sid())),
-    q(sb.from('word_answers').select('word').eq('student_id', sid()).gte('answered_at', dayStart())),
+    q(sb.from('word_progress').select('word, box, due_date, right_count, wrong_count, stability, difficulty, updated_at').eq('student_id', sid())),
+    q(sb.from('word_answers').select('word, answered_at, correct, stability_before, elapsed_days').eq('student_id', sid())),
   ]);
-  const answered = new Set(todayRows.map((r) => r.word));
-  const learned = progress.filter((p) => p.box >= WORD_LEARNED).length;
+  const start = dayStart();
+  const answered = new Set(answers.filter((r) => r.answered_at >= start).map((r) => r.word));
+  const scale = fitWordScale(answers);
+  const learned = progress.filter(wordLearned).length;
   const queue = wordQueue(list, progress, answered, Math.max(0, goal - answered.size));
   const extra = queue.length ? [] : wordQueue(list, progress, answered, 5);
   render(
@@ -2712,15 +2769,15 @@ async function viewWords() {
         h('span', { class: 'small muted' }, `Öğrendiğin kelime: ${learned}`)),
       h('div', { class: 'progress' }, h('i', { style: `width: ${Math.min(100, (answered.size / Math.max(1, goal)) * 100)}%` })),
       !goal ? h('p', { class: 'muted' }, 'Kelime kartları kapalı; velin Ayarlar\'dan açabilir.')
-        : queue.length ? h('button', { class: 'primary block', onclick: () => runWords(queue, list, progress) }, answered.size ? 'Devam et' : 'Başla')
+        : queue.length ? h('button', { class: 'primary block', onclick: () => runWords(queue, list, progress, scale) }, answered.size ? 'Devam et' : 'Başla')
           : h('p', {}, 'Bugünlük bu kadar, aferin! 🎉 Yarın yeni kelimeler gelecek.'),
-      goal && extra.length ? h('button', { class: 'block', onclick: () => runWords(extra, list, progress) }, `${extra.length} kelime daha`) : null),
+      goal && extra.length ? h('button', { class: 'block', onclick: () => runWords(extra, list, progress, scale) }, `${extra.length} kelime daha`) : null),
     h('p', { class: 'small muted', style: 'text-align: center' }, `${list.length} kelimenin ${progress.length} tanesini gördün.`));
 }
 
 // Kart oyunu, soru çözme oturumu gibi açılır: alt menü gizlenir, geri tuşu önce sorar (state.session).
-function runWords(queue, list, progress) {
-  const run = { track: 'words', cards: queue.map((w) => ({ w, again: false })), index: 0, right: 0, firstTries: queue.length };
+function runWords(queue, list, progress, scale = 1) {
+  const run = { track: 'words', cards: queue.map((w) => ({ w, again: false })), index: 0, right: 0, firstTries: queue.length, scale };
   state.session = run;
   pushOverlay('session');
   showWordCard(run, list, new Map(progress.map((p) => [p.word, p])));
@@ -2730,8 +2787,14 @@ function showWordCard(run, list, byWord) {
   if (run.index >= run.cards.length) return endWords(run);
   const { w, again } = run.cards[run.index];
   const p = byWord.get(w.en);
-  // İyice bildiği kelimede bazen tersi: Türkçe çıkar, İngilizcesini seçer.
-  const reverse = !again && (p?.box || 0) >= 3 && Math.random() < 0.5;
+  // Kartın türü. Yeni kelime ve oturum sonunda tekrar sorulan kelime yazılı. Bildiği kelime ikinci kez gelince yalnızca
+  // dinleme: yazı görünmez, kelimeyi duyup Türkçesini seçer (velinin isteği). Daha iyi bildiği kelimelerde yazılı, ters
+  // (Türkçe çıkar, İngilizcesini seçer) ve dinleme karışık. Telefon okuyamıyorsa dinleme yerine yazılı.
+  const seenBefore = (p?.right_count || 0) + (p?.wrong_count || 0);
+  const pickMode = () => ['yazili', 'ters', 'dinleme'][Math.floor(Math.random() * 3)];
+  let mode = again || !p ? 'yazili' : seenBefore === 1 && p.box >= 2 ? 'dinleme' : p.box >= 3 ? pickMode() : 'yazili';
+  if (mode === 'dinleme' && !canSpeak()) mode = 'yazili';
+  const reverse = mode === 'ters', listen = mode === 'dinleme';
   const label = (x) => (reverse ? x.en : x.tr);
   // Yanlış şıklar aynı gruptan (renkler, hayvanlar…); grupta yeterli yoksa komşu gruplardan.
   const same = list.filter((x) => x.group === w.group && x.en !== w.en);
@@ -2793,7 +2856,7 @@ function showWordCard(run, list, byWord) {
         : 'Bu kelime birazdan bir kez daha, yarın da yine gelecek.') : null,
       h('button', { class: 'primary block', onclick: next }, run.index + 1 < run.cards.length ? 'Sonraki kelime' : 'Bitir'));
     feedback.hidden = false;
-    await saveWord(w, ok, confidence, reverse, again, byWord);
+    await saveWord(w, ok, confidence, mode, again, byWord, run.scale);
     if (ok && sure) timer = setTimeout(() => { if (state.session === run) next(); }, 1200);
   }
   state.leaveOverlay = () => clearTimeout(timer);
@@ -2806,27 +2869,34 @@ function showWordCard(run, list, byWord) {
         h('i', { style: `width: ${(run.index / run.cards.length) * 100}%` }))),
     h('section', { class: 'card word-card' },
       again ? h('span', { class: 'tag amber' }, 'Bir daha') : null,
-      h('p', { class: 'word-big', lang: reverse ? 'tr' : 'en' }, reverse ? w.tr : w.en),
+      listen ? h('button', { class: 'listen-big', 'aria-label': 'Kelimeyi dinle', onclick: () => speak(w.en) }, '🔊')
+        : h('p', { class: 'word-big', lang: reverse ? 'tr' : 'en' }, reverse ? w.tr : w.en),
       // Ters soruda dinlemek cevabı söyler; dinleme cevaptan sonra.
-      !reverse && canSpeak() ? h('button', { class: 'ghost', 'aria-label': 'Dinle', onclick: () => speak(w.en) }, '🔊 Dinle') : null,
-      h('p', { class: 'small muted' }, reverse ? 'İngilizcesi hangisi?' : 'Türkçesi hangisi?')),
+      !reverse && !listen && canSpeak() ? h('button', { class: 'ghost', 'aria-label': 'Dinle', onclick: () => speak(w.en) }, '🔊 Dinle') : null,
+      h('p', { class: 'small muted' }, listen ? 'Dinle: Türkçesi hangisi? İstediğin kadar dinleyebilirsin.' : reverse ? 'İngilizcesi hangisi?' : 'Türkçesi hangisi?')),
     h('div', { class: 'word-opts' }, btns),
     confirmRow,
     feedback);
+  // Dinleme kartında kelime kendiliğinden bir kez okunur (telefon izin vermezse düğmeyle).
+  if (listen) setTimeout(() => { if (state.session === run && !done) speak(w.en); }, 300);
 }
 
-// Cevap kaydı ve kutu. Bilip emin olduğu (%75, %100) kelime bir kutu ilerler; yeni kelime "tamamen eminim"le 3 gün,
-// "büyük ölçüde eminim"le yarın gelir. Kararsız ya da tahminle bildiği kelime bir kutu geri, bilemediği 1. kutuya
-// (yarın) döner. Oturumun sonunda tekrar sorulan kelimenin kutusu ilk cevapla belirlenmiştir; sadece cevap kaydedilir.
-async function saveWord(w, ok, confidence, reverse, again, byWord) {
+// Cevap kaydı ve yeni durum (nextWordState, wordDays). Cevaba, o anki kararlılık ve son tekrardan bu yana geçen gün de
+// yazılır: çocuğun hafıza katsayısı bunlardan öğrenilir. Oturumun sonunda tekrar sorulan kelimenin durumu ilk cevapla
+// belirlenmiştir; sadece cevap kaydedilir.
+async function saveWord(w, ok, confidence, mode, again, byWord, scale = 1) {
   const p = byWord.get(w.en);
+  const today = localDate();
+  const prev = p?.stability ? { stability: p.stability, difficulty: p.difficulty }
+    : p ? { stability: LEGACY_WORD_DAYS[Math.min(p.box, LEGACY_WORD_DAYS.length - 1)] || 1, difficulty: 5 } : null;
+  const days = p?.updated_at ? Math.max(0, daysBetween(localDate(new Date(p.updated_at)), today)) : 0;
   try {
-    await q(sb.from('word_answers').insert({ student_id: sid(), word: w.en, correct: ok, confidence, reverse }));
+    await q(sb.from('word_answers').insert({ student_id: sid(), word: w.en, correct: ok, confidence, reverse: mode === 'ters', mode,
+      stability_before: !again && prev ? prev.stability : null, elapsed_days: !again && prev ? days : null }));
     if (again) return;
-    const box = !ok ? 1
-      : confidence >= 75 ? (p ? Math.min(WORD_LADDER.length - 1, p.box + 1) : confidence === 100 ? 2 : 1)
-        : (p ? Math.max(1, p.box - 1) : 1);
-    const row = { student_id: sid(), word: w.en, box, due_date: addDays(localDate(), WORD_LADDER[box]),
+    const st = nextWordState(prev, wordGrade(ok, confidence), days);
+    const row = { student_id: sid(), word: w.en, box: nextWordBox(p?.box || 0, ok, confidence),
+      stability: st.stability, difficulty: st.difficulty, due_date: addDays(today, wordDays(st.stability, scale)),
       right_count: (p?.right_count || 0) + (ok ? 1 : 0), wrong_count: (p?.wrong_count || 0) + (ok ? 0 : 1),
       updated_at: new Date().toISOString() };
     await q(sb.from('word_progress').upsert(row));
@@ -2852,10 +2922,11 @@ function endWords(run) {
 function wordBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
   (async () => {
-    const [progress, answers, list] = await Promise.all([
-      q(sb.from('word_progress').select('word, box, wrong_count').eq('student_id', sid())),
-      q(sb.from('word_answers').select('word, correct, confidence, answered_at').eq('student_id', sid()).gte('answered_at', addDays(localDate(), -6) + 'T00:00:00')),
+    const [progress, answers, list, memory] = await Promise.all([
+      q(sb.from('word_progress').select('word, box, wrong_count, stability').eq('student_id', sid())),
+      q(sb.from('word_answers').select('word, correct, confidence, mode, answered_at').eq('student_id', sid()).gte('answered_at', addDays(localDate(), -6) + 'T00:00:00')),
       loadWords(),
+      q(sb.from('word_answers').select('correct, stability_before, elapsed_days').eq('student_id', sid()).not('stability_before', 'is', null)),
     ]);
     if (!progress.length && !answers.length) return;
     const tr = Object.fromEntries(list.map((w) => [w.en, w.tr]));
@@ -2863,14 +2934,20 @@ function wordBox() {
     const todayN = new Set(answers.filter((a) => localDate(new Date(a.answered_at)) === today).map((a) => a.word)).size;
     const right = answers.filter((a) => a.correct).length;
     const unsure = answers.filter((a) => a.correct && a.confidence != null && a.confidence <= 50).length;
+    const heard = answers.filter((a) => a.mode === 'dinleme');
     const hard = progress.filter((p) => p.wrong_count > 0).sort((a, b) => b.wrong_count - a.wrong_count).slice(0, 6);
+    const scale = fitWordScale(memory);
     fill(box,
       h('h2', {}, 'Kelime kartları'),
       h('p', { class: 'small muted' }, 'Okuldaki İngilizce dersinden ayrı kelime çalışması (çocuğun İngilizce sekmesi).'),
       h('p', {}, `Bugün ${todayN}/${wordsPerDay(state.student)} kart. Son 7 günde ${answers.length} cevap, `
         + `%${answers.length ? Math.round((right / answers.length) * 100) : 0} doğru`
-        + (unsure ? `; ${unsure} doğrusunda emin değildi (kararsız ya da tahmin).` : '.')),
-      h('p', {}, `Öğrendiği: ${progress.filter((p) => p.box >= WORD_LEARNED).length} kelime · gördüğü: ${progress.length} / ${list.length}`),
+        + (unsure ? `; ${unsure} doğrusunda emin değildi (kararsız ya da tahmin).` : '.')
+        + (heard.length ? ` Dinleyerek ${heard.length} kartın ${heard.filter((a) => a.correct).length} tanesini bildi.` : '')),
+      h('p', {}, `Öğrendiği: ${progress.filter(wordLearned).length} kelime · gördüğü: ${progress.length} / ${list.length}`),
+      // Hafıza katsayısı en az 10 tekrar cevabından öğrenilir; o zamana kadar 1.
+      memory.length >= 10 ? h('p', { class: 'small muted' }, `Tekrar aralıkları hafızasına göre ayarlanıyor: ×${scale.toFixed(2).replace('.', ',')}`
+        + (scale > 1.05 ? ' (modelin beklediğinden iyi hatırlıyor).' : scale < 0.95 ? ' (modelin beklediğinden çabuk unutuyor; aralıklar kısaltıldı).' : '.')) : null,
       hard.length ? h('p', { class: 'small' }, h('b', {}, 'Zorlandıkları: '), hard.map((p) => `${p.word} (${tr[p.word] || '?'})`).join(', ')) : null);
     box.hidden = false;
   })().catch(() => {});
