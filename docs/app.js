@@ -81,6 +81,9 @@ const TOPIC_LADDER = [1, 3, 5, 8, 13, 21, 34, 55];
 const TOPIC_QUESTIONS_PER_REVIEW = 5;
 const TOPIC_QUESTIONS_BUSY = 3; // yoğun günde (dersin tekrarları kalan hakkını aşınca) konu tekrarı kısalır
 const TOPIC_PRACTICE_QUESTIONS = 10; // öğrencinin Konular sayfasından başlattığı konu çalışması
+// Konu çalışması her konuda bu kadar görülmemiş soruyu günlük tekrarlara bırakır (konu tekrarı ve hata tekrarı yalnızca
+// görülmemiş soru alır; saatlik görevin pool_needs'teki ilk hedefiyle aynı, iki konu tekrarına yeter).
+const PRACTICE_KEEP_UNSEEN = 10;
 
 const REASONS = [
   ['bilmiyordum', 'Konuyu bilmiyordum'],
@@ -829,13 +832,15 @@ function examOrder(entries, order = SUBJECT_ORDER) {
 }
 
 /* Konu çalışmasının soruları (öğrenci Konular sayfasında bir konu seçer; yalnızca o konudan sorular gelir). Önce hiç
-   görmediği sorular, tarzları çeşitlenerek; yetmezse daha önce hep doğru yaptığı sorular, en eski cevapladığından
-   başlayarak. Açık hata maddelerinin kaynak soruları ve onlara ayrılmış benzerler gelmez (hata tekrarında gelecekler);
-   kitap soruları da gelmez. pool: konunun soruları; answered: soru id → { at: son cevap zamanı, wrong: hiç yanlış
-   yaptı mı }; reserved: reservedVariants(); n: en fazla soru. */
-function practicePick(pool, answered, reserved, n) {
+   görmediği sorular, tarzları çeşitlenerek (velinin seçimi); ama konunun keep kadar görülmemiş sorusu günlük tekrarlara
+   kalır. Yetmezse daha önce hep doğru yaptığı sorular, en eski cevapladığından başlayarak. Açık hata maddelerinin kaynak
+   soruları ve onlara ayrılmış benzerler gelmez (hata tekrarında gelecekler); kitap soruları da gelmez. pool: konunun
+   soruları; answered: soru id → { at: son cevap zamanı, wrong: hiç yanlış yaptı mı }; reserved: reservedVariants();
+   n: en fazla soru; keep: tekrarlara bırakılan görülmemiş soru. */
+function practicePick(pool, answered, reserved, n, keep = PRACTICE_KEEP_UNSEEN) {
   const usable = pool.filter((p) => !p.book_id && !reserved.q.has(p.id) && !isVariantOf(p, reserved));
-  const picked = pickVaried(shuffle(usable.filter((p) => !answered.has(p.id))), n);
+  const fresh = usable.filter((p) => !answered.has(p.id));
+  const picked = pickVaried(shuffle(fresh), Math.min(n, Math.max(0, fresh.length - keep)));
   if (picked.length < n) {
     const again = usable.filter((p) => answered.has(p.id) && !answered.get(p.id).wrong)
       .sort((a, b) => (answered.get(a.id).at < answered.get(b.id).at ? -1 : 1));
@@ -2620,7 +2625,7 @@ async function buildPractice(topic) {
   return {
     entries: picked.map((question) => ({ item, question })),
     seconds: picked.reduce((s, p) => s + maxSeconds(p.subject) + 15, 0),
-    fresh: pool.filter((p) => !p.book_id && !answered.has(p.id)).length,
+    fresh: picked.filter((p) => !answered.has(p.id)).length, // bu çalışmadaki yeni sorular
   };
 }
 
@@ -2650,10 +2655,12 @@ async function viewTopicPractice() {
       : h('section', { class: 'card task' },
         h('p', { class: 'label' }, 'Konu çalışması'),
         n ? [h('div', { class: 'row' }, h('span', { class: 'big num' }, n), h('span', { class: 'muted' }, `soru · yaklaşık ${Math.max(1, Math.round(practice.seconds / 60))} dakika`)),
-             h('p', { class: 'small muted' }, (practice.fresh ? `Bu konuda daha önce görmediğin ${practice.fresh} soru var. ` : 'Bu konunun yeni soruları bitti; daha önce doğru yaptıkların geliyor. ')
+             h('p', { class: 'small muted' }, (practice.fresh === n ? 'Hepsi daha önce görmediğin sorular. '
+               : practice.fresh ? `${practice.fresh} tanesi yeni, ${n - practice.fresh} tanesi daha önce doğru yaptığın sorular. `
+               : 'Daha önce doğru yaptığın sorular geliyor; bu konunun yeni soruları günlük tekrarların için ayrıldı. ')
                + 'Yalnızca bu konudan sorular gelir; yanlış yaptıkların hata tekrarına girer.'),
              h('button', { class: 'primary block', onclick: () => runSession('practice', practice, 'konu') }, `Bu konudan ${n} soru çöz`)]
-          : h('p', { class: 'muted' }, 'Bu konuda şu an çözebileceğin soru yok. Yeni sorular hazırlanıyor; birkaç saat sonra tekrar bak.')),
+          : h('p', { class: 'muted' }, 'Bu konunun soruları şimdilik günlük tekrarların için ayrıldı. Yeni sorular hazırlanıyor; birkaç saat sonra tekrar bak.')),
     covered && status?.lesson ? h('details', { class: 'card' }, h('summary', {}, '📖 Bu konunun kısa anlatımı'), h('div', { class: 'note teacher', style: 'margin-top: 8px' }, status.lesson)) : null,
     covered ? h('a', { class: 'btn block', href: status?.youtube_query ? 'https://www.youtube.com/results?search_query=' + encodeURIComponent(status.youtube_query) : youtubeSearch(topic.name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı') : null);
 }

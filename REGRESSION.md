@@ -234,8 +234,10 @@ Her maddenin yanında nasıl denendiği yazar:
   Üst sınıf konularından yalnızca velinin açtıkları görünür.
 - İşlenen konuya dokununca konunun sayfası: durumu (eksik, takipteki yanlış, oturdu…), sıradaki konu tekrarı, varsa kısa
   anlatım, YouTube bağlantısı ve "Bu konudan N soru çöz".
-- Konu çalışması: en fazla 10 soru, yalnızca o konudan. Önce hiç görmediği sorular, yetmezse daha önce hep doğru yaptıkları
-  (en eskiden). Hata maddelerine ayrılmış benzerler ve kitap soruları gelmez. [O: `test-practice.mjs`]
+- Konu çalışması: en fazla 10 soru, yalnızca o konudan. Önce hiç görmediği sorular (velinin seçimi), ama konunun 10 görülmemiş
+  sorusu günlük tekrarlara kalır (konu ve hata tekrarı yalnızca görülmemiş soru alır; konu çalışması onları soru sıkıntısına
+  düşürmez). Yetmezse daha önce hep doğru yaptıkları (en eskiden). Hata maddelerine ayrılmış benzerler ve kitap soruları
+  gelmez. Soru kalmadıysa konunun sayfası yeni soruların hazırlandığını söyler. [O: `test-practice.mjs`]
   - Yanlış yaptığı (ya da "birlikte bakalım" dediği) soru hata tekrarına girer, ertesi gün benzeri gelir.
   - Konu tekrarının takvimi değişmez; cevaplar günlük plana sayılmaz (o gün günü gelen tekrarlar ertelenmez).
   - "Ara ver", geri tuşu ve oturum sonundaki "Konuya dön" konunun sayfasına döner. Raporda "konu çalışması" olarak görünür.
