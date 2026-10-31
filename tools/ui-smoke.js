@@ -141,12 +141,15 @@
       if (det) {
         det.open = true;
         for (let i = 0; i < 40 && !det.querySelector('.hero-preview svg'); i++) await wait(150);
+        // Beklenen sayılar seçenek listesinden: ten + saç rengi + göz renkleri; saç modelleri + gözlükler.
+        const wantSwatches = HERO_LOOK.ten.length + HERO_LOOK.sac.length + HERO_LOOK.goz.length;
+        const wantChips = HERO_LOOK.model.length + HERO_LOOK.gozluk.length;
         const swatches = det.querySelectorAll('.swatch').length, chips = det.querySelectorAll('.chip').length;
         const before = det.querySelector('.hero-preview')?.innerHTML;
         det.querySelectorAll('.swatch')[5]?.click();
         const changed = !!before && det.querySelector('.hero-preview').innerHTML !== before;
-        check('Aile: kahramanın görünüşü açılır, seçim önizlemeyi değiştirir', swatches === 19 && chips === 9 && changed && /fotoğraf/i.test(det.innerText),
-          `renk ${swatches}, seçenek ${chips}, değişti ${changed}`);
+        check('Aile: kahramanın görünüşü açılır, seçim önizlemeyi değiştirir', swatches === wantSwatches && chips === wantChips && changed && /fotoğraf/i.test(det.innerText),
+          `renk ${swatches}/${wantSwatches}, seçenek ${chips}/${wantChips}, değişti ${changed}`);
         det.open = false;
       } else check('Aile: kahramanın görünüşü', false, 'kelime kartları açık çocuk yok');
     }
