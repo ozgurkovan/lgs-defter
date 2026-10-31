@@ -229,9 +229,9 @@ public, and do not copy long passages into questions.
 
 Children with İngilizce or Klavye turned on have a cartoon hero (Kelime kahramanı). A parent can upload
 a passport-style photo of the child (Ayarlar → Aile → Kelime kahramanı) so the hero looks like them.
-The hero stays a cartoon; you only choose its colours and hair from fixed lists.
+The hero stays a cartoon; you only choose its colours, hair and face features from fixed lists.
 
-The parent's rule: the hero must always stay cute. It is a sweet cartoon kid with a round face, a smile
+The parent's rule: the hero must always stay cute. It is a sweet cartoon kid with a soft face, a smile
 and pink cheeks at every level. The photo only decides which of the fixed options come closest. When two
 options are about equally close, pick the one that looks cuter on the hero (draw both with `heroSvg` if
 unsure). Never try to copy anything that would make the hero less sweet. Find waiting photos:
@@ -251,10 +251,21 @@ A photo waits when `hero_look_at` is empty or older than `hero_photo_at`. For ea
    - `goz` (eyes): 0 very dark, 1 brown, 2 hazel, 3 green, 4 blue.
    - `gozluk`: `''` none, `yuvarlak` round, `koseli` rectangular. `cil`: true only for clearly
      visible freckles.
+   - The face, so the hero looks like this child and siblings look different from each other (the parent
+     wants the face to resemble the photo, not only the colours):
+     - `yuz` (face shape): `''` round, `oval` a little long, `genis` full cheeks, `sivri` narrow chin.
+     - `kas` (eyebrows): `''` none drawn, `ince` thin or light, `kalin` thick and dark, `kavisli` arched.
+     - `gozsekli` (eye shape): `''` round, `iri` big and bright, `badem` almond.
+     - `burun` (nose): `''` none drawn, `kucuk` small, `yuvarlak` round button, `uzun` straight and long.
+     - `agiz` (smile): `''` gentle smile, `genis` wide closed smile, `disli` open smile with teeth,
+       `yamuk` lopsided smile.
+     - `kulak` (ears): `''` normal, `buyuk` big or sticking out.
+     Draw your choice with `heroSvg` and compare it with the photo before saving. If a feature makes the
+     hero look less sweet, take the next closest option.
    Choose only these. Do not guess girl or boy (`avatar` is the parent's choice; leave it). If the photo
    shows no child's face clearly (blurry, someone else, not a person), do not change `hero_look`; still
    set `hero_look_at` so it stops waiting, and say so in the run summary for the parent to upload again.
-3. `node tools/sb.mjs patch "profiles?id=eq.<id>" '{"hero_look":{"ten":<0–5>,"sac":<0–7>,"model":"<model>","goz":<0–4>,"gozluk":"<gözlük>","cil":<true|false>},"hero_look_at":"<now ISO>"}'`
+3. `node tools/sb.mjs patch "profiles?id=eq.<id>" '{"hero_look":{"ten":<0–5>,"sac":<0–7>,"model":"<model>","goz":<0–4>,"gozluk":"<gözlük>","cil":<true|false>,"yuz":"<yüz>","kas":"<kaş>","gozsekli":"<göz şekli>","burun":"<burun>","agiz":"<gülüş>","kulak":"<kulak>"},"hero_look_at":"<now ISO>"}'`
    with the values you chose for this photo (there is no default; never copy this line's placeholders).
 
 The photo is the family's private picture of a child. Never describe the child's appearance in the

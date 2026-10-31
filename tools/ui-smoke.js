@@ -141,9 +141,11 @@
       if (det) {
         det.open = true;
         for (let i = 0; i < 40 && !det.querySelector('.hero-preview svg'); i++) await wait(150);
-        // Beklenen sayılar seçenek listesinden: ten + saç rengi + göz renkleri; saç modelleri + gözlükler.
-        const wantSwatches = HERO_LOOK.ten.length + HERO_LOOK.sac.length + HERO_LOOK.goz.length;
-        const wantChips = HERO_LOOK.model.length + HERO_LOOK.gozluk.length;
+        // Beklenen sayılar seçenek listesinden: ten + saç rengi + göz renkleri; öbür listelerin hepsi (saç, gözlük, yüz,
+        // kaş, göz şekli, burun, gülüş, kulak) seçenek düğmesidir.
+        const colorKeys = ['ten', 'sac', 'goz'];
+        const wantSwatches = colorKeys.reduce((n, k) => n + HERO_LOOK[k].length, 0);
+        const wantChips = Object.entries(HERO_LOOK).filter(([k]) => !colorKeys.includes(k)).reduce((n, [, v]) => n + v.length, 0);
         const swatches = det.querySelectorAll('.swatch').length, chips = det.querySelectorAll('.chip').length;
         const before = det.querySelector('.hero-preview')?.innerHTML;
         det.querySelectorAll('.swatch')[5]?.click();

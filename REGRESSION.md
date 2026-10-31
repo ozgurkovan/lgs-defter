@@ -122,8 +122,9 @@ Her maddenin yanında nasıl denendiği yazar:
 **Kelime kahramanı** (İngilizce sekmesi) [A], oyun [E]
 - Sevimli bir çocuk çizimi, hep pazılarını gösterir. Görünüşünü veli seçer (Ayarlar → Aile → 🦸 Kelime kahramanı); seçilmediyse
   kıvırcık saçlı. Çocuk bunu kendisi değiştiremez.
-- Velinin kuralı: kahraman her seviyede ve her görünüşte sevimli kalır (yuvarlak yüz, gülümseme, pembe yanak). Fotoğraftan
-  benzetme yalnızca hazır seçeneklerden en yakınını seçer. [E]
+- Velinin kuralı: kahraman her seviyede ve her görünüşte sevimli kalır (yumuşak hatlı yüz, gülümseme, pembe yanak). Fotoğraftan
+  benzetme yalnızca hazır seçeneklerden en yakınını seçer. Yüz de benzer (yüz şekli, kaş, göz şekli, burun, gülüş, kulak);
+  kardeşlerin kahramanları birbirinden ayrılır. Bu çizgiler seçilmemişse eski yüz aynen kalır. [E]
 - Güç 0–10, kelime gücünden gelir: 5, 15, 30, 50 … 290. [O]
   - Kelime gücü: her kelime, ulaştığı en yüksek kararlılığın 7'de biri kadar sayılır, en çok 1. Hiç azalmaz; unuttuğu kelime
     gücü düşürmez.
@@ -279,9 +280,9 @@ Her maddenin yanında nasıl denendiği yazar:
   - çocuk ekleme ve silme (silmede adını yazarak onay);
   - veli ekleme;
   - öğretmen bağlama (ders seçerek);
-  - 🦸 Kelime kahramanı (İngilizce ya da Klavye açık her çocuk). Kız ya da erkek, ten, saç rengi, saç modeli (kısa, kısa
-    perçemli, yana taralı, kıvırcık, uzun, örgülü, at kuyruğu, kâküllü), göz, gözlük, çil seçilir; önizleme hemen değişir;
-    Kaydet, Sıfırla.
+  - 🦸 Kelime kahramanı (İngilizce ya da Klavye açık her çocuk). Kız ya da erkek, ten, yüz şekli, saç rengi, saç modeli
+    (kısa, kısa perçemli, yana taralı, kıvırcık, uzun, örgülü, at kuyruğu, kâküllü), kaş, göz rengi ve şekli, burun, gülüş,
+    kulak, gözlük, çil seçilir; önizleme hemen değişir; Kaydet, Sıfırla.
   - Vesikalık fotoğraf yüklenir; saatlik iş bir saat içinde kahramanı ona benzetir, yine çizgi karakter kalır. Fotoğrafı
     yalnızca veliler görür; benzetildikten sonra "Fotoğrafı sil".
 

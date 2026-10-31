@@ -2859,8 +2859,8 @@ function itemIcon(it, size) {
 }
 
 // Kahramanın görünüşü (profiles.hero_look): veli Aile bölümünden seçer ya da saatlik iş vesikalık fotoğraftan benzetir.
-// { ten, sac, goz: renk sırası; model: saç modeli; gozluk; cil: çil }. Seçilmeyen değer kız ya da erkek oluşuna göre
-// varsayılanı kullanır.
+// { ten, sac, goz: renk sırası; model: saç modeli; gozluk; cil: çil; yuz, kas, gozsekli, burun, agiz, kulak: yüzün
+// çizgileri }. Seçilmeyen saç kız ya da erkek oluşuna göre varsayılanı kullanır; yüzün çizgilerinde '' eski yüzdür.
 const HERO_LOOK = {
   ten: ['#FCE1CF', '#F5CBA7', '#E9B58C', '#D39B6A', '#A8704A', '#7B4B2E'],
   sac: ['#1F1A17', '#3B2418', '#4A2E1F', '#6B3E26', '#93623A', '#C9954F', '#E8C77A', '#A9472A'],
@@ -2868,13 +2868,19 @@ const HERO_LOOK = {
   model: [['kisa', 'Kısa'], ['percem', 'Kısa perçemli'], ['yan', 'Yana taralı'], ['kivircik', 'Kıvırcık'], ['uzun', 'Uzun'], ['orgu', 'Örgülü'],
     ['atkuyrugu', 'At kuyruğu'], ['kakul', 'Kâküllü']],
   gozluk: [['', 'Yok'], ['yuvarlak', 'Yuvarlak'], ['koseli', 'Köşeli']],
+  yuz: [['', 'Yuvarlak'], ['oval', 'Oval'], ['genis', 'Tombul'], ['sivri', 'Sivri çene']],
+  kas: [['', 'Yok'], ['ince', 'İnce'], ['kalin', 'Kalın'], ['kavisli', 'Kavisli']],
+  gozsekli: [['', 'Yuvarlak'], ['iri', 'İri'], ['badem', 'Badem']],
+  burun: [['', 'Yok'], ['kucuk', 'Küçük'], ['yuvarlak', 'Yuvarlak'], ['uzun', 'Uzun']],
+  agiz: [['', 'Gülümseme'], ['genis', 'Geniş gülüş'], ['disli', 'Dişli gülüş'], ['yamuk', 'Yan gülüş']],
+  kulak: [['', 'Normal'], ['buyuk', 'Büyük']],
 };
 const darken = (hex, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
 // Kahramanın çizimi (SVG metni; içindekiler sabit, kullanıcı metni yok). Hep pazılarını gösterir; seviye 0'da kolları
 // ince, 10'da kocaman. Kıyafet: 0–1 düz tişört, 2–3 renkli yıldızlı tişört, 4–5 çizgili spor kıyafet ve şapka (uzun
 // saçta saç bandı), 6–7 10 numaralı forma ve bileklik, 8–9 pelerinli kahraman, 10 altın madalya ve taç.
-// Velinin kuralı: kahraman her seviyede ve her görünüşte sevimli kalır (yuvarlak yüz, gülümseme, pembe yanak); benzetme
-// yalnızca renkleri, saçı, gözlüğü ve çili değiştirir.
+// Velinin kuralı: kahraman her seviyede ve her görünüşte sevimli kalır (yumuşak hatlı yüz, gülümseme, pembe yanak);
+// benzetme yalnızca hazır seçeneklerden seçer: renkler, saç, yüz şekli, kaş, göz şekli, burun, gülüş, kulak, gözlük, çil.
 function heroSvg(gender, level, look) {
   const L = Math.min(10, Math.max(0, level | 0));
   const lk = look && typeof look === 'object' ? look : {};
@@ -2925,8 +2931,17 @@ function heroSvg(gender, level, look) {
   }[style];
   if (back) s.push(back);
   s.push(`<rect x="94" y="80" width="12" height="18" rx="5" fill="${shade}"/>`);
-  s.push(`<circle cx="70" cy="61" r="6.5" fill="${skin}"/><circle cx="130" cy="61" r="6.5" fill="${skin}"/>`);
-  s.push(`<circle cx="100" cy="58" r="30" fill="${skin}"/>`);
+  // Kulaklar ve yüz şekli: yuvarlak, oval (biraz uzun), tombul (biraz geniş), sivri çene (yumuşak kalp)
+  const side = lk.yuz === 'oval' ? 28 : lk.yuz === 'genis' ? 31.5 : 30;
+  const bigEar = lk.kulak === 'buyuk', earX = side + (bigEar ? 1.5 : 0);
+  for (const d of [-1, 1]) {
+    s.push(`<circle cx="${cx + d * earX}" cy="61" r="${bigEar ? 8.5 : 6.5}" fill="${skin}"/>`);
+    if (bigEar) s.push(`<path d="M${cx + d * (earX + 2.5)} 57 q${d * 2.6} 4 0 8.5" stroke="${shade}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`);
+  }
+  if (lk.yuz === 'sivri') s.push(`<path d="M70 56 C70 36 84 28 100 28 C116 28 130 36 130 56 C130 73 116 89 100 89 C84 89 70 73 70 56 Z" fill="${skin}"/>`);
+  else if (lk.yuz === 'oval') s.push(`<ellipse cx="100" cy="59" rx="28" ry="31.5" fill="${skin}"/>`);
+  else if (lk.yuz === 'genis') s.push(`<ellipse cx="100" cy="58.5" rx="31.5" ry="29" fill="${skin}"/>`);
+  else s.push(`<circle cx="100" cy="58" r="30" fill="${skin}"/>`);
   // Saçın ön kısmı
   if (style === 'orgu' || style === 'uzun') {
     s.push(`<path d="M67 62 C61 27 86 17 102 19 C121 20 140 31 133 62 C128 45 117 39 103 39 C89 39 75 45 67 62 Z" fill="${hair}"/>`);
@@ -2949,17 +2964,40 @@ function heroSvg(gender, level, look) {
   } else {
     for (const [x, y, r] of [[73, 47, 9], [80, 36, 10], [92, 29, 11], [106, 28, 11], [119, 34, 10], [127, 46, 9]]) s.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${hair}"/>`);
   }
-  // Yüz: gözler (renkli gözde bebek), parıltı, yanaklar, çiller, gülümseme (güçlendikçe genişler), gözlük
+  // Yüz: kaşlar, gözler (renkli gözde bebek; iri ya da badem), parıltı, yanaklar, çiller, burun, gülüş (güçlendikçe
+  // genişler), gözlük
+  if (['ince', 'kalin', 'kavisli'].includes(lk.kas)) {
+    const bw = lk.kas === 'kalin' ? 2.7 : lk.kas === 'ince' ? 1.5 : 2, lift = lk.kas === 'kavisli' ? 3.2 : 1.5;
+    for (const x of [89, 111]) s.push(`<path d="M${x - 4.6} 52.8 Q${x} ${52.8 - lift} ${x + 4.6} 52.8" stroke="${darken(hair, 0.8)}" stroke-width="${bw}" fill="none" stroke-linecap="round"/>`);
+  }
   const eye = HERO_LOOK.goz[lk.goz] || HERO_LOOK.goz[0];
+  const es = { iri: [4.8, 5.8, 2.7, 1.8], badem: [5.2, 4.6, 2.2, 1.4] }[lk.gozsekli] || [4, 5, 2.2, 1.5];
   for (const x of [89, 111]) {
-    s.push(`<ellipse cx="${x}" cy="60" rx="4" ry="5" fill="${eye}"/>`);
-    if (eye !== HERO_LOOK.goz[0]) s.push(`<circle cx="${x}" cy="60.5" r="2.2" fill="#1E1B22"/>`);
-    s.push(`<circle cx="${x + 1.4}" cy="58.2" r="1.5" fill="#fff"/>`);
+    // Badem göz: köşeleri hafif sivri, yine açık ve parlak.
+    if (lk.gozsekli === 'badem') s.push(`<path d="M${x - es[0]} 60.3 Q${x - 1} ${60.3 - es[1] * 1.9} ${x + es[0]} 59.7 Q${x + 1} ${60.3 + es[1] * 1.75} ${x - es[0]} 60.3 Z" fill="${eye}"/>`);
+    else s.push(`<ellipse cx="${x}" cy="60" rx="${es[0]}" ry="${es[1]}" fill="${eye}"/>`);
+    if (eye !== HERO_LOOK.goz[0]) s.push(`<circle cx="${x}" cy="60.5" r="${es[2]}" fill="#1E1B22"/>`);
+    s.push(`<circle cx="${x + 1.4}" cy="${60 - es[1] * 0.36}" r="${es[3]}" fill="#fff"/>`);
+    if (lk.gozsekli === 'iri') s.push(`<circle cx="${x - 1.7}" cy="62.6" r=".8" fill="#fff" opacity=".85"/>`);
   }
   for (const x of [82, 118]) s.push(`<circle cx="${x}" cy="69" r="5" fill="#F79E9E" opacity=".55"/>`);
   if (lk.cil) for (const [x, y] of [[79, 65], [83, 67.5], [78, 69.5], [121, 65], [117, 67.5], [122, 69.5]]) s.push(`<circle cx="${x}" cy="${y}" r="1.1" fill="${darken(skin, 0.62)}" opacity=".8"/>`);
-  const sm = 7 + L * 0.35;
-  s.push(`<path d="M${cx - sm} 71 Q${cx} ${77 + L * 0.3} ${cx + sm} 71" stroke="#9A4A3C" stroke-width="2.6" fill="none" stroke-linecap="round"/>`);
+  const nose = darken(skin, 0.78);
+  if (lk.burun === 'kucuk') s.push(`<path d="M98.2 66 q1.8 1.7 3.6 0" stroke="${nose}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`);
+  else if (lk.burun === 'yuvarlak') s.push(`<ellipse cx="100" cy="66" rx="2.7" ry="2.1" fill="${darken(skin, 0.9)}"/><circle cx="99.1" cy="65.3" r=".7" fill="#fff" opacity=".6"/>`);
+  else if (lk.burun === 'uzun') s.push(`<path d="M100.8 60.8 q-.6 4.4 -2.4 5.6 q1.6 1.2 3.6 .2" stroke="${nose}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`);
+  const sm = 7 + L * 0.35, dip = 77 + L * 0.3, lip = '#9A4A3C';
+  if (lk.agiz === 'disli') {
+    // Ağzı açık gülüş: üstte dişler, altta dil.
+    const w = sm + 1.5;
+    s.push(`<path d="M${cx - w} 70 Q${cx} ${dip + 6} ${cx + w} 70 Z" fill="${lip}"/>`);
+    s.push(`<path d="M${cx - w + 1.4} 70.6 L${cx + w - 1.4} 70.6 Q${cx} 75 ${cx - w + 1.4} 70.6 Z" fill="#fff"/>`);
+    s.push(`<ellipse cx="${cx}" cy="${(dip + 6 + 70) / 2 + 1.3}" rx="${w * 0.42}" ry="2" fill="#F08A8A"/>`);
+  } else if (lk.agiz === 'genis') {
+    s.push(`<path d="M${cx - sm - 3} 70 Q${cx} ${dip + 2} ${cx + sm + 3} 70" stroke="${lip}" stroke-width="2.8" fill="none" stroke-linecap="round"/>`);
+  } else if (lk.agiz === 'yamuk') {
+    s.push(`<path d="M${cx - sm} 71.8 Q${cx + 1} ${dip - 0.5} ${cx + sm} 69.2" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`);
+  } else s.push(`<path d="M${cx - sm} 71 Q${cx} ${dip} ${cx + sm} 71" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`);
   if (lk.gozluk === 'yuvarlak' || lk.gozluk === 'koseli') {
     const lens = (x) => (lk.gozluk === 'yuvarlak' ? `<circle cx="${x}" cy="60" r="7.5"` : `<rect x="${x - 8}" y="53.5" width="16" height="13" rx="3.5"`)
       + ' fill="rgba(255,255,255,.18)" stroke="#2D2A32" stroke-width="2"/>';
@@ -3791,9 +3829,15 @@ function heroEditor(kid) {
       preview,
       h('div', { class: 'spread' }, h('span', {}, 'Kız ya da erkek'), genderSel),
       choice('Ten', 'ten', colors(HERO_LOOK.ten)),
+      choice('Yüz', 'yuz', HERO_LOOK.yuz),
       choice('Saç rengi', 'sac', colors(HERO_LOOK.sac)),
       choice('Saç', 'model', HERO_LOOK.model),
+      choice('Kaş', 'kas', HERO_LOOK.kas),
       choice('Göz', 'goz', colors(HERO_LOOK.goz)),
+      choice('Göz şekli', 'gozsekli', HERO_LOOK.gozsekli),
+      choice('Burun', 'burun', HERO_LOOK.burun),
+      choice('Gülüş', 'agiz', HERO_LOOK.agiz),
+      choice('Kulak', 'kulak', HERO_LOOK.kulak),
       choice('Gözlük', 'gozluk', HERO_LOOK.gozluk),
       h('label', { class: 'row small' }, cil, 'Çilli'),
       h('div', { class: 'row' }, save, h('button', { class: 'ghost', onclick: () => ui(p, {}, gender) }, 'Sıfırla')),
