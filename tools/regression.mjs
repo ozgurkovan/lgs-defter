@@ -1,7 +1,8 @@
 // Regresyon testinin otomatik kısmı. Her değişiklikten sonra, yayınlamadan önce: node tools/regression.mjs
 //  1. Uygulama dosyası hatasız okunuyor mu, sürüm numaraları tutuyor mu; şifresiz giriş bağlantısı yalnızca
 //     test hesaplarına mı üretiliyor (bu deneme Supabase'e gitmez).
-//  2. Takvim ve günlük plan hesapları (tools/test-schedule.mjs), klavye dersleri (tools/test-typing.mjs).
+//  2. Takvim ve günlük plan hesapları (tools/test-schedule.mjs), klavye dersleri (tools/test-typing.mjs), konu
+//     çalışmasının soru seçimi (tools/test-practice.mjs).
 //  3. Veritabanı yetkileri: supabase/test-*.sql. Her test kullanıcıların yerine geçip dener ve sonucu
 //     "SONUC {...}" hatasıyla döndürür; hata yüzünden her şey geri alınır, iz kalmaz. Sonuç dosyadaki
 //     "-- beklenen:" satırıyla karşılaştırılır (">0" gibi değerler sayı aralığıdır).
@@ -48,6 +49,10 @@ report(sched.length > 0 && !schedBad.length, 'Takvim ve günlük plan', schedBad
 const typingOut = node(['tools/test-typing.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const typingBad = typingOut.filter((l) => !l.startsWith('OK'));
 report(typingOut.length > 0 && !typingBad.length, 'Klavye dersleri', typingBad.length ? typingBad.join(' | ') : `${typingOut.length} kontrol`);
+// Konu çalışması: öğrencinin seçtiği konudan soru seçimi (tools/test-practice.mjs).
+const practiceOut = node(['tools/test-practice.mjs']).trim().split(/\r?\n/).filter(Boolean);
+const practiceBad = practiceOut.filter((l) => !l.startsWith('OK'));
+report(practiceOut.length > 0 && !practiceBad.length, 'Konu çalışması', practiceBad.length ? practiceBad.join(' | ') : `${practiceOut.length} kontrol`);
 
 // 3
 const fits = (want, got) => {

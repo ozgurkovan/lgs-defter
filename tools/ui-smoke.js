@@ -23,6 +23,7 @@
     const root = rootTab();
     const pages = role === 'student'
       ? { home: ['hata tekrarı', 'konu tekrarı'], upload: ['deneme çöz', 'karma deneme'], send: ['soru ekle', 'kâğıt deneme'],
+          topics: ['hangi konuyu çalışmak istersin', 'işlendi'],
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
@@ -57,11 +58,28 @@
           back !== wantBack && (back ? 'fazladan Geri' : 'Geri yok')].filter(Boolean).join('; '));
     }
 
-    // Konuları veli işaretler, yıllık plana göre kendiliğinden de açılır; öğrencide Konularım yok, adresle de açılmaz.
+    // Öğrencinin Konular sekmesi salt okunur (konuları veli işaretler, yıllık plana göre kendiliğinden de açılır):
+    // işaret kutusu yok. İşlenen bir konuya girip yalnızca o konudan soru çözer; geri tuşu konunun sayfasına döner.
+    // Soru cevaplanmadığı için hiçbir şey yazılmaz.
     if (role === 'student') {
-      const noTab = ![...document.querySelectorAll('nav.tabs button')].some((x) => /Konular/.test(x.textContent));
+      const tabs = [...document.querySelectorAll('nav.tabs button')].map((x) => x.textContent.trim());
       go('topics'); await settle();
-      check('Konularım öğrencide yok', noTab && state.tab === 'home', `açılan ${state.tab}`);
+      const boxes = document.querySelectorAll('#app input[type=checkbox]').length;
+      check('Konular öğrencide salt okunur, Yükle\'nin sağında', tabs.indexOf('Konular') === tabs.indexOf('Yükle') + 1 && !boxes,
+        `${tabs.join(', ')}${boxes ? `; ${boxes} işaret kutusu` : ''}`);
+      const first = document.querySelector('button.topic-row.go');
+      if (first) {
+        first.click(); await settle();
+        const start = [...document.querySelectorAll('button')].find((x) => /^Bu konudan \d+ soru çöz$/.test(x.textContent));
+        if (start) {
+          const topicId = state.topicId;
+          start.click(); await settle();
+          const only = !!state.session && state.session.track === 'practice' && state.session.entries.every((en) => en.question.topic_id === topicId);
+          history.back(); await settle();
+          check('Konu çalışması: yalnızca o konudan sorular, geri tuşu konuya döner', only && !state.session && state.tab === 'konu' && !history.state?.overlay,
+            `açılan ${state.tab}`);
+        } else check('Konu çalışması', state.tab === 'konu' && !pageText().includes('bir şey ters gitti'), 'konuda soru yok, oturum atlandı');
+      } else check('Konu çalışması', true, 'işlenen konu yok, atlandı');
     }
 
     // Klavye sekmesi yalnızca dersleri açık öğrencide (ilkokulda varsayılan açık, sonrasında veli açar).

@@ -185,6 +185,14 @@ input, select, textarea {
 .topic-row input { width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--accent); }
 .topic-row .name { min-width: 0; }
 .topic-row .tag { white-space: nowrap; }
+/* Öğrencinin Konular listesi: işlenen konu bir düğmedir (konunun sayfasını açar), işlenmeyen konu soluk durur. */
+button.topic-row.go {
+  display: grid; grid-template-columns: 1fr auto auto; width: 100%; text-align: left; font: inherit; font-size: 0.95rem;
+  border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; background: transparent; padding: 4px 0; min-height: 44px;
+}
+button.topic-row.go:last-child { border-bottom: 0; }
+button.topic-row.go::after { content: '›'; color: var(--ink-soft); font-size: 1.3rem; line-height: 1; }
+.topic-row.off { grid-template-columns: 1fr auto; cursor: default; color: var(--ink-soft); }
 
 .member { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-block: 6px; border-bottom: 1px solid var(--rule); }
 .member:last-child { border-bottom: 0; }

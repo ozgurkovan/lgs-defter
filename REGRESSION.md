@@ -228,10 +228,18 @@ Her maddenin yanında nasıl denendiği yazar:
 - Son yüklemelerin durumu.
 - Gönderilmemiş fotoğraf varken sayfadan çıkılırsa sorulur. Panodan yapıştırma çalışır.
 
-**Konularım** öğrencide yok (velinin isteği) [A]
-- Konuları veli işaretler (Konular sekmesi), yıllık plandaki haftası gelince kendiliğinden de açılır. Öğrencinin alt
-  menüsünde Konularım yok; adresle de açılmaz, Bugün'e döner.
-- Eksik konuların kısa anlatımı soru çözerken açılır: o konunun sorusunda "Anlamadım" deyince ya da yardım isteyince,
+**Konular** (öğrenci, Yükle'nin sağında; velinin isteği, 2026-11-01) [A]
+- Salt okunur: öğrenci konuları görür, işaretleyemez. Konuları veli işaretler (velinin Konular sekmesi), yıllık plandaki
+  haftası gelince kendiliğinden de açılır. Derse göre kartlar; işlenmeyen konu soluk ("Plan: tarih" ya da "Henüz işlenmedi").
+  Üst sınıf konularından yalnızca velinin açtıkları görünür.
+- İşlenen konuya dokununca konunun sayfası: durumu (eksik, takipteki yanlış, oturdu…), sıradaki konu tekrarı, varsa kısa
+  anlatım, YouTube bağlantısı ve "Bu konudan N soru çöz".
+- Konu çalışması: en fazla 10 soru, yalnızca o konudan. Önce hiç görmediği sorular, yetmezse daha önce hep doğru yaptıkları
+  (en eskiden). Hata maddelerine ayrılmış benzerler ve kitap soruları gelmez. [O: `test-practice.mjs`]
+  - Yanlış yaptığı (ya da "birlikte bakalım" dediği) soru hata tekrarına girer, ertesi gün benzeri gelir.
+  - Konu tekrarının takvimi değişmez; cevaplar günlük plana sayılmaz (o gün günü gelen tekrarlar ertelenmez).
+  - "Ara ver", geri tuşu ve oturum sonundaki "Konuya dön" konunun sayfasına döner. Raporda "konu çalışması" olarak görünür.
+- Eksik konuların kısa anlatımı soru çözerken de açılır: o konunun sorusunda "Anlamadım" deyince ya da yardım isteyince,
   YouTube bağlantısının yanında "📖 Bu konunun kısa anlatımı". [E]
 
 ## Veli

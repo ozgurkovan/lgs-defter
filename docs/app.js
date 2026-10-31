@@ -80,6 +80,7 @@ const MISTAKE_LADDER = [1, 2, 4, 14, 30];
 const TOPIC_LADDER = [1, 3, 5, 8, 13, 21, 34, 55];
 const TOPIC_QUESTIONS_PER_REVIEW = 5;
 const TOPIC_QUESTIONS_BUSY = 3; // yoğun günde (dersin tekrarları kalan hakkını aşınca) konu tekrarı kısalır
+const TOPIC_PRACTICE_QUESTIONS = 10; // öğrencinin Konular sayfasından başlattığı konu çalışması
 
 const REASONS = [
   ['bilmiyordum', 'Konuyu bilmiyordum'],
@@ -330,12 +331,13 @@ function renderTabs() {
       : [['settings', 'Ayarlar', 'settings']])
     : role === 'teacher'
       ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
-      : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'],
+      : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'], ['topics', 'Konular', 'topics'],
           typingPerDay(state.student) > 0 && hasKeyboard() ? ['typing', 'Klavye', 'keyboard'] : null,
           wordsPerDay(state.student) > 0 ? ['words', 'İngilizce', 'words'] : null, ['settings', 'Ayarlar', 'settings']].filter(Boolean);
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
-      h('button', { 'aria-current': state.tab === id ? 'page' : null, onclick: () => go(id) }, icon(ic), label))));
+      // Konunun sayfası (konu) öğrencinin Konular sekmesinin içindedir.
+      h('button', { 'aria-current': state.tab === id || (id === 'topics' && state.tab === 'konu') ? 'page' : null, onclick: () => go(id) }, icon(ic), label))));
   document.body.append(nav);
 }
 
@@ -393,7 +395,7 @@ const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', 'words', 'shop', 'typing', 'upload', 'send', 'paper', 'ask', 'read', 'settings', 'reasons', 'together']
+  ? ['home', 'words', 'shop', 'typing', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together']
   : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
@@ -451,7 +453,8 @@ function go(tab, how = 'push') {
     home: viewHome, upload: () => (state.profile?.role === 'student' ? viewExamHub() : viewUpload('deneme')),
     send: viewSend, paper: () => viewUpload('deneme'), ask: () => viewUpload('soru'), book: () => viewUpload('kitap'),
     read: () => viewUpload('okuma'), // ilkokul: okuduğu kitabın sayfaları
-    topics: viewTopics, settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
+    topics: viewTopics, konu: viewTopicPractice, // konu: öğrencinin seçtiği konu ve konu çalışması
+    settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
     together: viewTogether, words: viewWords, shop: viewShop, typing: viewTyping, // klavye dersleri: typing.js
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
@@ -825,6 +828,22 @@ function examOrder(entries, order = SUBJECT_ORDER) {
   return [...entries].sort((a, b) => (rank(a) - rank(b)) || ((a.item.topics?.sort ?? 0) - (b.item.topics?.sort ?? 0)));
 }
 
+/* Konu çalışmasının soruları (öğrenci Konular sayfasında bir konu seçer; yalnızca o konudan sorular gelir). Önce hiç
+   görmediği sorular, tarzları çeşitlenerek; yetmezse daha önce hep doğru yaptığı sorular, en eski cevapladığından
+   başlayarak. Açık hata maddelerinin kaynak soruları ve onlara ayrılmış benzerler gelmez (hata tekrarında gelecekler);
+   kitap soruları da gelmez. pool: konunun soruları; answered: soru id → { at: son cevap zamanı, wrong: hiç yanlış
+   yaptı mı }; reserved: reservedVariants(); n: en fazla soru. */
+function practicePick(pool, answered, reserved, n) {
+  const usable = pool.filter((p) => !p.book_id && !reserved.q.has(p.id) && !isVariantOf(p, reserved));
+  const picked = pickVaried(shuffle(usable.filter((p) => !answered.has(p.id))), n);
+  if (picked.length < n) {
+    const again = usable.filter((p) => answered.has(p.id) && !answered.get(p.id).wrong)
+      .sort((a, b) => (answered.get(a.id).at < answered.get(b.id).at ? -1 : 1));
+    picked.push(...again.slice(0, n - picked.length));
+  }
+  return picked;
+}
+
 // ---------------------------------------------------------------- öğrenci: bugün
 
 /* Okuduğu kitabın soruları (ilkokul, source 'okuma'): sınav tarihine kadar her gün, sınavdan sonra hiç. Günlük sayı
@@ -874,11 +893,12 @@ async function viewHome() {
   ]);
   state.poemLog = poemLog;
   // Günlük plan derse göre soru sayısıdır. Önce hata tekrarları, sonra konu tekrarları hakkı kullanır;
-  // kalan hak ek çalışmayla dolar. Kitap soruları bu sayılara girmez.
+  // kalan hak ek çalışmayla dolar. Kitap soruları ve öğrencinin kendi seçtiği konu çalışması bu sayılara girmez
+  // (o gün konu çalıştı diye günü gelen tekrarlar ertelenmesin).
   const plan = dailyPlan(state.student);
   const dailyTarget = planTotal(plan);
   const remaining = { ...plan };
-  const planCount = todayCount.filter((r) => r.track !== 'book');
+  const planCount = todayCount.filter((r) => r.track !== 'book' && r.track !== 'practice');
   planCount.forEach((r) => { const s = r.questions?.subject; if (s in remaining) remaining[s]--; });
   // Yoğun gün (velinin isteği, 2026-10-31): bir dersin günü gelen hata ve konu tekrarları, destek sorularıyla birlikte
   // o dersin kalan hakkını aşıyorsa o derste destek soruları atlanır, konu tekrarı 3 soru olur.
@@ -990,8 +1010,8 @@ function statusTag(status) {
 
 // ---------------------------------------------------------------- öğrenci: soru oturumu
 
-// Eksik konuların kısa anlatımları (saatlik iş yazar, topic_status.lesson). Öğrenci Konularım'ı görmediği için anlatım,
-// o konunun sorusunda "Anlamadım" deyince ya da yardım isteyince açılır.
+// Eksik konuların kısa anlatımları (saatlik iş yazar, topic_status.lesson). Anlatım o konunun sorusunda "Anlamadım"
+// deyince ya da yardım isteyince açılır; öğrencinin Konular'daki konu sayfasında da durur.
 let gapLessons = new Map();
 function loadGapLessons() {
   const id = sid();
@@ -999,9 +1019,10 @@ function loadGapLessons() {
     .then(({ data }) => { if (sid() === id) gapLessons = new Map((data || []).map((r) => [r.topic_id, r.lesson])); });
 }
 
-function runSession(track, s) {
+// returnTo: "Ara ver" ve oturum sonu düğmesinin açtığı sayfa (konu çalışmasında konunun sayfası).
+function runSession(track, s, returnTo = 'home') {
   loadGapLessons();
-  state.session = { track, entries: examOrder(s.entries, studentSubjects(state.student)), index: 0, results: new Map(), stats: { correct: 0, total: 0 }, together: [] };
+  state.session = { track, returnTo, entries: examOrder(s.entries, studentSubjects(state.student)), index: 0, results: new Map(), stats: { correct: 0, total: 0 }, together: [] };
   pushOverlay('session'); // geri tuşu önce sorsun; oturum bitince tek geri ana sayfaya döner
   showQuestion();
 }
@@ -1152,12 +1173,13 @@ function showQuestion() {
       // Konu tekrarında, ek çalışmada ya da kitap sorusunda yanlış (ya da "birlikte bakalım"): o soru hata tekrarına
       // girer. Yarın o sorunun değiştirilmiş hâli ya da benzeri gelir (saatlik görev yazar; kitap sorusunda kitabın aynı
       // sayfalarından), sonra 2, 4, 14, 30 gün. Kitabın sınavı geçince kitap hataları da gelmez.
-      if (!correct && (entry.extra || item.track === 'topic' || item.track === 'book')) {
+      if (!correct && (entry.extra || ['topic', 'book', 'practice'].includes(item.track))) {
         const mi = await q(sb.from('items').insert({
           student_id: sid(), track: 'mistake', topic_id: item.topic_id, question_id: question.id,
           step: 0, interval_days: 1, due_date: addDays(localDate(), 1),
           note: help ? 'Birlikte bakalım dedi' : entry.extra ? 'Ek çalışmada yanlış'
-            : item.track === 'book' ? `Kitap sorusunda yanlış: ${item.topics?.name || ''}` : 'Konu tekrarında yanlış',
+            : item.track === 'book' ? `Kitap sorusunda yanlış: ${item.topics?.name || ''}`
+            : item.track === 'practice' ? 'Konu çalışmasında yanlış' : 'Konu tekrarında yanlış',
         }).select('id').single());
         mistakeItemId = mi.id;
       }
@@ -1279,7 +1301,7 @@ function showQuestion() {
   render(
     h('div', { class: 'qhead stack', style: 'gap: 8px' },
       h('div', { class: 'spread' },
-        h('button', { class: 'ghost', onclick: () => { clearInterval(timerId); go('home'); } }, '← Ara ver'),
+        h('button', { class: 'ghost', onclick: () => { clearInterval(timerId); go(ss.returnTo || 'home'); } }, '← Ara ver'),
         timer),
       h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': ss.entries.length, 'aria-valuenow': ss.index },
         h('i', { style: `width: ${(ss.index / ss.entries.length) * 100}%` }))),
@@ -1319,15 +1341,15 @@ async function saveItemGrade(item, results) {
 }
 
 function showSessionEnd() {
-  const { stats, track, together } = state.session;
+  const { stats, track, together, returnTo } = state.session;
   state.session = null;
   render(
     h('section', { class: 'card', style: `margin-top: ${together.length ? 16 : 80}px; text-align: center` },
-      h('p', { class: 'label' }, { mistake: 'Hata tekrarı bitti', topic: 'Konu tekrarı bitti', extra: 'Ek çalışma bitti', book: 'Kitap soruları bitti' }[track]),
+      h('p', { class: 'label' }, { mistake: 'Hata tekrarı bitti', topic: 'Konu tekrarı bitti', extra: 'Ek çalışma bitti', book: 'Kitap soruları bitti', practice: 'Konu çalışması bitti' }[track]),
       h('p', { class: 'task' }, h('span', { class: 'big num' }, `${stats.correct} / ${stats.total}`)),
-      h('p', { class: 'muted' }, stats.correct === stats.total ? 'Hepsi doğru. Bu konular bir süre rahat.' :
+      h('p', { class: 'muted' }, stats.correct === stats.total ? (track === 'practice' ? 'Hepsi doğru. Bu konuyu iyi biliyorsun.' : 'Hepsi doğru. Bu konular bir süre rahat.') :
         'Yanlış yaptıkların yakında farklı sorularla tekrar gelecek.'),
-      h('button', { class: 'primary block', onclick: () => go('home') }, 'Ana sayfa')),
+      h('button', { class: 'primary block', onclick: () => go(returnTo || 'home') }, track === 'practice' ? 'Konuya dön' : 'Ana sayfa')),
     // Oturum bitince çoğu zaman ödül gibi bir fıkra, bilmece ya da şiir.
     Math.random() < 0.6 ? jokeCard('Mola') : null,
     together.length ? h('section', { class: 'stack' },
@@ -1751,7 +1773,7 @@ async function viewTogether() {
   // Veli ve öğretmen işaretler (öğretmen sadece kendi derslerini görür ve işaretler); öğrenci işaretlemez.
   const canMark = state.profile.role !== 'student';
   const name = state.student?.display_name || 'Öğrenci';
-  const trackName = { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma' };
+  const trackName = { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', practice: 'Konu çalışması' };
   render(
     h('header', { class: 'stack', style: 'gap: 6px' },
       h('h1', {}, 'Birlikte bakılacaklar'),
@@ -2521,10 +2543,125 @@ function showExamResult(exam, rows, results, reason, saved) {
 
 // ---------------------------------------------------------------- öğrenci: konular
 
+// Konunun durumu (Konular sayfaları): eksik, takipteki yanlış sayısı, tekrarı kapalı, oturdu, tekrarda ya da yeni.
+function topicLevel(topic, status, items) {
+  const t = items.find((i) => i.topic_id === topic.id && i.track === 'topic');
+  const openMistakes = items.filter((i) => i.topic_id === topic.id && i.track === 'mistake' && i.state === 'active').length;
+  if (status === 'gap') return ['Eksik', 'red'];
+  if (openMistakes) return [`${openMistakes} yanlış takipte`, 'amber'];
+  if (t && t.state === 'paused' && isRare(topic)) return ['Tekrar kapalı', ''];
+  if (t && t.step >= 4) return ['Oturdu', 'green'];
+  if (t) return ['Tekrarda', ''];
+  return ['Yeni', ''];
+}
+
+/* Öğrencinin Konular sayfası (velinin isteği, 2026-11-01): konuları yalnızca görür, işaretleyemez (konuları veli
+   işaretler, yıllık plandaki haftası gelince kendiliğinden de açılırlar). İşlenen bir konuya dokununca konunun sayfası
+   açılır; oradan yalnızca o konudan soru çözer (viewTopicPractice). İşlenmeyen konular soluk durur. */
+async function viewMyTopics() {
+  loading();
+  const [topics, statuses, items] = await Promise.all([
+    // "Kitap okuma" konusu okuduğu kitabın sorularınındır; Konular'da görünmez.
+    q(sb.from('topics').select('id, subject, grade, name, sort, planned_start, lgs_avg').in('grade', studentGrades(state.student)).not('id', 'like', '%.kitap-okuma')),
+    q(sb.from('topic_status').select('topic_id, status').eq('student_id', sid())),
+    q(sb.from('items').select('topic_id, track, step, state').eq('student_id', sid())),
+  ]);
+  const st = Object.fromEntries(statuses.map((s) => [s.topic_id, s.status]));
+  const covered = (t) => !!st[t.id] && st[t.id] !== 'not_taught';
+  const row = (t) => {
+    if (!covered(t)) {
+      return h('div', { class: 'topic-row off' }, h('span', { class: 'name' }, t.name),
+        h('span', { class: 'tag' }, t.grade === state.student.grade && t.planned_start ? `Plan: ${fmtDate(t.planned_start)}` : 'Henüz işlenmedi'));
+    }
+    const [label, color] = topicLevel(t, st[t.id], items);
+    return h('button', { class: 'topic-row go', onclick: () => { state.topicId = t.id; go('konu'); } },
+      h('span', { class: 'name' }, t.name), h('span', { class: 'tag ' + color }, label));
+  };
+  // Kendi sınıfının bütün konuları; veli üst sınıf konusu açtıysa yalnızca açtıkları.
+  const cards = (list, showAll) => visibleSubjects().map((s) => {
+    const mine = list.filter((t) => t.subject === s && (showAll || covered(t))).sort((a, b) => a.sort - b.sort);
+    if (!mine.length) return null;
+    return h('section', { class: 'card' },
+      h('div', { class: 'spread' }, subjTag(s), h('span', { class: 'small muted' }, `${mine.filter(covered).length} / ${mine.length} işlendi`)),
+      mine.map(row));
+  });
+  const grade = state.student.grade || 8;
+  const upper = studentGrades(state.student).filter((g) => g !== grade)
+    .map((g) => [g, cards(topics.filter((t) => t.grade === g), false).filter(Boolean)]).filter(([, c]) => c.length);
+  render(
+    h('header', { class: 'stack', style: 'gap: 4px' },
+      h('p', { class: 'label' }, 'Konular'),
+      h('h1', {}, 'Hangi konuyu çalışmak istersin?'),
+      h('p', { class: 'small muted' }, 'Okulda işlediğin bir konuya dokun, yalnızca o konudan soru çöz. Yanlışların hata tekrarına girer.')),
+    cards(topics.filter((t) => t.grade === grade), true),
+    upper.map(([g, c]) => [h('h2', { style: 'margin-top: 8px' }, `${g}. sınıf konuları`), c]),
+    !topics.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'Bu sınıfın konu listesi henüz yüklenmedi.')) : null);
+}
+
+/* Konu çalışmasının soruları: konunun havuzundan practicePick ile en fazla TOPIC_PRACTICE_QUESTIONS soru. Oturumda
+   madde yoktur (item.id boş, track 'practice'): konu tekrarının takvimi değişmez, yanlış yapılan soru hata tekrarına
+   girer, cevaplar günlük plana sayılmaz. */
+async function buildPractice(topic) {
+  const pool = await q(sb.from('questions').select('id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam, book_id')
+    .eq('topic_id', topic.id).eq('active', true).eq('exam_only', false)); // gerçek LGS soruları denemeye saklı
+  const [rows, reserved] = await Promise.all([
+    pool.length ? q(sb.from('reviews').select('question_id, correct, answered_at').eq('student_id', sid()).eq('voided', false).in('question_id', pool.map((p) => p.id))) : [],
+    reservedVariants(),
+  ]);
+  const answered = new Map();
+  for (const r of rows) {
+    const a = answered.get(r.question_id) || { at: '', wrong: false };
+    if (r.answered_at > a.at) a.at = r.answered_at;
+    if (!r.correct) a.wrong = true;
+    answered.set(r.question_id, a);
+  }
+  const item = { id: null, track: 'practice', topic_id: topic.id, topics: { subject: topic.subject, name: topic.name, sort: topic.sort, lgs_avg: topic.lgs_avg } };
+  const picked = practicePick(pool, answered, reserved, TOPIC_PRACTICE_QUESTIONS);
+  return {
+    entries: picked.map((question) => ({ item, question })),
+    seconds: picked.reduce((s, p) => s + maxSeconds(p.subject) + 15, 0),
+    fresh: pool.filter((p) => !p.book_id && !answered.has(p.id)).length,
+  };
+}
+
+// Öğrencinin seçtiği konunun sayfası: durumu, varsa kısa anlatımı ve "Bu konudan soru çöz".
+async function viewTopicPractice() {
+  const id = state.topicId;
+  if (!id) return go('topics', 'replace'); // sayfa yenilendi: hangi konu olduğu bilinmiyor
+  loading();
+  const [topic, status, items] = await Promise.all([
+    q(sb.from('topics').select('id, subject, grade, name, sort, lgs_avg').eq('id', id).maybeSingle()),
+    q(sb.from('topic_status').select('status, lesson, youtube_query').eq('student_id', sid()).eq('topic_id', id).maybeSingle()),
+    q(sb.from('items').select('topic_id, track, step, state, due_date').eq('student_id', sid()).eq('topic_id', id)),
+  ]);
+  if (!topic) return go('topics', 'replace');
+  const covered = !!status && status.status !== 'not_taught';
+  const practice = covered ? await buildPractice(topic) : { entries: [], seconds: 0, fresh: 0 };
+  const [label, color] = topicLevel(topic, status?.status, items);
+  const review = items.find((i) => i.track === 'topic' && i.state === 'active');
+  const n = practice.entries.length;
+  render(
+    h('header', { class: 'stack', style: 'gap: 6px' },
+      h('div', { class: 'row' }, subjTag(topic.subject), covered ? h('span', { class: 'tag ' + color }, label) : null),
+      h('h1', {}, topic.name),
+      covered && review ? h('p', { class: 'small muted' }, review.due_date <= localDate()
+        ? 'Bu konunun tekrar günü geldi; Bugün sayfasındaki konu tekrarında gelecek.' : `Sıradaki konu tekrarı: ${fmtDate(review.due_date)}`) : null),
+    !covered ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'Bu konu okulda henüz işlenmedi. İşlenince buradan çalışabilirsin.'))
+      : h('section', { class: 'card task' },
+        h('p', { class: 'label' }, 'Konu çalışması'),
+        n ? [h('div', { class: 'row' }, h('span', { class: 'big num' }, n), h('span', { class: 'muted' }, `soru · yaklaşık ${Math.max(1, Math.round(practice.seconds / 60))} dakika`)),
+             h('p', { class: 'small muted' }, (practice.fresh ? `Bu konuda daha önce görmediğin ${practice.fresh} soru var. ` : 'Bu konunun yeni soruları bitti; daha önce doğru yaptıkların geliyor. ')
+               + 'Yalnızca bu konudan sorular gelir; yanlış yaptıkların hata tekrarına girer.'),
+             h('button', { class: 'primary block', onclick: () => runSession('practice', practice, 'konu') }, `Bu konudan ${n} soru çöz`)]
+          : h('p', { class: 'muted' }, 'Bu konuda şu an çözebileceğin soru yok. Yeni sorular hazırlanıyor; birkaç saat sonra tekrar bak.')),
+    covered && status?.lesson ? h('details', { class: 'card' }, h('summary', {}, '📖 Bu konunun kısa anlatımı'), h('div', { class: 'note teacher', style: 'margin-top: 8px' }, status.lesson)) : null,
+    covered ? h('a', { class: 'btn block', href: status?.youtube_query ? 'https://www.youtube.com/results?search_query=' + encodeURIComponent(status.youtube_query) : youtubeSearch(topic.name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı') : null);
+}
+
 async function viewTopics() {
-  // Konuları veli işaretler, yıllık plandaki haftası gelince kendiliğinden de açılır; öğrenci bu sayfayı görmez (velinin
-  // isteği). Eksik konuların kısa anlatımı öğrenciye soru çözerken açılır (gapLessons).
-  if (state.profile?.role === 'student') return go('home', 'replace');
+  // Öğrenci konuları yalnızca görür ve bir konuyu seçip çalışır (viewMyTopics). Konuları veli işaretler, yıllık plandaki
+  // haftası gelince kendiliğinden de açılır. Eksik konuların kısa anlatımı öğrenciye soru çözerken de açılır (gapLessons).
+  if (state.profile?.role === 'student') return viewMyTopics();
   loading();
   const [topics, statuses, items] = await Promise.all([
     // "Kitap okuma" konusu okuduğu kitabın sorularınındır; Konular'da işaretlenmez.
@@ -2544,16 +2681,7 @@ async function viewTopics() {
     viewTopics();
   };
 
-  const level = (topicId) => {
-    const t = items.find((i) => i.topic_id === topicId && i.track === 'topic');
-    const openMistakes = items.filter((i) => i.topic_id === topicId && i.track === 'mistake' && i.state === 'active').length;
-    if (st[topicId]?.status === 'gap') return ['Eksik', 'red'];
-    if (openMistakes) return [`${openMistakes} yanlış takipte`, 'amber'];
-    if (t && t.state === 'paused' && isRare(byId[topicId])) return ['Tekrar kapalı', ''];
-    if (t && t.step >= 4) return ['Oturdu', 'green'];
-    if (t) return ['Tekrarda', ''];
-    return ['Yeni', ''];
-  };
+  const level = (topicId) => topicLevel(byId[topicId], st[topicId]?.status, items);
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
@@ -4051,7 +4179,7 @@ async function viewQuestions() {
           h('b', {}, k), h('span', {}, qn.choices[k]),
           k === r.answer ? h('span', { class: 'muted' }, ' ← seçimi') : null))),
       h('p', { class: 'small muted' }, [
-        { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', deneme: 'Deneme' }[r.track] || '',
+        { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', practice: 'Konu çalışması', deneme: 'Deneme' }[r.track] || '',
         new Date(r.answered_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
         r.confidence ? `emin %${r.confidence}` : null,
         `süre ${fmtDuration(r.duration_sec)} / ${fmtDuration(max)}${r.duration_sec > max ? ' (aştı)' : ''}`,
@@ -4307,7 +4435,7 @@ function dayReport(reviews, items, topicName) {
   const byTime = (a, b) => (a.answered_at < b.answered_at ? -1 : 1);
   const itemById = Object.fromEntries(items.map((i) => [i.id, i]));
   const solid = (r) => r.correct && !(r.confidence && r.confidence <= 50);
-  const trackName = { mistake: 'hata tekrarı', topic: 'konu tekrarı', extra: 'ek çalışma', deneme: 'deneme' };
+  const trackName = { mistake: 'hata tekrarı', topic: 'konu tekrarı', extra: 'ek çalışma', practice: 'konu çalışması', deneme: 'deneme' };
   let day = today;
 
   // "Anlamadım" ya da "birlikte bakalım" dediyse tek doğru yetmez: çözümü yeni okumuş olabilir.
