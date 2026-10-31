@@ -165,7 +165,7 @@ Her maddenin yanında nasıl denendiği yazar:
   - Sonra hayvanlar, renkler ve sayılar, cümleler, İngilizce kelimeler.
 - Ders sonunda gösterilenler: puan (harf sayısı eksi yanlış), doğruluk, dakikada kelime, en çok zorlandığı tuşlar. [O]
   - Doğruluk aşağı yuvarlanır.
-  - Yıldız doğruluğa göredir: %97 üç, %90 iki, %75 bir.
+  - Yıldız doğruluğa göredir: %95 üç (60 harflik derste en çok 3 yanlış), %90 iki, %75 bir.
   - "Tekrar dene" ve "Sonraki ders" düğmeleri var.
   - Yarıda bırakılan ders kaydedilmez; geri tuşu önce sorar.
 - Klavye kahramanı da büyütür. Kelime sayfası, mağaza ve rapor bunu sayar; güç arttıysa kutlama olur. Kahraman Klavye

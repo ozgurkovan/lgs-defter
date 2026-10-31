@@ -117,10 +117,10 @@ function typingLines(lesson, rnd = Math.random) {
   if (!lesson.words) return [d(false), d(true), d(true)];
   return [d(false), w(), d(true), w()];
 }
-// Yıldız doğruluğa göre (hız değil; önce doğru yazmak): %97 üç, %90 iki, %75 bir yıldız.
+// Yıldız doğruluğa göre (hız değil; önce doğru yazmak): %95 üç (velinin seçimi), %90 iki, %75 bir yıldız.
 function typingStars(chars, errors) {
   const acc = chars ? chars / (chars + errors) : 0;
-  return acc >= 0.97 ? 3 : acc >= 0.9 ? 2 : acc >= 0.75 ? 1 : 0;
+  return acc >= 0.95 ? 3 : acc >= 0.9 ? 2 : acc >= 0.75 ? 1 : 0;
 }
 // Ders sonuçlarından: her dersin en iyi yıldızı, bugün bitirdiği ders sayısı, kahramana katkısı. Her dersin yalnızca en
 // iyi sonucu sayılır (aynı dersi tekrar tekrar yapmak şişirmez): her yıldız 1 güç ve 5 altın; günün dersleri (en az bir
@@ -536,7 +536,7 @@ async function endTyping(run) {
   state.session = null;
   const seconds = Math.max(1, Math.round(run.ms / 1000));
   const stars = typingStars(run.chars, run.errors);
-  const acc = Math.floor((100 * run.chars) / Math.max(1, run.chars + run.errors)); // aşağı: %96,7 "%97" görünüp iki yıldız almasın
+  const acc = Math.floor((100 * run.chars) / Math.max(1, run.chars + run.errors)); // aşağı: %94,9 "%95" görünüp iki yıldız almasın
   const wpm = Math.round(run.chars / 5 / (seconds / 60));
   const before = run.hero?.typing.best[run.lesson.id] || 0;
   const misses = Object.entries(run.misses).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c]) => keyName(c));
@@ -557,7 +557,7 @@ async function endTyping(run) {
     hero.level = level;
   }
   const nextOpen = run.index + 1 < TYPING_LESSONS.length && (stars >= TYPING_PASS || typingOpen(hero?.typing.best || {}, run.index + 1));
-  const maxErrors = Math.floor((run.chars * 3) / 97); // üç yıldızın (%97) izin verdiği yanlış
+  const maxErrors = Math.floor((run.chars * 5) / 95); // üç yıldızın (%95) izin verdiği yanlış
   if (stars) sayTr(stars === 3 ? 'Harika! Üç yıldız.' : stars === 2 ? 'Aferin! İki yıldız.' : 'Aferin! Bir yıldız.');
   render(
     h('section', { class: 'card stack', style: 'margin-top: 4vh; text-align: center; align-items: center' },

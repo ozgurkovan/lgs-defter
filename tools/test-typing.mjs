@@ -65,7 +65,7 @@ const asLine = T.typingLines(T.TYPING_LESSONS.find((l) => l.id === 'as'), rnd)[0
 check('"asas asas asas" gibi: ilk satır tek alıştırmanın tekrarı', new Set(asLine.split(' ')).size === 1 && asLine.split(' ').length >= 3, asLine);
 
 // Yıldızlar doğruluğa göre.
-check('yıldız: %97 üç, %90 iki, %75 bir, altı sıfır', T.typingStars(97, 3) === 3 && T.typingStars(96, 4) === 2 && T.typingStars(90, 10) === 2
+check('yıldız: %95 üç, %90 iki, %75 bir, altı sıfır', T.typingStars(95, 5) === 3 && T.typingStars(62, 3) === 3 && T.typingStars(94, 6) === 2 && T.typingStars(90, 10) === 2
   && T.typingStars(89, 11) === 1 && T.typingStars(75, 25) === 1 && T.typingStars(74, 26) === 0 && T.typingStars(0, 0) === 0);
 
 // Kahramana katkı: dersin en iyi sonucu; yıldız başına 1 güç ve 5 altın; günün dersleri bittiği gün 5 altın.
