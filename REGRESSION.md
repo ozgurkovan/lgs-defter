@@ -122,6 +122,8 @@ Her maddenin yanında nasıl denendiği yazar:
 **Kelime kahramanı** (İngilizce sekmesi) [A], oyun [E]
 - Sevimli bir çocuk çizimi, hep pazılarını gösterir. Görünüşünü veli seçer (Ayarlar → Aile → 🦸 Kelime kahramanı); seçilmediyse
   kıvırcık saçlı. Çocuk bunu kendisi değiştiremez.
+- Velinin kuralı: kahraman her seviyede ve her görünüşte sevimli kalır (yuvarlak yüz, gülümseme, pembe yanak). Fotoğraftan
+  benzetme yalnızca hazır seçeneklerden en yakınını seçer. [E]
 - Güç 0–10, kelime gücünden gelir: 5, 15, 30, 50 … 290. [O]
   - Kelime gücü: her kelime, ulaştığı en yüksek kararlılığın 7'de biri kadar sayılır, en çok 1. Hiç azalmaz; unuttuğu kelime
     gücü düşürmez.
@@ -277,8 +279,9 @@ Her maddenin yanında nasıl denendiği yazar:
   - çocuk ekleme ve silme (silmede adını yazarak onay);
   - veli ekleme;
   - öğretmen bağlama (ders seçerek);
-  - 🦸 Kelime kahramanı (kelime kartları açık her çocuk). Kız ya da erkek, ten, saç rengi, saç modeli, göz, gözlük, çil
-    seçilir; önizleme hemen değişir; Kaydet, Sıfırla.
+  - 🦸 Kelime kahramanı (İngilizce ya da Klavye açık her çocuk). Kız ya da erkek, ten, saç rengi, saç modeli (kısa, kısa
+    perçemli, yana taralı, kıvırcık, uzun, örgülü, at kuyruğu, kâküllü), göz, gözlük, çil seçilir; önizleme hemen değişir;
+    Kaydet, Sıfırla.
   - Vesikalık fotoğraf yüklenir; saatlik iş bir saat içinde kahramanı ona benzetir, yine çizgi karakter kalır. Fotoğrafı
     yalnızca veliler görür; benzetildikten sonra "Fotoğrafı sil".
 
@@ -291,7 +294,8 @@ Her maddenin yanında nasıl denendiği yazar:
 - Kâğıt denemeleri notlandırır: teşhis, kırpılmış soru, konu durumu, hata maddeleri.
 - Kitap sayfalarından havuza soru ekler. Öğrencinin gönderdiği soruları işler (1e).
 - Okuduğu kitabın sayfalarından anlama soruları yazar (1f). Sınavı geçmiş kitabın hata maddelerini bekletir (1c).
-- Velinin yüklediği vesikalık fotoğrafa bakıp kahramanın görünüşünü yazar (1g). Fotoğrafı tarif etmez, kopyalamaz, silmez.
+- Velinin yüklediği vesikalık fotoğrafa bakıp kahramanın görünüşünü yazar (1g); kahraman sevimli kalır. Fotoğrafı tarif
+  etmez, kopyalamaz, silmez.
 - Uygulama içi deneme yanlışlarına teşhis yazar ve her hata maddesine benzer sorular yazar.
 - MEB kitapçıklarını aktarır. Bunlar aile içi kullanım içindir, hiçbir yerde yayımlanmaz.
 - Soru havuzunu doldurur: boş konular önce gelir, sık çıkan konular önde.

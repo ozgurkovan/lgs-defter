@@ -2865,13 +2865,16 @@ const HERO_LOOK = {
   ten: ['#FCE1CF', '#F5CBA7', '#E9B58C', '#D39B6A', '#A8704A', '#7B4B2E'],
   sac: ['#1F1A17', '#3B2418', '#4A2E1F', '#6B3E26', '#93623A', '#C9954F', '#E8C77A', '#A9472A'],
   goz: ['#2D2A32', '#5B3A24', '#7C6A35', '#3F7D4E', '#3F6FB2'],
-  model: [['kisa', 'Kısa'], ['kivircik', 'Kıvırcık'], ['uzun', 'Uzun'], ['orgu', 'Örgülü'], ['atkuyrugu', 'At kuyruğu'], ['kakul', 'Kâküllü']],
+  model: [['kisa', 'Kısa'], ['percem', 'Kısa perçemli'], ['yan', 'Yana taralı'], ['kivircik', 'Kıvırcık'], ['uzun', 'Uzun'], ['orgu', 'Örgülü'],
+    ['atkuyrugu', 'At kuyruğu'], ['kakul', 'Kâküllü']],
   gozluk: [['', 'Yok'], ['yuvarlak', 'Yuvarlak'], ['koseli', 'Köşeli']],
 };
 const darken = (hex, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
 // Kahramanın çizimi (SVG metni; içindekiler sabit, kullanıcı metni yok). Hep pazılarını gösterir; seviye 0'da kolları
 // ince, 10'da kocaman. Kıyafet: 0–1 düz tişört, 2–3 renkli yıldızlı tişört, 4–5 çizgili spor kıyafet ve şapka (uzun
 // saçta saç bandı), 6–7 10 numaralı forma ve bileklik, 8–9 pelerinli kahraman, 10 altın madalya ve taç.
+// Velinin kuralı: kahraman her seviyede ve her görünüşte sevimli kalır (yuvarlak yüz, gülümseme, pembe yanak); benzetme
+// yalnızca renkleri, saçı, gözlüğü ve çili değiştirir.
 function heroSvg(gender, level, look) {
   const L = Math.min(10, Math.max(0, level | 0));
   const lk = look && typeof look === 'object' ? look : {};
@@ -2936,6 +2939,13 @@ function heroSvg(gender, level, look) {
   } else if (style === 'kisa') {
     s.push(`<path d="M69 57 C66 30 86 22 102 24 C120 25 135 34 131 57 C126 45 116 40 104 41 C92 41 77 46 69 57 Z" fill="${hair}"/>`);
     s.push(`<path d="M97 25 q7 -11 16 -4 q-7 1 -9 7 Z" fill="${hair}"/>`);
+  } else if (style === 'percem') {
+    // Kısa saç, alnı kaşlara kadar örten dört tutamlı perçem; yanlarda kulakların üstüne iner.
+    s.push(`<path d="M67 64 C61 27 86 17 101 18 C120 19 140 29 133 64 C132 58 131 53 129 49 Q124 55 118 48.5 Q112 55 105 48.5 Q98 55 91 48.5 Q84 54 76 49 C71 53 69 58 67 64 Z" fill="${hair}"/>`);
+  } else if (style === 'yan') {
+    // Kısa saç, yana taranmış perçem: alnın bir yanı açık, öbür yanını sivri bir tutam örter.
+    s.push(`<path d="M67 63 C61 29 86 18 101 19 C120 20 138 30 133 59 C131 50 125 42 116 40 C100 40 86 46 75 58 C73 60 70 61 67 63 Z" fill="${hair}"/>`);
+    s.push(`<path d="M113 25 C101 29 91 37 85 47" stroke="${darken(hair, 0.78)}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".7"/>`);
   } else {
     for (const [x, y, r] of [[73, 47, 9], [80, 36, 10], [92, 29, 11], [106, 28, 11], [119, 34, 10], [127, 46, 9]]) s.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${hair}"/>`);
   }
