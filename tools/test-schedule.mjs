@@ -24,7 +24,7 @@ const total = (list) => list.reduce((s, k) => s + counts[k] * SUBJECTS[k].sec, 0
 
 const today = localDate();
 const lgs = '2027-06-13';
-const ok = (r) => [{ correct: true, strong: r !== 'weak' }];
+const ok = (r) => [{ correct: true, strong: r !== 'weak', slow: r === 'weak' }]; // zayıf: doğru ama süreyi aştı
 const wrong = [{ correct: false, strong: false }];
 let fails = 0;
 const check = (label, cond, info) => { if (!cond) fails++; console.log(`${cond ? 'OK  ' : 'FAIL'} ${label}${info ? '  ' + info : ''}`); };
@@ -43,7 +43,7 @@ it = { track: 'mistake', step: 3, ease: 1, consecutive_wrong: 0 };
 it = { ...it, ...gradeItem(it, wrong, lgs) };
 check('yanlışta başa dönüş', it.step === 0 && it.interval_days === 1 && it.due_date === addDays(today, 1), `step ${it.step}, ${it.interval_days} gün, ease ${it.ease}`);
 
-// Yavaş/emin değil doğru → aralık aynı
+// Yavaş doğru → aralık aynı
 it = { track: 'mistake', step: 2, ease: 1, consecutive_wrong: 1 };
 it = { ...it, ...gradeItem(it, ok('weak'), lgs) };
 check('zayıf doğruda aralık aynı', it.step === 2 && it.interval_days === 4 && it.consecutive_wrong === 0, `${it.interval_days} gün`);
@@ -69,7 +69,16 @@ it = { track: 'topic', step: 4, ease: 1, consecutive_wrong: 0 };
 let g = gradeItem(it, [{ correct: true, strong: true, confidence: 100 }], '2030-06-01');
 check('tam emin doğru: aralık uzar, destek yok', g.step === 5 && g.support === 0, `step ${g.step}, ${g.interval_days} gün`);
 g = gradeItem(it, [{ correct: true, strong: false, confidence: 75 }], '2030-06-01');
-check('%75 emin doğru: aralık aynı, 1 destek', g.step === 4 && g.support === 1, `step ${g.step}, ${g.interval_days} gün`);
+check('%75 emin doğru: aralık uzar, 1 destek', g.step === 5 && g.support === 1, `step ${g.step}, ${g.interval_days} gün`);
+g = gradeItem(it, [{ correct: true, strong: false, confidence: 100, hint: true }], '2030-06-01');
+check('ipucuyla doğru: aralık aynı, 1 destek', g.step === 4 && g.support === 1, `step ${g.step}, ${g.interval_days} gün`);
+g = gradeItem(it, [{ correct: true, strong: false, confidence: 75 }, { correct: true, strong: false, confidence: 50 }], '2030-06-01');
+check('destek sorusunda kararsız: aralık uzamaz', g.step === 3 && g.support === 2, `step ${g.step}`);
+// Hata takibi büyük ölçüde emin doğrularla da biter: 2, 4, 14, 30 gün
+let m75 = { track: 'mistake', step: 0, ease: 1, consecutive_wrong: 0 };
+const g75 = [];
+for (let i = 0; i < 5; i++) { m75 = { ...m75, ...gradeItem(m75, [{ correct: true, strong: false, confidence: 75 }], lgs) }; g75.push(m75.interval_days + (m75.state === 'done' ? '(bitti)' : '')); }
+check('%75 emin doğrularla hata takibi biter', m75.state === 'done', g75.join(' → '));
 g = gradeItem(it, [{ correct: true, strong: false, confidence: 50 }], '2030-06-01');
 check('tahmine yakın doğru: bir basamak geri, 2 destek', g.step === 3 && g.support === 2, `step ${g.step}, ${g.interval_days} gün`);
 g = gradeItem(it, [{ correct: false, strong: false, confidence: 100 }], '2030-06-01');

@@ -53,13 +53,20 @@ Her maddenin yanında nasıl denendiği yazar:
   - "Birlikte bakılacak N soru" satırı. [A]
 - **Konu tekrarı** kartı:
   - soru sayısı ve süre, "Başla";
-  - "yeni soru hazırlanıyor" ve "günlük sınıra takıldı" notları;
+  - "yeni soru hazırlanıyor", "yoğun gün: N tekrar kısa tutuldu" ve "günlük sınıra takıldı" notları (iki kartta da);
   - altında **Ek çalışma** (günlük hedefi tamamlar, en zayıf konulardan başlar). [A]
 
 **Günlük plan ve takvim** [O]
 - Velinin ders ders günlük soru sayısı. Önce hata tekrarı, sonra konu tekrarı, kalan hak ek çalışmaya gider.
 - Bir dersin hakkı bir konu tekrarından küçükse o dersin günün ilk tekrarı yine tam yapılır.
 - Hata tekrarı 1, 2, 4, 14 ve 30 gün sonra gelir; her yanlışa üç benzer soru yazılır, sorunun kendisi değil.
+- Aralık, "tamamen eminim" ya da "büyük ölçüde eminim" ile ipucusuz ve süresinde doğru bilinince uzar; büyük ölçüde emin
+  doğrunun sonraki tekrarına 1 destek sorusu eklenir. Yavaş ya da ipuçlu doğru aralığı değiştirmez; kararsız ya da tahmin
+  bir basamak geri götürür; yanlış başa döndürür.
+- Yoğun gün: bir dersin günü gelen hata ve konu tekrarları (destek sorularıyla) o dersin kalan hakkını aşıyorsa o derste
+  destek soruları atlanır, konu tekrarı 5 yerine 3 soru olur; her madde en az bir kez görülür.
+- Toplu gelen hatalar (birkaç deneme birlikte, uygulamada tam LGS, on soru birden) ilk tekrar günlerine yayılır: bir derse
+  bir günde o dersin günlük sayısından fazla hata tekrarı düşmez (`spread_new_mistake` tetiği, `test-spread.sql`).
 - Konu tekrarı Fibonacci aralıklarıyla gelir. LGS'de sık çıkan konular en fazla 21 gün arayla, seyrek konular aralık çarpı velinin katsayısıyla.
 - İlkokulda (3–4. sınıf) günde 20 soru. Üstün çocuk bir üst sınıfın konularını da alabilir.
 
@@ -260,7 +267,8 @@ Her maddenin yanında nasıl denendiği yazar:
 - Çocuk değiştirme (üst çubukta). [E]
 
 **Ayarlar** [E]
-- Ders ders günlük soru sayısı; bugün ve son 7 günde harcanan süre; hata tekrarı sınırı aşıyorsa uyarı ve "X yap".
+- Ders ders günlük soru sayısı; bugün ve son 7 günde harcanan süre; madde başına bir soruyla bile sınırı aşan hata tekrarı
+  varsa uyarı ve "X yap".
 - İngilizce (kelime kartları) ve Klavye dersleri: aile isterse açar, her sınıfta; açma düğmesi ve açıkken günde kaç kart ya
   da ders. Kapalıyken çocuğun sekmesi görünmez. Ders sayılarından ayrı satırlarda; kelimede bugün kaç kart çözdüğü. [A]
 - Sınıf (1–8), bir üst sınıfın konuları, LGS tarihi (8. sınıf).

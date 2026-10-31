@@ -108,6 +108,8 @@ Sayısal: Matematik 1–20, Fen Bilimleri 1–20. Choices are A–D.
 8. Scheduling items (`items`), due tomorrow (local date, Europe/Istanbul), all with `student_id`:
    - one `mistake` item per `yanlis` or `bos` question (`track=mistake, topic_id, exam_question_id,
      step=0, interval_days=1, due_date=tomorrow`); `state=paused` if the topic is `maybe_not_taught`.
+     The database spreads new mistake items (trigger `spread_new_mistake`): a subject never gets more due
+     mistakes per day than its daily limit, so some land a few days later. Leave those dates as they are.
      Their similar questions come from section 1c (in this run if time allows, otherwise the next).
    - one `topic` item per active topic that does not have one yet for this student (`track=topic,
      step=0, interval_days=1, due_date=tomorrow`). Topics rare in LGS (`lgs_avg < 0.5`) are tracked

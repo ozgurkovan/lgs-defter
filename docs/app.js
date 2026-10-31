@@ -79,6 +79,7 @@ const planTotal = (plan) => Object.values(plan).reduce((n, v) => n + (v || 0), 0
 const MISTAKE_LADDER = [1, 2, 4, 14, 30];
 const TOPIC_LADDER = [1, 3, 5, 8, 13, 21, 34, 55];
 const TOPIC_QUESTIONS_PER_REVIEW = 5;
+const TOPIC_QUESTIONS_BUSY = 3; // yoğun günde (dersin tekrarları kalan hakkını aşınca) konu tekrarı kısalır
 
 const REASONS = [
   ['bilmiyordum', 'Konuyu bilmiyordum'],
@@ -604,7 +605,7 @@ async function signOut() {
 // ---------------------------------------------------------------- tekrar takvimi
 
 /* Bir maddenin (yanlış soru ya da konu) bir sonraki tekrar gününü hesaplar.
-   results: o madde için bu oturumda çözülen soruların sonuçları {correct, strong, confidence}.
+   results: o madde için bu oturumda çözülen soruların sonuçları {correct, strong, confidence, hint, slow}.
    confidence: öğrencinin emin olma ölçeği (25, 50, 75, 100).
    support: bir sonraki tekrarda eklenecek, farklı tarzda destek sorusu sayısı. */
 function gradeItem(item, results, lgsDate, rareFactor = 1) {
@@ -614,6 +615,9 @@ function gradeItem(item, results, lgsDate, rareFactor = 1) {
   const allStrong = results.every((r) => r.strong);
   const minConfidence = Math.min(...results.map((r) => r.confidence ?? (r.strong ? 100 : 75)));
   const confidentlyWrong = results.some((r) => !r.correct && (r.confidence ?? 0) >= 75);
+  // Büyük ölçüde emin (%75 ve üstü), ipucusuz ve süresinde doğru: bilgi oturuyor, aralık uzar (velinin isteği,
+  // 2026-10-31; önceden yalnızca "tamamen eminim" uzatıyordu, doğru bildiği soru ertesi gün destekle geri geliyordu).
+  const allSteady = allCorrect && minConfidence >= 75 && results.every((r) => !r.hint && !r.slow);
   let { step, ease, consecutive_wrong } = item;
   let note, support;
   let st = 'active';
@@ -625,10 +629,15 @@ function gradeItem(item, results, lgsDate, rareFactor = 1) {
     consecutive_wrong = 0;
     support = 0;
     note = 'Rahat ve emin bildi, aralık uzadı.';
+  } else if (allSteady) {
+    step += 1;
+    consecutive_wrong = 0;
+    support = 1;
+    note = 'Doğru ve büyük ölçüde emin; aralık uzadı, sonraki tekrarda 1 destek sorusu.';
   } else if (allCorrect && minConfidence >= 75) {
     consecutive_wrong = 0;
     support = 1;
-    note = 'Doğru ama tam emin değil, yavaş ya da ipucuyla; aralık aynı, sonraki tekrarda 1 destek sorusu.';
+    note = 'Doğru ama yavaş ya da ipucuyla; aralık aynı, sonraki tekrarda 1 destek sorusu.';
   } else if (allCorrect) {
     // Doğru ama tahmine yakın: bilgi oturmamış sayılır.
     consecutive_wrong = 0;
@@ -677,12 +686,13 @@ function gradeItem(item, results, lgsDate, rareFactor = 1) {
 
 /* Bugünün oturumunu kurar: günü gelmiş maddeler, katsayı ve gecikmeye göre sıralanır,
    her birine daha önce hiç görülmemiş bir soru seçilir. remaining derse göre bugün kalan soru
-   hakkıdır ve azaltılır; hakkı biten dersin maddeleri ertesi güne kalır (deferred). */
-async function buildSession(track, remaining) {
+   hakkıdır ve azaltılır; hakkı biten dersin maddeleri ertesi güne kalır (deferred). busy: yoğun dersler;
+   onlarda destek soruları atlanır, konu tekrarı TOPIC_QUESTIONS_BUSY soru olur (shortened). */
+async function buildSession(track, remaining, busy = new Set()) {
   const today = localDate();
   const items = await q(sb.from('items').select('*, topics(subject, name, sort, lgs_avg)')
     .eq('student_id', sid()).eq('track', track).eq('state', 'active').lte('due_date', today));
-  if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0, deferred: 0 };
+  if (!items.length) return { entries: [], shortage: 0, seconds: 0, dueCount: 0, deferred: 0, shortened: 0 };
 
   const topicIds = [...new Set(items.map((i) => i.topic_id))];
   const [pool, seenRows, missRows, reserved, books] = await Promise.all([
@@ -714,17 +724,19 @@ async function buildSession(track, remaining) {
 
   const used = new Set();
   const entries = [];
-  let seconds = 0, shortage = 0, deferred = 0;
+  let seconds = 0, shortage = 0, deferred = 0, shortened = 0;
   const basePerItem = track === 'mistake' ? 1 : TOPIC_QUESTIONS_PER_REVIEW;
   const started = new Set(); // bu oturumda en az bir maddesi alınan dersler
   for (const it of items) {
     if (pastBooks.has(bookOf.get(it.question_id))) continue;
-    // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur.
-    const want = basePerItem + (it.support || 0);
+    // Emin olmadığı maddelere destek soruları eklenir; her yeni soru mümkünse farklı bir tarzda olur. Yoğun derste
+    // destek soruları atlanır ve konu tekrarı kısalır: her madde en az bir kez görülsün, bütün madde ertelenmesin.
+    const subject = it.topics?.subject;
+    const full = basePerItem + (it.support || 0);
+    const want = busy.has(subject) ? Math.min(full, track === 'mistake' ? 1 : TOPIC_QUESTIONS_BUSY) : full;
     // Tekrar yarım kalmasın: maddenin soruları dersin kalan hakkına sığmıyorsa madde ertesi güne kalır.
     // Ama dersin hakkı bir konu tekrarından küçükse (ilkokulda Hayat Bilgisi'ne günde 4 soru gibi) o dersin
     // günün ilk tekrarı yine tam yapılır; yoksa o dersten hiç tekrar gelmezdi.
-    const subject = it.topics?.subject;
     const room = remaining[subject] || 0;
     if (room < want && !(room > 0 && !started.has(subject))) { deferred += want; continue; }
     const styles = missedStyles[it.topic_id] || new Set();
@@ -741,10 +753,11 @@ async function buildSession(track, remaining) {
     if (picked.length < want) picked = [...picked, ...pickVaried(candidates, want - picked.length)];
     remaining[subject] -= picked.length;
     started.add(subject);
+    if (want < full) shortened++;
     picked.forEach((p, i) => { used.add(p.id); entries.push({ item: it, question: p, last: i === picked.length - 1 }); });
     seconds += picked.reduce((s, p) => s + maxSeconds(p.subject) + 15, 0);
   }
-  return { entries, shortage, seconds, dueCount: items.length, deferred };
+  return { entries, shortage, seconds, dueCount: items.length, deferred, shortened };
 }
 /* Ek çalışma: günü gelen tekrarlar bir dersin günlük sayısını doldurmuyorsa açığı kapatır.
    Takipteki konulardan en zayıf olanlardan başlar, her konudan sırayla görülmemiş bir soru alır.
@@ -867,8 +880,18 @@ async function viewHome() {
   const remaining = { ...plan };
   const planCount = todayCount.filter((r) => r.track !== 'book');
   planCount.forEach((r) => { const s = r.questions?.subject; if (s in remaining) remaining[s]--; });
-  const mistake = await buildSession('mistake', remaining);
-  const topic = await buildSession('topic', remaining);
+  // Yoğun gün (velinin isteği, 2026-10-31): bir dersin günü gelen hata ve konu tekrarları, destek sorularıyla birlikte
+  // o dersin kalan hakkını aşıyorsa o derste destek soruları atlanır, konu tekrarı 3 soru olur.
+  const dueRows = await q(sb.from('items').select('track, support, topics(subject)').eq('student_id', sid()).eq('state', 'active')
+    .in('track', ['mistake', 'topic']).lte('due_date', localDate()));
+  const demand = {};
+  for (const it of dueRows) {
+    const s = it.topics?.subject;
+    if (s) demand[s] = (demand[s] || 0) + (it.track === 'mistake' ? 1 : TOPIC_QUESTIONS_PER_REVIEW) + (it.support || 0);
+  }
+  const busy = new Set(Object.keys(demand).filter((s) => demand[s] > (remaining[s] || 0)));
+  const mistake = await buildSession('mistake', remaining, busy);
+  const topic = await buildSession('topic', remaining, busy);
   const dueNow = mistake.entries.length + topic.entries.length;
   const extra = await buildExtra(remaining, [...mistake.entries, ...topic.entries].map((e) => e.question.id));
   state.cache = { mistake, topic, extra };
@@ -892,6 +915,7 @@ async function viewHome() {
            h('button', { class: lead ? 'block' : 'primary block', onclick: () => runSession(track, s) }, 'Başla')]
         : h('p', { class: 'muted' }, doneToday ? 'Bugünlük bu kadar. Aferin.' : 'Bugün tekrar edilecek soru yok.'),
       s.shortage ? h('p', { class: 'small muted' }, `${s.shortage} konu için yeni soru hazırlanıyor, yarın gelecek.`) : null,
+      s.shortened ? h('p', { class: 'small muted' }, `Bugün yoğun gün: ${s.shortened} tekrar kısa tutuldu, destek soruları sonraki günlere kaldı.`) : null,
       s.deferred ? h('p', { class: 'small muted' }, `${s.deferred} soru günlük sınıra takıldı, yarın gelecek. Velin sınırı Ayarlar'dan artırabilir.`) : null,
       tail);
   };
@@ -1065,7 +1089,7 @@ function showQuestion() {
     });
     ss.stats.total++; if (correct) ss.stats.correct++;
     const list = ss.results.get(item.id) || [];
-    myResult = { correct, strong, confidence };
+    myResult = { correct, strong, confidence, hint: !!hintUsed, slow: overTime };
     list.push(myResult);
     ss.results.set(item.id, list);
     // Birlikte bakılacaklar: boş geçtiği ya da tahmin ettiği soru (yanlıştan sonra "anlamadım" da eklenir).
@@ -3589,14 +3613,14 @@ function planSection(p) {
       q(sb.from('items').select('support, topics(subject)').eq('student_id', p.id).eq('track', 'mistake').eq('state', 'active').lte('due_date', today)),
       q(sb.from('word_answers').select('word').eq('student_id', p.id).gte('answered_at', dayStart())),
     ]);
-    const stat = Object.fromEntries(subjects.map((s) => [s, { n: 0, sec: 0, week: 0, due: 0 }]));
+    const stat = Object.fromEntries(subjects.map((s) => [s, { n: 0, sec: 0, week: 0, due: 0, items: 0 }]));
     for (const r of rows) {
       const st = stat[r.questions?.subject];
       if (!st) continue;
       st.week += r.duration_sec || 0;
       if (localDate(new Date(r.answered_at)) === today) { st.n++; st.sec += r.duration_sec || 0; }
     }
-    for (const it of due) { const st = stat[it.topics?.subject]; if (st) st.due += 1 + (it.support || 0); }
+    for (const it of due) { const st = stat[it.topics?.subject]; if (st) { st.due += 1 + (it.support || 0); st.items++; } }
     const sum = (k) => subjects.reduce((a, s) => a + stat[s][k], 0);
     const days = new Set(rows.map((r) => localDate(new Date(r.answered_at)))).size;
 
@@ -3614,11 +3638,12 @@ function planSection(p) {
         'aria-label': `${SUBJECTS[s].name} günlük soru sayısı`, style: 'width: 76px' });
       input.addEventListener('input', update);
       const warn = h('p', { class: 'small', style: 'color: var(--red)' });
+      // Yoğun günde destek soruları atlanır: sınırı aşan, madde başına bir soruyla bile sığmayan hata tekrarıdır.
       checks.push(() => {
         const limit = +input.value || 0;
-        warn.hidden = st.due <= limit;
-        fill(warn, st.due > limit ? [`Bugün ${st.due} hata tekrarı sorusu birikti, sınır ${limit}. Fazlası yarına kalır. `,
-          h('button', { class: 'ghost small', onclick: () => { input.value = st.due; update(); } }, `${st.due} yap`)] : null);
+        warn.hidden = st.items <= limit;
+        fill(warn, st.items > limit ? [`Bugün ${st.items} hata tekrarı birikti, sınır ${limit}. Destek soruları atlansa da fazlası yarına kalır. `,
+          h('button', { class: 'ghost small', onclick: () => { input.value = st.items; update(); } }, `${st.items} yap`)] : null);
       });
       return h('div', { class: 'stack', style: 'gap: 4px; padding: 8px 0; border-top: 1px solid var(--rule)' },
         h('div', { class: 'spread' }, subjTag(s), input),
