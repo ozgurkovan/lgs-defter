@@ -17,7 +17,8 @@ const code = [
   pick(app, 'function localDate', 'function parseDay'),
   pick(src, '/* Klavye dersleri: saf kısım', '/* Klavye: ses */'),
   pick(src, 'const TQ_ROWS', 'const KB = '),
-  'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate };',
+  'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
+    + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP };',
 ].join('\n');
 const T = new Function(code)();
 
@@ -92,5 +93,31 @@ check('sıradaki ders: üç yıldızı olmayan ilk açık ders, hepsi bittiyse s
   && T.typingNext(three) === 1 && T.typingNext(stuck) === 5 && T.typingNext(all3) === 21);
 check('günde kaç ders: aile açar, açılmadıysa kapalı (her sınıfta)', T.typingPerDay({ grade: 4 }) === 0 && T.typingPerDay({ grade: 8 }) === 0
   && T.typingPerDay({ grade: 3, daily_typing: 0 }) === 0 && T.typingPerDay({ grade: 8, daily_typing: 2 }) === 2);
+
+// Kelime roketi (oyun): kelimeler yalnızca açık derslerin harflerinden; oyun gittikçe hızlanır ve zorlaşır.
+// Çalıştığı harfler: ilk kilitli derse kadar açık derslerin harfleri.
+const lettersOf = (best) => {
+  const open = T.TYPING_LESSONS.findIndex((l, i) => !T.typingOpen(best, i));
+  return new Set(T.TYPING_LESSONS.slice(0, open < 0 ? undefined : open).flatMap((l) => [...(l.keys || 'abcçdefgğhıijklmnoöprsştuüvyzqwx')]));
+};
+const onlyKnown = (best) => { const k = lettersOf(best); return T.gameWords(best).every((w) => [...w].every((c) => k.has(c))); };
+const first = T.gameWords(none), mid = T.gameWords(stuck), all = T.gameWords(all3);
+check('oyun kelimeleri yalnızca çalıştığı harflerden', first.length > 0 && first.every((w) => /^[fj]+$/.test(w)) && onlyKnown(stuck) && onlyKnown(two),
+  `ilk derste ${first.length} kelime, altıncı derse kadar ${mid.length}`);
+check('oyun kelimeleri: boşluk, nokta, tek harf yok; kelime çoksa tuş alıştırması yok',
+  all.every((w) => /^[a-zçğıöşü]{2,}$/u.test(w)) && !all.includes('fff') && !all.includes('yaz geldi.') && all.includes('kedi'), `${all.length} kelime`);
+const levels = Array.from({ length: 25 }, (_, i) => i + 1);
+const falls = levels.map(T.gameFall), gaps = levels.map(T.gameEvery);
+check('oyun gittikçe hızlanır: düşüş 12 sn → en az 4 sn, aralık 3,2 sn → en az 0,9 sn, ekranda en çok 7 kelime',
+  falls[0] === 12 && falls.every((f, i) => i === 0 || f <= falls[i - 1]) && Math.min(...falls) === 4 && falls[1] < falls[0]
+  && gaps[0] === 3.2 && gaps.every((g, i) => i === 0 || g <= gaps[i - 1]) && Math.min(...gaps) === 0.9
+  && T.gameMax(1) === 3 && T.gameMax(25) === 7 && T.gameLevel(0) === 1 && T.gameLevel(5) === 1 && T.gameLevel(6) === 2,
+  `seviye 5: ${T.gameFall(5).toFixed(1)} sn düşüş, ${T.gameEvery(5).toFixed(1)} sn aralık`);
+seed = 11;
+const picks = Array.from({ length: 40 }, () => T.gameWord(all, 1, rnd, new Set(['k', 'a'])));
+check('kelime seçimi: başta kısa kelimeler, ekrandakilerden farklı ilk harf; olmazsa kural gevşer',
+  picks.every((w) => w.length <= 4 && !'ka'.includes(w[0])) && T.gameWord(['fj', 'jf'], 1, rnd, new Set(['f', 'j'])) != null
+  && T.gameWord([], 1, rnd) === null && T.gameLen(1) === 4 && T.gameLen(5) === 99);
+check('beş ev, her çatı iki darbe', T.GAME_ROOFS === 5 && T.GAME_ROOF_HP === 2);
 
 process.exit(fails ? 1 : 0);

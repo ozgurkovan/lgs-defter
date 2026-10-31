@@ -178,6 +178,17 @@ Her maddenin yanında nasıl denendiği yazar:
   - Yıldız doğruluğa göredir: %95 üç (60 harflik derste en çok 3 yanlış), %90 iki, %75 bir.
   - "Tekrar dene" ve "Sonraki ders" düğmeleri var.
   - Yarıda bırakılan ders kaydedilmez; geri tuşu önce sorar.
+- 🚀 **Kelime roketi** (oyun, velinin isteği; Klavye sayfasında "Oyna") [A], oyun [E]
+  - Gece göğünden kelimeler düşer; alt kenarda beş ev. Kelimeler çalıştığı harflerden: ilk kilitli derse kadar açık derslerin
+    kelimeleri, kelime azsa tuş alıştırmaları da. Ekrandaki kelimeler farklı harfle başlar. [O]
+  - İlk harfe basınca çatıya en yakın o harfle başlayan kelime hedef olur; yazdıkça harfleri yeşillenir. Yönerge ve ekrandaki
+    klavye sıradaki harfin tuşunu ve parmağını gösterir. Kelime bitince en yakın sağlam çatıdan roket kalkar, vurur (💥),
+    puan = harf sayısı × seviye. Yanlış tuşta saha sallanır. ⌫ ya da Esc hedefi bırakır.
+  - Çatıya değen kelime çatıyı hırpalar: ilk darbede yara bandı 🩹, ikincide çatı uçar. Beş çatı da gidince oyun biter.
+  - Gittikçe zorlaşır: her 6 kelimede bir seviye; düşüş 12 sn'den en az 4 sn'ye, iki kelime arası 3,2 sn'den en az 0,9 sn'ye,
+    ekranda en çok 7 kelime; kelimeler uzar (başta en çok 4 harf). [O]
+  - Bitişte puan, vurulan kelime, seviye, doğruluk, en iyi puan (bu tarayıcıda; "Yeni rekor!"), "Tekrar oyna".
+  - Pencere arka plana geçince oyun durur, bir harfe basınca sürer. Geri tuşu önce sorar. Oyun hiçbir şey kaydetmez.
 - Klavye kahramanı da büyütür. Kelime sayfası, mağaza ve rapor bunu sayar; güç arttıysa kutlama olur. Kahraman Klavye
   sayfasında da görünür. [O]
   - Her dersin en iyi yıldızı 1 güç verir; aynı dersi tekrarlamak şişirmez.

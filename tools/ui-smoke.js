@@ -35,7 +35,7 @@
     }
     // Klavye dersleri: klavyeli cihazda (bu tarayıcı bölmesi) sekmesi olan öğrencide.
     const typingTab = role === 'student' && typingPerDay(state.student) > 0 && hasKeyboard();
-    if (typingTab) pages.typing = ['on parmak klavye', 'orta sıra', 'kelimeler ve cümleler', 'başla: ders'];
+    if (typingTab) pages.typing = ['on parmak klavye', 'orta sıra', 'kelimeler ve cümleler', 'başla: ders', 'kelime roketi'];
     // İlkokul: okuduğu kitabın sayfaları Yükle sekmesinden gönderilir.
     if (role === 'student' && (state.student?.grade || 8) <= 4) {
       pages.send = [...pages.send, 'okuduğum kitap'];
@@ -140,6 +140,29 @@
       check('Klavye dersi: tuşlar ve eller, F-J ile başlar, doğru harf yanar, yanlışta ⌫ gösterilir, geri tuşu Klavye sayfasına döner',
         opened && intro && lit && erase && cleared && !state.session && state.tab === 'typing' && !history.state?.overlay,
         [!opened && 'açılmadı', !intro && 'tanıtım yok', !lit && 'satır yanmadı', !erase && '⌫ yok', !cleared && 'silinmedi'].filter(Boolean).join('; '));
+
+      // Kelime roketi: yazılan kelimeyi çatıdan kalkan roket vurur, puan artar; çatıya değen kelime çatıyı hırpalar.
+      // Geri tuşu önce sorar, Klavye sayfasına döner. Oyun hiçbir şey kaydetmez.
+      go('typing'); await settle();
+      [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
+      const g = state.session;
+      let shot = false, bonk = false;
+      if (g?.track === 'game') {
+        g.paused = false;
+        const w = g.spawn();
+        for (const ch of w.text) key(ch, TQ_KEY[ch]);
+        await wait(1200); // roketin uçuşu (arka plandaki sayfada zamanlayıcı yavaşlar)
+        shot = g.hits === 1 && g.score > 0 && !g.list.includes(w);
+        const w2 = g.spawn(), roofs = g.roofs.reduce((a, b) => a + b, 0);
+        w2.y = w2.ground;
+        g.paused = false; // test sırasında tarayıcı bölmesi odağı kaybedince oyun durabilir
+        g.tick(0.016);
+        bonk = g.roofs.reduce((a, b) => a + b, 0) === roofs - 1 && !g.list.includes(w2);
+      }
+      history.back(); await settle();
+      check('Kelime roketi: yazılan kelimeyi roket vurur, çatıya değen kelime çatıyı hırpalar, geri tuşu Klavye sayfasına döner',
+        g?.track === 'game' && shot && bonk && !state.session && state.tab === 'typing' && !history.state?.overlay,
+        [g?.track !== 'game' && 'açılmadı', !shot && 'vurmadı', !bonk && 'çatı hırpalanmadı', state.tab !== 'typing' && `açılan ${state.tab}`].filter(Boolean).join('; '));
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).

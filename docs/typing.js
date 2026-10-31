@@ -148,6 +148,38 @@ function typingNext(best) {
 // Günde kaç ders: aile isterse açar (velinin isteği), her sınıfta; açılmadıysa kapalı.
 const typingPerDay = (p) => p?.daily_typing ?? 0;
 
+/* Klavye oyunu "Kelime roketi" (velinin isteği): yukarıdan kelimeler düşer; çocuk bir kelimeyi yazınca çatıdan roket
+   kalkar ve kelimeyi vurur. Çatıya değen kelime çatıyı hırpalar; bütün çatılar gidince oyun biter. Kelimeler açık
+   derslerin harflerinden (çalıştığı harfler); oyun ilerledikçe kelimeler hızlanır, sıklaşır ve uzar. */
+// Oyunun kelimeleri: ilk kilitli derse kadar açık derslerin kelimeleri; kelime azsa (ilk dersler) tuş alıştırmaları da.
+// Boşluklu, noktalı ve tek harfli olanlar alınmaz.
+function gameWords(best) {
+  const words = new Set(), drills = new Set();
+  for (const [i, l] of TYPING_LESSONS.entries()) {
+    if (!typingOpen(best, i)) break;
+    for (const w of l.words || []) if (/^[a-zçğıöşü]{2,}$/.test(w)) words.add(w);
+    for (const w of l.drills || []) if (/^[a-zçğıöşü]{2,}$/.test(w)) drills.add(w);
+  }
+  return words.size >= 12 ? [...words] : [...new Set([...words, ...drills])];
+}
+// Zorluk: her 6 kelimede bir seviye. Kelimenin çatıya düşüşü 12 sn'den başlar, her seviyede %10 kısalır (en az 4 sn);
+// iki kelime arası 3,2 sn'den başlar (en az 0,9 sn); ekranda en çok 2 + seviye kelime (en çok 7); kelimeler uzar.
+const gameLevel = (hits) => 1 + Math.floor(hits / 6);
+const gameFall = (level) => Math.max(4, 12 * 0.9 ** (level - 1));
+const gameEvery = (level) => Math.max(0.9, 3.2 * 0.9 ** (level - 1));
+const gameMax = (level) => Math.min(7, 2 + level);
+const gameLen = (level) => (level <= 2 ? 4 : level <= 4 ? 6 : 99);
+// Sıradaki kelime: seviyenin uzunluğunu geçmeyen ve ekrandaki kelimelerden farklı harfle başlayan (hangi kelimeyi
+// yazdığı ilk harften anlaşılsın). Öyle kelime yoksa önce uzunluk, sonra ilk harf kuralı gevşer.
+function gameWord(words, level, rnd, taken = new Set()) {
+  const short = words.filter((w) => w.length <= gameLen(level));
+  for (const pool of [short.filter((w) => !taken.has(w[0])), words.filter((w) => !taken.has(w[0])), short, words]) {
+    if (pool.length) return pool[Math.floor(rnd() * pool.length)];
+  }
+  return null;
+}
+const GAME_ROOFS = 5, GAME_ROOF_HP = 2; // beş ev; her çatı iki darbeye dayanır
+
 /* Klavye: ses */
 
 // Tuşun adı ekranda (klavyedeki yazısı) ve seste (Türkçe okunuşu).
@@ -350,6 +382,12 @@ async function viewTyping() {
       h('button', { class: 'primary block', onclick: () => runTyping(next, hero) }, `Başla: Ders ${next + 1} · ${lesson.title}`),
       h('p', { class: 'small muted' }, 'Parmakların böyle durur: işaret parmakların F ve J\'de (bu iki tuşta küçük çıkıntı var), başparmakların boşlukta.'),
       kb.el),
+    // Oyun: düşen kelimeleri yaz, çatıdan roket fırlat (kelimeler açık derslerin harflerinden).
+    h('section', { class: 'card stack', style: 'gap: 8px' },
+      h('div', { class: 'spread' }, h('b', {}, '🚀 Kelime roketi'), gameBest() ? h('span', { class: 'small muted num' }, `En iyi puanın: ${gameBest()}`) : null),
+      h('p', { class: 'small muted' }, 'Yukarıdan düşen kelimeleri yaz; çatıdan roket kalkıp vursun. Kelime çatıya değerse çatı hırpalanır, '
+        + 'çatılar bitince oyun biter. Kelimeler öğrendiğin harflerden; oyun gittikçe hızlanır.'),
+      h('button', { class: 'block', onclick: () => runTypingGame(hero) }, 'Oyna')),
     TYPING_STAGES.map((name, s) => [
       h('h2', {}, name),
       h('div', { class: 'ty-lessons' }, TYPING_LESSONS.map((l, i) => (l.stage === s ? tile(l, i) : null))),
@@ -579,6 +617,310 @@ async function endTyping(run) {
         h('span', { style: `left: ${(i * 41) % 100}%; animation-delay: ${(i % 6) * 0.15}s` }, ['🎉', '✨', '⭐', '🎊'][i % 4]))),
       h('h2', {}, `💪 Güç ${level}! Kahramanın güçlendi.`),
       heroScene(state.student, level, hero.owned)) : null);
+}
+
+/* Klavye: oyun (Kelime roketi) */
+
+const GAME_COLORS = ['#F2738C', '#5AB0F0', '#F5A524', '#7ACB6A', '#A383F0']; // çatıların renkleri
+const fingerDot = (f) => h('span', { class: 'dot', style: `background: ${FINGER_COLOR[f]}` });
+// En iyi puan bu tarayıcıda, çocuğa göre tutulur (oyun hiçbir şey kaydetmez).
+const gameBestKey = () => `defter.typingGameBest.${sid()}`;
+function gameBest() {
+  try { return +localStorage.getItem(gameBestKey()) || 0; } catch (e) { return 0; }
+}
+
+// Oyun Klavye sayfasından açılır; ders gibi alt menü gizli, geri tuşu önce sorar. Pencere arka plana geçince durur, bir
+// harfe basınca sürer. game.spawn ve game.tick duman testi içindir.
+function runTypingGame(hero) {
+  const game = {
+    track: 'game', hero, words: gameWords(hero.typing.best), level: 1, hits: 0, score: 0, typed: 0, errors: 0,
+    list: [], roofs: Array(GAME_ROOFS).fill(GAME_ROOF_HP), target: null, spawnIn: 1, last: 0, paused: false, over: false,
+    kb: keyboardView(), leaveText: 'Oyundan çıkılsın mı?',
+  };
+  game.spawn = () => gameSpawn(game);
+  game.tick = (dt) => gameStep(game, dt);
+  const onKey = (e) => {
+    if (state.session !== game) { game.detach(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // kısayollar tarayıcının
+    if (e.key === 'Tab') e.preventDefault();
+    if (e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); return gameRelease(game); }
+    if (e.key.length !== 1) return; // Shift, Enter, oklar…
+    e.preventDefault();
+    if (e.repeat) return;
+    if (game.paused) return gameResume(game);
+    gameKey(game, e);
+  };
+  const onBlur = () => gamePause(game);
+  const onVisibility = () => { if (document.hidden) gamePause(game); };
+  game.detach = () => {
+    window.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('blur', onBlur);
+    document.removeEventListener('visibilitychange', onVisibility);
+    cancelAnimationFrame(game.raf);
+  };
+  // Bitiş ekranından "Tekrar oyna": aynı oturum kaydı kullanılır, geçmiş şişmez.
+  if (history.state?.overlay === 'session') history.replaceState(history.state, '');
+  else pushOverlay('session');
+  state.session = game;
+  state.leaveOverlay = game.detach;
+  window.addEventListener('keydown', onKey, true);
+  window.addEventListener('blur', onBlur);
+  document.addEventListener('visibilitychange', onVisibility);
+  document.activeElement?.blur?.();
+  gameDraw(game);
+  game.last = performance.now();
+  const frame = (now) => {
+    if (state.session !== game || game.over) return;
+    gameStep(game, Math.min(0.05, (now - game.last) / 1000));
+    game.last = now;
+    game.raf = requestAnimationFrame(frame);
+  };
+  game.raf = requestAnimationFrame(frame);
+}
+
+// Oyun sayfası bir kez çizilir: gökyüzü, alt kenarda beş ev, altında yönerge ve ekrandaki klavye.
+function gameDraw(game) {
+  const v = game.view = {
+    field: h('div', { class: 'tg-field' }), layer: h('div', { class: 'tg-layer' }), houses: [],
+    score: h('b', { class: 'num' }), level: h('b', { class: 'num' }), roofs: h('b', { class: 'num' }),
+    guide: h('div', { class: 'ty-guide', role: 'status' }),
+    banner: h('div', { class: 'tg-banner', hidden: true }),
+    pause: h('div', { class: 'tg-pause', hidden: true }, 'Oyun durdu. Devam etmek için bir harfe bas.'),
+  };
+  const town = h('div', { class: 'tg-town' });
+  for (let i = 0; i < GAME_ROOFS; i++) {
+    const house = h('div', { class: 'tg-house', style: `--c: ${GAME_COLORS[i]}`, 'data-hp': GAME_ROOF_HP }, h('i', { class: 'roof' }), h('i', { class: 'body' }));
+    v.houses.push(house);
+    town.append(house);
+  }
+  v.field.append(v.layer, town, v.banner, v.pause);
+  render(
+    h('div', { class: 'qhead stack', style: 'gap: 8px' },
+      h('div', { class: 'spread' },
+        h('button', { class: 'ghost', onclick: () => go('typing') }, '← Ara ver'),
+        h('b', {}, '🚀 Kelime roketi'),
+        h('span', { class: 'small' }, 'Puan ', v.score, ' · Seviye ', v.level, ' · Çatı ', v.roofs))),
+    h('section', { class: 'ty-wrap tg-wrap stack' }, v.field, v.guide, game.kb.el,
+      h('p', { class: 'small muted' }, 'Kelimenin ilk harfine basınca o kelime hedef olur. Hedefi bırakmak için ⌫.')));
+  window.scrollTo(0, 0); // Klavye sayfasının aşağısından açılınca da gökyüzü baştan görünsün
+  gameHud(game);
+  gameGuide(game);
+}
+
+function gameHud(game) {
+  const v = game.view;
+  v.score.textContent = game.score;
+  v.level.textContent = game.level;
+  v.roofs.textContent = `${game.roofs.filter((n) => n > 0).length}/${GAME_ROOFS}`;
+}
+
+// Yönerge: hedef varsa sıradaki harf ve parmağı (ekrandaki klavyede de yanar); yoksa ne yapacağı.
+function gameGuide(game, missed = false) {
+  const v = game.view, t = game.target;
+  v.guide.className = 'ty-guide' + (missed ? ' bad' : '');
+  if (t) {
+    const ch = t.text[t.pos], code = TQ_KEY[ch] || '', f = FINGER_OF[code] ?? 8;
+    fill(v.guide, fingerDot(f), `${missed ? 'O tuş değil. ' : ''}${upFirst(FINGER_NAMES[f])} → ${keyName(ch)}`);
+    game.kb.show({ codes: [code] });
+  } else {
+    fill(v.guide, missed ? 'Bu harfle başlayan kelime yok. Düşen bir kelimenin ilk harfine bas.' : 'Düşen bir kelimenin ilk harfine bas, kelimeyi yaz: roket kalksın! 🚀');
+    game.kb.show({});
+  }
+}
+
+// Yeni kelime: sağlam çatılı bir evin üstünden düşer, hızı seviyeye göre.
+function gameSpawn(game) {
+  const v = game.view;
+  const alive = game.roofs.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
+  if (!alive.length) return null;
+  const house = alive[Math.floor(Math.random() * alive.length)];
+  const text = gameWord(game.words, game.level, Math.random, new Set(game.list.map((w) => w.text[0])));
+  if (!text) return null;
+  const f = v.field.getBoundingClientRect(), r = v.houses[house].getBoundingClientRect();
+  const w = { text, pos: 0, house, el: h('span', { class: 'tg-word' }), y: -8, ground: r.top - f.top + 10 };
+  v.layer.append(w.el);
+  gamePaintWord(w);
+  // Kelime sahadan taşmasın.
+  const half = w.el.offsetWidth / 2 + 6;
+  w.x = Math.min(f.width - half, Math.max(half, r.left - f.left + r.width / 2 + (Math.random() - 0.5) * r.width * 0.4));
+  w.speed = (w.ground - w.y) / gameFall(game.level);
+  gamePlace(w);
+  game.list.push(w);
+  return w;
+}
+
+function gamePaintWord(w) {
+  fill(w.el, h('span', { class: 'done' }, w.text.slice(0, w.pos)), w.text.slice(w.pos));
+}
+// Kelimenin konumu: x ortası, y alt kenarı (sahaya göre).
+const gamePlace = (w) => { w.el.style.transform = `translate(${w.x}px, ${w.y}px) translate(-50%, -100%)`; };
+
+function gameStep(game, dt) {
+  if (game.paused || game.over) return;
+  game.spawnIn -= dt;
+  if (game.spawnIn <= 0) {
+    if (game.list.length < gameMax(game.level)) gameSpawn(game);
+    game.spawnIn = gameEvery(game.level);
+  }
+  for (const w of [...game.list]) {
+    if (w.locked) continue; // roket yolda
+    w.y += w.speed * dt;
+    gamePlace(w);
+    if (w.y >= w.ground) gameLand(game, w);
+  }
+}
+
+function gameRemove(game, w) {
+  game.list = game.list.filter((x) => x !== w);
+  w.el.remove();
+  if (game.target === w) { game.target = null; gameGuide(game); }
+}
+
+// Kelime çatıya değdi: çatı bir darbe alır (önce yara bandı, sonra uçar). Bütün çatılar gidince oyun biter.
+function gameLand(game, w) {
+  gameRemove(game, w);
+  gamePuff(game, w.x, w.ground - 6, '💨');
+  if (game.roofs[w.house] > 0) {
+    const hp = --game.roofs[w.house];
+    const house = game.view.houses[w.house];
+    house.dataset.hp = hp;
+    house.classList.remove('hit');
+    void house.offsetWidth; // animasyon yeniden başlasın
+    house.classList.add('hit');
+  }
+  gameHud(game);
+  if (game.roofs.every((n) => n === 0)) gameOver(game);
+}
+
+function gameKey(game, e) {
+  if (game.over) return;
+  let t = game.target;
+  if (!t) {
+    // Bu harfle başlayan, çatıya en yakın kelime hedef olur.
+    t = game.list.filter((w) => !w.locked && typedIs(e, w.text[0])).sort((a, b) => b.y - a.y)[0];
+    if (!t) return gameMiss(game, e);
+    game.target = t;
+    t.el.classList.add('target');
+  }
+  if (!typedIs(e, t.text[t.pos])) return gameMiss(game, e);
+  t.pos++;
+  game.typed++;
+  game.kb.flash(e.code, true);
+  gamePaintWord(t);
+  if (t.pos >= t.text.length) gameFire(game, t);
+  gameGuide(game);
+}
+
+function gameMiss(game, e) {
+  game.errors++;
+  game.kb.flash(e.code, false);
+  const field = game.view.field;
+  field.classList.remove('miss');
+  void field.offsetWidth;
+  field.classList.add('miss');
+  gameGuide(game, true);
+}
+
+// ⌫ ya da Esc: hedef bırakılır, başka kelimeye geçilebilir.
+function gameRelease(game) {
+  const t = game.target;
+  if (!t) return;
+  t.pos = 0;
+  t.el.classList.remove('target');
+  gamePaintWord(t);
+  game.target = null;
+  gameGuide(game);
+}
+
+// Kelime tamam: en yakın sağlam çatıdan roket kalkar, kelimeye uçar, vurur. Vuruş zamanlayıcıyla olur; çizim bitmese de
+// (sayfa arka plandaysa) kelime vurulur.
+function gameFire(game, t) {
+  t.locked = true;
+  t.el.classList.remove('target');
+  t.el.classList.add('locked');
+  game.target = null;
+  const v = game.view, f = v.field.getBoundingClientRect();
+  let from = null, near = Infinity;
+  v.houses.forEach((house, i) => {
+    if (game.roofs[i] <= 0) return;
+    const r = house.getBoundingClientRect(), x = r.left - f.left + r.width / 2;
+    if (Math.abs(x - t.x) < near) { near = Math.abs(x - t.x); from = { x, y: r.top - f.top }; }
+  });
+  from ||= { x: t.x, y: f.height };
+  const to = { x: t.x, y: t.y - 14 };
+  const angle = (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI + 45; // 🚀 sağ üste bakar
+  const rocket = h('span', { class: 'tg-rocket', 'aria-hidden': 'true' }, '🚀');
+  const ms = reduceMotion() ? 60 : 260, t0 = performance.now();
+  const at = (k) => { rocket.style.transform = `translate(${from.x + (to.x - from.x) * k}px, ${from.y + (to.y - from.y) * k}px) translate(-50%, -50%) rotate(${angle}deg)`; };
+  at(0); // ilk kare çizilmeden de çatının üstünde dursun
+  v.layer.append(rocket);
+  const fly = (now) => {
+    const k = Math.min(1, (now - t0) / ms);
+    at(k);
+    if (k < 1 && rocket.isConnected) requestAnimationFrame(fly);
+  };
+  requestAnimationFrame(fly);
+  setTimeout(() => { rocket.remove(); gameHit(game, t); }, ms + 20);
+}
+
+function gameHit(game, t) {
+  if (game.over || !game.list.includes(t)) return; // oyun bitti ya da çıkıldı
+  gameRemove(game, t);
+  gamePuff(game, t.x, t.y - 14, '💥');
+  game.hits++;
+  game.score += t.text.length * game.level;
+  const level = gameLevel(game.hits);
+  if (level > game.level) {
+    game.level = level;
+    gameBanner(game, `⭐ Seviye ${level}! Kelimeler hızlanıyor.`);
+  }
+  gameHud(game);
+}
+
+function gamePuff(game, x, y, emoji) {
+  const el = h('span', { class: 'tg-puff', 'aria-hidden': 'true', style: `transform: translate(${x}px, ${y}px) translate(-50%, -50%)` }, emoji);
+  game.view.layer.append(el);
+  setTimeout(() => el.remove(), 550);
+}
+
+function gameBanner(game, text) {
+  const b = game.view.banner;
+  b.textContent = text;
+  b.hidden = false;
+  clearTimeout(game.bannerTimer);
+  game.bannerTimer = setTimeout(() => { b.hidden = true; }, 1800);
+}
+
+function gamePause(game) {
+  if (game.over || game.paused || state.session !== game) return;
+  game.paused = true;
+  game.view.pause.hidden = false;
+}
+function gameResume(game) {
+  game.paused = false;
+  game.view.pause.hidden = true;
+  game.last = performance.now();
+}
+
+// Bütün çatılar gitti: puan, vurduğu kelime, seviye, doğruluk ve en iyi puan; "Tekrar oyna".
+function gameOver(game) {
+  game.over = true;
+  game.detach();
+  state.session = null;
+  const best = gameBest(), record = game.score > best;
+  if (record) try { localStorage.setItem(gameBestKey(), String(game.score)); } catch (e) { /* önemli değil */ }
+  const acc = Math.floor((100 * game.typed) / Math.max(1, game.typed + game.errors));
+  game.kb.show({});
+  game.view.field.append(h('div', { class: 'tg-over' },
+    h('section', { class: 'card stack', style: 'gap: 8px; align-items: center' },
+      h('h2', {}, 'Çatılar gitti, oyun bitti!'),
+      h('p', { class: 'ty-stars num' }, `${game.score}`),
+      h('p', {}, `${game.hits} kelime vurdun · seviye ${game.level} · doğruluk %${acc}`),
+      h('p', { class: 'small' }, record ? '🏆 Yeni rekor!' : `En iyi puanın: ${best}`),
+      h('div', { class: 'row', style: 'justify-content: center' },
+        h('button', { class: 'primary', onclick: () => runTypingGame(game.hero) }, 'Tekrar oyna'),
+        h('button', { onclick: () => go('typing') }, 'Klavye\'ye dön')))));
+  fill(game.view.guide, record ? '🏆 Yeni rekor!' : 'Tekrar oynayınca kelimeler yine yavaş başlar.');
 }
 
 /* Klavye: veli ve öğretmen */
