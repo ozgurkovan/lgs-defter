@@ -94,6 +94,10 @@ Her maddenin yanında nasıl denendiği yazar:
   fiiller, zıt anlamlılar, zor sıfatlar ve "and, but, because" gibi küçük kelimelerle biter. [O, `test-words.mjs`]
   - Kelime kimliği İngilizcesidir: önceki sürümdeki hiçbir kelime silinmez ya da yazımı değişmez, yeni gruplar sona eklenir.
   - Kelimeler tekrar etmez; her grupta en az 4 kelime var ve grupta iki kelimenin Türkçesi aynı değil.
+- Yeni kelimeler her çocuğa kendi sırasıyla gelir (velinin isteği: kardeşler aynı kartları yan yana çözüp kavga
+  ediyordu). Liste 6 gruplık bloklara ayrılır. Çocuk her blokta kendine düşen gruptan başlar, grup içinde kelimeler
+  karışık gelir. Bir grubun kelimeleri yine arka arkaya gelir. Sıra her açılışta aynı; kolaydan zora en fazla 5 grup
+  sapar. İki çocuğun ilk 20 kartı çoğunlukla farklıdır. [O, `test-words.mjs`]
 - Bütün kelimeleri gördüyse ve hiçbirinin günü gelmediyse "Yarın yeni kelimeler gelecek" yazmaz. Bunun yerine
   "Listedeki N kelimenin hepsini gördün… sıradaki <tarih>" yazar. Velinin Günlük plan satırında "hepsini gördü: … sayıyı
   artırmak yeni kart getirmez" yazar; değilse "N kelimenin M tanesini gördü". [E]

@@ -15,7 +15,8 @@ const pick = (from, to) => {
   return app.slice(a, b);
 };
 const today = new Date().toLocaleDateString('sv-SE');
-const { wordQueue } = new Function('localDate', pick('function wordQueue', 'async function viewWords') + 'return { wordQueue };')(() => today);
+const { wordQueue, WORD_MIX, mixHash } = new Function('localDate', pick('const WORD_MIX', 'async function viewWords')
+  + 'return { wordQueue, WORD_MIX, mixHash };')(() => today);
 
 let fails = 0;
 const check = (label, cond, info) => { if (!cond) fails++; console.log(`${cond ? 'OK  ' : 'FAIL'} ${label}${info ? '  ' + info : ''}`); };
@@ -49,9 +50,9 @@ if (before) {
 } else check('önceki sürümle karşılaştırma', true, 'git yok, atlandı');
 console.log(`OK   liste: ${groups.length} grup, ${words.length} kelime`);
 
-// wordQueue: önce günü gelen tekrarlar (en eskisi önce), sonra listedeki sıradaki yeni kelimeler; bugün cevaplananlar
-// yeniden gelmez. Bütün kelimeler görülmüş ve hiçbirinin günü gelmemişse kart çıkmaz.
-const list = words.map(([en, tr, emoji], i) => ({ en, tr, emoji, group: 0, i }));
+// wordQueue: önce günü gelen tekrarlar (en eskisi önce), sonra sıradaki yeni kelimeler; bugün cevaplananlar yeniden
+// gelmez. Bütün kelimeler görülmüş ve hiçbirinin günü gelmemişse kart çıkmaz.
+const list = groups.flatMap((g, group) => g.words.map(([en, tr, emoji]) => ({ en, tr, emoji, group })));
 const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
 const prog = (en, due, box = 2) => ({ word: en, due_date: due, box });
 let q = wordQueue(list, [prog(list[5].en, day(-2)), prog(list[3].en, day(-1)), prog(list[0].en, day(9))], new Set(), 4);
@@ -61,5 +62,33 @@ q = wordQueue(list, list.map((w) => prog(w.en, day(30))), new Set(), 40);
 check('hepsi görülmüş ve günü gelmemişse kart yok', q.length === 0, `${q.length} kart`);
 q = wordQueue(list, list.slice(0, -2).map((w) => prog(w.en, day(30))), new Set([list.at(-1).en]), 40);
 check('bugün cevapladığı yeni kelime yeniden gelmez', q.length === 1 && q[0].en === list.at(-2).en, q.map((w) => w.en).join(','));
+
+// Her çocuğa kendi sırası (seed: öğrenci kimliği): kardeşler aynı akşam aynı kelimeleri aynı sırayla görmez, ama sıra
+// kolaydan zora kalır: bir kelime en fazla WORD_MIX - 1 grup önce ya da sonra gelir. Örnekte ikisi de ilk 30 grubu
+// (386 kelime) görmüş, sıradaki blok baştan başlıyor.
+const seen386 = list.slice(0, 386).map((w) => prog(w.en, day(30)));
+const turnOf = (s) => Math.floor(WORD_MIX * mixHash(s));
+const seeds = Array.from({ length: 400 }, (_, i) => `kardes-${i}`);
+const kidA = seeds[0], kidB = seeds.find((s) => turnOf(s) === (turnOf(kidA) + WORD_MIX / 2) % WORD_MIX);
+const order = (s, n = list.length) => wordQueue(list, seen386, new Set(), n, s);
+const common = (x, y, from, to) => x.slice(from, to).filter((w) => y.slice(from, to).some((v) => v.en === w.en)).length;
+const a = order(kidA), b = order(kidB);
+check('başka gruptan başlayan iki çocuğun ilk 20 kartı ortak değil', common(a, b, 0, 20) === 0, `ortak ${common(a, b, 0, 20)}`);
+const pairs = Array.from({ length: 100 }, (_, i) => [order(seeds[2 * i], 20), order(seeds[2 * i + 1], 20)]);
+const avg = pairs.reduce((n, [x, y]) => n + common(x, y, 0, 20), 0) / pairs.length;
+check('rastgele iki çocukta ilk 20 kartın ortalama ortağı 20\'nin üçte birinden az', avg < 20 / 3, `ortalama ${avg.toFixed(1)}`);
+check('aynı çocuğun sırası her açılışta aynı', order(kidA, 40).every((w, i) => w.en === a[i].en));
+check('her yeni kelime bir kez gelir', a.length === list.length - 386 && new Set(a.map((w) => w.en)).size === a.length);
+check('bir grubun kelimeleri arka arkaya gelir (yanlış şıklar aynı gruptan)', a.every((w, i) => i === 0 || w.group === a[i - 1].group
+  || !a.slice(0, i - 1).some((v) => v.group === w.group)));
+let worst = 0;
+for (const s of seeds.slice(0, 50)) {
+  let maxBefore = -1;
+  for (const w of order(s)) { worst = Math.max(worst, maxBefore - w.group); maxBefore = Math.max(maxBefore, w.group); }
+}
+check(`kolaydan zora: önce gelen kelime en fazla ${WORD_MIX - 1} grup ileriden`, worst < WORD_MIX && a[0].group < 30 + WORD_MIX,
+  `en büyük geri dönüş ${worst} grup, ilk kart ${a[0].group}. gruptan`);
+q = wordQueue(list, [...seen386, prog(list[7].en, day(-1))], new Set(), 3, kidB);
+check('seed varken de önce günü gelen tekrar', q[0].en === list[7].en && q.length === 3);
 
 process.exit(fails ? 1 : 0);

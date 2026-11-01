@@ -3287,19 +3287,34 @@ function rideParty(it, before, after) {
   overlay.querySelector('button').focus();
 }
 
-// Bugünün kartları: önce günü gelen tekrarlar (en eskisi önce), kalan yer listedeki sıradaki yeni kelimelerle dolar.
-function wordQueue(list, progress, answeredToday, n) {
+// Bugünün kartları: önce günü gelen tekrarlar (en eskisi önce), kalan yer sıradaki yeni kelimelerle dolar.
+// Yeni kelimeler kolaydan zora gelir ama her çocuğa kendi sırasıyla (seed: öğrenci kimliği). Liste WORD_MIX gruplık
+// bloklara ayrılır; çocuk her blokta kendine düşen gruptan başlar ve sırayla döner, grup içinde kelimeler de karışık
+// gelir. Böylece bir kelime en fazla WORD_MIX - 1 grup önce ya da sonra gelir, kardeşler de aynı akşam aynı kelimeleri
+// aynı sırayla çözmez (velinin isteği, 2026-11-01: aynı kartları yan yana çözüp kavga ediyorlardı). Sıra her açılışta
+// aynıdır; seed yoksa liste sırası.
+const WORD_MIX = 6;
+function wordQueue(list, progress, answeredToday, n, seed = '') {
   const today = localDate();
   const byWord = new Map(list.map((w) => [w.en, w]));
   const due = progress.filter((p) => p.due_date <= today && !answeredToday.has(p.word) && byWord.has(p.word))
     .sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : a.box - b.box));
   const picks = due.slice(0, n).map((p) => byWord.get(p.word));
   const started = new Set(progress.map((p) => p.word));
-  for (const w of list) {
-    if (picks.length >= n) break;
-    if (!started.has(w.en) && !answeredToday.has(w.en)) picks.push(w);
-  }
-  return picks;
+  const fresh = list.filter((w) => !started.has(w.en) && !answeredToday.has(w.en));
+  const turn = Math.floor(WORD_MIX * mixHash(seed));
+  const rank = (w) => w.group - (w.group % WORD_MIX) + (((w.group - turn) % WORD_MIX) + WORD_MIX) % WORD_MIX
+    + 0.5 * mixHash(`${seed}:${w.en}`);
+  const order = !seed ? fresh : fresh.map((w) => [rank(w), w]).sort((a, b) => a[0] - b[0]).map(([, w]) => w);
+  return [...picks, ...order.slice(0, Math.max(0, n - picks.length))];
+}
+// Yazıya bağlı, hep aynı çıkan 0–1 arası sayı (FNV-1a, sonra bitleri karıştırır).
+function mixHash(s) {
+  let x = 2166136261;
+  for (let i = 0; i < s.length; i++) x = Math.imul(x ^ s.charCodeAt(i), 16777619);
+  x = Math.imul(x ^ (x >>> 16), 2246822507);
+  x = Math.imul(x ^ (x >>> 13), 3266489909);
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
 }
 
 async function viewWords() {
@@ -3316,8 +3331,8 @@ async function viewWords() {
   const answered = new Set(answers.filter((r) => r.answered_at >= start && !r.again).map((r) => r.word));
   const scale = fitWordScale(answers);
   const learned = progress.filter(wordLearned).length;
-  const queue = wordQueue(list, progress, answered, Math.max(0, goal - answered.size));
-  const extra = queue.length ? [] : wordQueue(list, progress, answered, 5);
+  const queue = wordQueue(list, progress, answered, Math.max(0, goal - answered.size), sid());
+  const extra = queue.length ? [] : wordQueue(list, progress, answered, 5, sid());
   // Listedeki bütün kelimeleri gördüyse yarın yeni kelime gelmez: bildiği kelimeler yalnızca günü gelince döner.
   const started = new Set(progress.map((p) => p.word));
   const unseen = list.filter((w) => !started.has(w.en)).length;
