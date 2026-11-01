@@ -190,11 +190,16 @@ Her maddenin yanında nasıl denendiği yazar:
   - "Tekrar dene" ve "Sonraki ders" düğmeleri var.
   - Yarıda bırakılan ders kaydedilmez; geri tuşu önce sorar.
 - 🚀 **Kelime roketi** (oyun, velinin isteği; Klavye sayfasında "Oyna") [A], oyun [E]
-  - Gece göğünden kelimeler düşer; alt kenarda beş ev. Kelimeler çalıştığı harflerden: ilk kilitli derse kadar açık derslerin
-    kelimeleri, kelime azsa tuş alıştırmaları da. Ekrandaki kelimeler farklı harfle başlar. [O]
+  - Gece göğünden kelimeler düşer; alt kenarda beş ev. Kelimeler yalnızca en az bir yıldızla bitirdiği derslerin
+    harflerinden (sırayla, ilk bitirmediği derse kadar), kelime azsa tuş alıştırmaları da. Açılmış ama yapmadığı dersin
+    harfleri gelmez (velinin isteği, 2026-11-01). Hiç ders bitirmediyse "Oyna" yerine "İlk dersi (F ve J) bitirince oyun
+    açılır". Ekrandaki kelimeler farklı harfle başlar. [O]
   - İlk harfe basınca çatıya en yakın o harfle başlayan kelime hedef olur; yazdıkça harfleri yeşillenir. Yönerge ve ekrandaki
     klavye sıradaki harfin tuşunu ve parmağını gösterir. Kelime bitince en yakın sağlam çatıdan roket kalkar, vurur (💥),
-    puan = harf sayısı × seviye. Yanlış tuşta saha sallanır. ⌫ ya da Esc hedefi bırakır.
+    puan = harf sayısı × seviye.
+  - Yanlış tuş hedefi bırakır, yazdıkları silinir ("O tuş değil, kelime baştan"); saha sallanır (velinin isteği: yanlıştan
+    sonra kelimede takılı kalıyorlardı). Basılan harfle başlayan başka bir kelime varsa hemen o kelimeye geçer; başka
+    kelimeye geçmek tek tuş, bu yanlış sayılmaz. ⌫ ya da Esc de hedefi bırakır.
   - Çatıya değen kelime çatıyı hırpalar: ilk darbede yara bandı 🩹, ikincide çatı uçar. Beş çatı da gidince oyun biter.
   - Gittikçe zorlaşır: her 6 kelimede bir seviye; düşüş 12 sn'den en az 4 sn'ye, iki kelime arası 3,2 sn'den en az 0,9 sn'ye,
     ekranda en çok 7 kelime; kelimeler uzar (başta en çok 4 harf). [O]

@@ -149,14 +149,16 @@ function typingNext(best) {
 const typingPerDay = (p) => p?.daily_typing ?? 0;
 
 /* Klavye oyunu "Kelime roketi" (velinin isteği): yukarıdan kelimeler düşer; çocuk bir kelimeyi yazınca çatıdan roket
-   kalkar ve kelimeyi vurur. Çatıya değen kelime çatıyı hırpalar; bütün çatılar gidince oyun biter. Kelimeler açık
+   kalkar ve kelimeyi vurur. Çatıya değen kelime çatıyı hırpalar; bütün çatılar gidince oyun biter. Kelimeler bitirdiği
    derslerin harflerinden (çalıştığı harfler); oyun ilerledikçe kelimeler hızlanır, sıklaşır ve uzar. */
-// Oyunun kelimeleri: ilk kilitli derse kadar açık derslerin kelimeleri; kelime azsa (ilk dersler) tuş alıştırmaları da.
-// Boşluklu, noktalı ve tek harfli olanlar alınmaz.
+// Oyunun kelimeleri: en az bir yıldızla bitirdiği derslerin kelimeleri, sırayla ilk bitirmediği derse kadar; kelime azsa
+// (ilk dersler) tuş alıştırmaları da. Açılmış ama henüz yapmadığı dersin harfleri gelmez (velinin isteği, 2026-11-01:
+// çalışmadığı harfler çıkıyordu). Hiç ders bitirmediyse kelime yok, oyun ilk dersten sonra açılır. Boşluklu, noktalı ve
+// tek harfli olanlar alınmaz.
 function gameWords(best) {
   const words = new Set(), drills = new Set();
-  for (const [i, l] of TYPING_LESSONS.entries()) {
-    if (!typingOpen(best, i)) break;
+  for (const l of TYPING_LESSONS) {
+    if (!(best[l.id] > 0)) break;
     for (const w of l.words || []) if (/^[a-zçğıöşü]{2,}$/.test(w)) words.add(w);
     for (const w of l.drills || []) if (/^[a-zçğıöşü]{2,}$/.test(w)) drills.add(w);
   }
@@ -382,12 +384,14 @@ async function viewTyping() {
       h('button', { class: 'primary block', onclick: () => runTyping(next, hero) }, `Başla: Ders ${next + 1} · ${lesson.title}`),
       h('p', { class: 'small muted' }, 'Parmakların böyle durur: işaret parmakların F ve J\'de (bu iki tuşta küçük çıkıntı var), başparmakların boşlukta.'),
       kb.el),
-    // Oyun: düşen kelimeleri yaz, çatıdan roket fırlat (kelimeler açık derslerin harflerinden).
+    // Oyun: düşen kelimeleri yaz, çatıdan roket fırlat (kelimeler bitirdiği derslerin harflerinden).
     h('section', { class: 'card stack', style: 'gap: 8px' },
       h('div', { class: 'spread' }, h('b', {}, '🚀 Kelime roketi'), gameBest() ? h('span', { class: 'small muted num' }, `En iyi puanın: ${gameBest()}`) : null),
       h('p', { class: 'small muted' }, 'Yukarıdan düşen kelimeleri yaz; çatıdan roket kalkıp vursun. Kelime çatıya değerse çatı hırpalanır, '
-        + 'çatılar bitince oyun biter. Kelimeler öğrendiğin harflerden; oyun gittikçe hızlanır.'),
-      h('button', { class: 'block', onclick: () => runTypingGame(hero) }, 'Oyna')),
+        + 'çatılar bitince oyun biter. Kelimeler bitirdiğin derslerin harflerinden; oyun gittikçe hızlanır.'),
+      gameWords(hero.typing.best).length
+        ? h('button', { class: 'block', onclick: () => runTypingGame(hero) }, 'Oyna')
+        : h('p', { class: 'small' }, `İlk dersi (${TYPING_LESSONS[0].title}) bitirince oyun açılır.`)),
     TYPING_STAGES.map((name, s) => [
       h('h2', {}, name),
       h('div', { class: 'ty-lessons' }, TYPING_LESSONS.map((l, i) => (l.stage === s ? tile(l, i) : null))),
@@ -632,6 +636,7 @@ function gameBest() {
 // Oyun Klavye sayfasından açılır; ders gibi alt menü gizli, geri tuşu önce sorar. Pencere arka plana geçince durur, bir
 // harfe basınca sürer. game.spawn ve game.tick duman testi içindir.
 function runTypingGame(hero) {
+  if (!gameWords(hero.typing.best).length) return;
   const game = {
     track: 'game', hero, words: gameWords(hero.typing.best), level: 1, hits: 0, score: 0, typed: 0, errors: 0,
     list: [], roofs: Array(GAME_ROOFS).fill(GAME_ROOF_HP), target: null, spawnIn: 1, last: 0, paused: false, over: false,
@@ -701,7 +706,7 @@ function gameDraw(game) {
         h('b', {}, '🚀 Kelime roketi'),
         h('span', { class: 'small' }, 'Puan ', v.score, ' · Seviye ', v.level, ' · Çatı ', v.roofs))),
     h('section', { class: 'ty-wrap tg-wrap stack' }, v.field, v.guide, game.kb.el,
-      h('p', { class: 'small muted' }, 'Kelimenin ilk harfine basınca o kelime hedef olur. Hedefi bırakmak için ⌫.')));
+      h('p', { class: 'small muted' }, 'Kelimenin ilk harfine basınca o kelime hedef olur. Başka kelimeye geçmek için onun ilk harfine bas; yanlış harfte kelime baştan başlar.')));
   window.scrollTo(0, 0); // Klavye sayfasının aşağısından açılınca da gökyüzü baştan görünsün
   gameHud(game);
   gameGuide(game);
@@ -723,7 +728,8 @@ function gameGuide(game, missed = false) {
     fill(v.guide, fingerDot(f), `${missed ? 'O tuş değil. ' : ''}${upFirst(FINGER_NAMES[f])} → ${keyName(ch)}`);
     game.kb.show({ codes: [code] });
   } else {
-    fill(v.guide, missed ? 'Bu harfle başlayan kelime yok. Düşen bir kelimenin ilk harfine bas.' : 'Düşen bir kelimenin ilk harfine bas, kelimeyi yaz: roket kalksın! 🚀');
+    fill(v.guide, missed === 'reset' ? 'O tuş değil, kelime baştan. Düşen bir kelimenin ilk harfine bas.'
+      : missed ? 'Bu harfle başlayan kelime yok. Düşen bir kelimenin ilk harfine bas.' : 'Düşen bir kelimenin ilk harfine bas, kelimeyi yaz: roket kalksın! 🚀');
     game.kb.show({});
   }
 }
@@ -792,17 +798,22 @@ function gameLand(game, w) {
   if (game.roofs.every((n) => n === 0)) gameOver(game);
 }
 
+// Basılan harf hedefin sıradaki harfiyse yazılır. Değilse hedef bırakılır, yazdıkları silinir (velinin isteği,
+// 2026-11-01: yanlıştan sonra kelimede takılı kalıyorlardı). Bu harfle başlayan bir kelime varsa (bıraktığı da olabilir)
+// çatıya en yakını hemen hedef olur; böylece başka kelimeye geçmek tek tuş. Hiçbir kelime bu harfle başlamıyorsa yanlış
+// sayılır.
 function gameKey(game, e) {
   if (game.over) return;
-  let t = game.target;
-  if (!t) {
-    // Bu harfle başlayan, çatıya en yakın kelime hedef olur.
-    t = game.list.filter((w) => !w.locked && typedIs(e, w.text[0])).sort((a, b) => b.y - a.y)[0];
-    if (!t) return gameMiss(game, e);
-    game.target = t;
-    t.el.classList.add('target');
-  }
-  if (!typedIs(e, t.text[t.pos])) return gameMiss(game, e);
+  const t = game.target;
+  if (t && typedIs(e, t.text[t.pos])) return gameType(game, t, e);
+  if (t) gameRelease(game);
+  const next = game.list.filter((w) => !w.locked && typedIs(e, w.text[0])).sort((a, b) => b.y - a.y)[0];
+  if (!next) return gameMiss(game, e, !!t);
+  game.target = next;
+  next.el.classList.add('target');
+  gameType(game, next, e);
+}
+function gameType(game, t, e) {
   t.pos++;
   game.typed++;
   game.kb.flash(e.code, true);
@@ -811,14 +822,15 @@ function gameKey(game, e) {
   gameGuide(game);
 }
 
-function gameMiss(game, e) {
+// reset: yanlış harf yarım kelimeyi bıraktı.
+function gameMiss(game, e, reset = false) {
   game.errors++;
   game.kb.flash(e.code, false);
   const field = game.view.field;
   field.classList.remove('miss');
   void field.offsetWidth;
   field.classList.add('miss');
-  gameGuide(game, true);
+  gameGuide(game, reset ? 'reset' : true);
 }
 
 // ⌫ ya da Esc: hedef bırakılır, başka kelimeye geçilebilir.

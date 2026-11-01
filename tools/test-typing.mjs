@@ -94,16 +94,23 @@ check('sıradaki ders: üç yıldızı olmayan ilk açık ders, hepsi bittiyse s
 check('günde kaç ders: aile açar, açılmadıysa kapalı (her sınıfta)', T.typingPerDay({ grade: 4 }) === 0 && T.typingPerDay({ grade: 8 }) === 0
   && T.typingPerDay({ grade: 3, daily_typing: 0 }) === 0 && T.typingPerDay({ grade: 8, daily_typing: 2 }) === 2);
 
-// Kelime roketi (oyun): kelimeler yalnızca açık derslerin harflerinden; oyun gittikçe hızlanır ve zorlaşır.
-// Çalıştığı harfler: ilk kilitli derse kadar açık derslerin harfleri.
+// Kelime roketi (oyun): kelimeler yalnızca bitirdiği derslerin harflerinden; oyun gittikçe hızlanır ve zorlaşır.
+// Çalıştığı harfler: sırayla, en az bir yıldızla bitirdiği derslerin harfleri (ilk bitirmediği derse kadar). Açılmış ama
+// yapmadığı dersin harfleri sayılmaz (velinin isteği: oyunda çalışmadığı harfler çıkıyordu).
 const lettersOf = (best) => {
-  const open = T.TYPING_LESSONS.findIndex((l, i) => !T.typingOpen(best, i));
-  return new Set(T.TYPING_LESSONS.slice(0, open < 0 ? undefined : open).flatMap((l) => [...(l.keys || 'abcçdefgğhıijklmnoöprsştuüvyzqwx')]));
+  const done = T.TYPING_LESSONS.findIndex((l) => !(best[l.id] > 0));
+  return new Set(T.TYPING_LESSONS.slice(0, done < 0 ? undefined : done).flatMap((l) => [...(l.keys || 'abcçdefgğhıijklmnoöprsştuüvyzqwx')]));
 };
 const onlyKnown = (best) => { const k = lettersOf(best); return T.gameWords(best).every((w) => [...w].every((c) => k.has(c))); };
-const first = T.gameWords(none), mid = T.gameWords(stuck), all = T.gameWords(all3);
-check('oyun kelimeleri yalnızca çalıştığı harflerden', first.length > 0 && first.every((w) => /^[fj]+$/.test(w)) && onlyKnown(stuck) && onlyKnown(two),
-  `ilk derste ${first.length} kelime, altıncı derse kadar ${mid.length}`);
+const first = T.gameWords(two), opened = T.gameWords(three), mid = T.gameWords(stuck), all = T.gameWords(all3);
+const fourDone = Object.fromEntries(T.TYPING_LESSONS.slice(0, 4).map((l) => [l.id, 3])); // beşinci ders (G ve H) açık, yapılmadı
+check('oyun kelimeleri yalnızca bitirdiği derslerin harflerinden',
+  first.length > 0 && first.every((w) => /^[fj]+$/.test(w)) && opened.every((w) => /^[fj]+$/.test(w))
+  && onlyKnown(stuck) && onlyKnown(fourDone) && !T.gameWords(fourDone).some((w) => /[gh]/.test(w)),
+  `ilk derste ${first.length} kelime, dört ders bitince ${T.gameWords(fourDone).length}`);
+check('hiç ders bitirmediyse oyun kelimesi yok (oyun ilk dersten sonra açılır)', T.gameWords(none).length === 0
+  && T.gameWords({ fj: 0 }).length === 0 && T.gameWords({ dk: 3 }).length === 0, `${T.gameWords(none).length} kelime`);
+check('eşik değişmeden önce bitirdiği ders de sayılır (en az bir yıldız)', mid.length > T.gameWords(fourDone).length && onlyKnown(stuck), `${mid.length} kelime`);
 check('oyun kelimeleri: boşluk, nokta, tek harf yok; kelime çoksa tuş alıştırması yok',
   all.every((w) => /^[a-zçğıöşü]{2,}$/u.test(w)) && !all.includes('fff') && !all.includes('yaz geldi.') && all.includes('kedi'), `${all.length} kelime`);
 const levels = Array.from({ length: 25 }, (_, i) => i + 1);

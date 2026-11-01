@@ -146,7 +146,7 @@
       go('typing'); await settle();
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
-      let shot = false, bonk = false;
+      let shot = false, bonk = false, reset = false, swap = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -158,11 +158,24 @@
         g.paused = false; // test sırasında tarayıcı bölmesi odağı kaybedince oyun durabilir
         g.tick(0.016);
         bonk = g.roofs.reduce((a, b) => a + b, 0) === roofs - 1 && !g.list.includes(w2);
+        // Yanlış harf yarım kelimeyi bırakır (yazılanlar silinir); başka kelimenin ilk harfi o kelimeye geçirir.
+        [...g.list].forEach((x) => gameRemove(g, x));
+        const a1 = g.spawn(), a2 = g.spawn();
+        if (a1 && a2) {
+          a1.text = 'fjf'; a2.text = 'kdk'; gamePaintWord(a1); gamePaintWord(a2);
+          g.paused = false;
+          key('f', 'KeyF'); key('d', 'KeyD'); // a1'de sıradaki harf j; d ile başlayan kelime yok
+          reset = !g.target && a1.pos === 0 && /baştan/.test(document.querySelector('.ty-guide')?.textContent || '');
+          key('f', 'KeyF'); key('k', 'KeyK'); // a1 yeniden hedef, sonra k ile a2'ye geçer
+          swap = g.target === a2 && a2.pos === 1 && a1.pos === 0;
+        }
       }
       history.back(); await settle();
       check('Kelime roketi: yazılan kelimeyi roket vurur, çatıya değen kelime çatıyı hırpalar, geri tuşu Klavye sayfasına döner',
         g?.track === 'game' && shot && bonk && !state.session && state.tab === 'typing' && !history.state?.overlay,
         [g?.track !== 'game' && 'açılmadı', !shot && 'vurmadı', !bonk && 'çatı hırpalanmadı', state.tab !== 'typing' && `açılan ${state.tab}`].filter(Boolean).join('; '));
+      check('Kelime roketi: yanlış harf kelimeyi baştan başlatır, başka kelimenin ilk harfi ona geçirir', reset && swap,
+        [!reset && 'yanlışta bırakılmadı', !swap && 'başka kelimeye geçmedi'].filter(Boolean).join('; '));
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).
