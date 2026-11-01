@@ -3318,6 +3318,10 @@ async function viewWords() {
   const learned = progress.filter(wordLearned).length;
   const queue = wordQueue(list, progress, answered, Math.max(0, goal - answered.size));
   const extra = queue.length ? [] : wordQueue(list, progress, answered, 5);
+  // Listedeki bütün kelimeleri gördüyse yarın yeni kelime gelmez: bildiği kelimeler yalnızca günü gelince döner.
+  const started = new Set(progress.map((p) => p.word));
+  const unseen = list.filter((w) => !started.has(w.en)).length;
+  const nextDue = progress.map((p) => p.due_date).filter((d) => d > localDate()).sort()[0];
   // Kelime kahramanı: güç (kelime gücü ve klavye yıldızları, araçlarının götürdüğü yere kadar), altın, yolculuk, sıradaki
   // büyük ödül.
   const owned = new Set(purchases.map((p) => p.item));
@@ -3350,7 +3354,9 @@ async function viewWords() {
       h('div', { class: 'progress' }, h('i', { style: `width: ${Math.min(100, (answered.size / Math.max(1, goal)) * 100)}%` })),
       !goal ? h('p', { class: 'muted' }, 'Kelime kartları kapalı; velin Ayarlar\'dan açabilir.')
         : queue.length ? h('button', { class: 'primary block', onclick: () => runWords(queue, list, progress, scale, hero) }, answered.size ? 'Devam et' : 'Başla')
-          : h('p', {}, 'Bugünlük bu kadar, aferin! 🎉 Yarın yeni kelimeler gelecek.'),
+          : unseen ? h('p', {}, 'Bugünlük bu kadar, aferin! 🎉 Yarın yeni kelimeler gelecek.')
+            : h('p', {}, `Listedeki ${list.length} kelimenin hepsini gördün, aferin! 🎉 Bildiğin kelimeler unutmadan önce yine gelecek`
+              + (nextDue ? `, sıradaki ${fmtDate(nextDue)}.` : '.')),
       goal && extra.length ? h('button', { class: 'block', onclick: () => runWords(extra, list, progress, scale, hero) }, `${extra.length} kelime daha`) : null),
     h('p', { class: 'small muted', style: 'text-align: center' }, `${list.length} kelimenin ${progress.length} tanesini gördün.`));
 }
@@ -3790,12 +3796,20 @@ function planSection(p) {
   const box = h('section', { class: 'card stack' }, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yükleniyor…'));
   (async () => {
     const today = localDate();
-    const [rows, due, wordRows] = await Promise.all([
+    const [rows, due, wordRows, wordSeen, words] = await Promise.all([
       q(sb.from('reviews').select('duration_sec, answered_at, questions(subject)').eq('student_id', p.id).eq('voided', false)
         .gte('answered_at', addDays(today, -6) + 'T00:00:00')),
       q(sb.from('items').select('support, topics(subject)').eq('student_id', p.id).eq('track', 'mistake').eq('state', 'active').lte('due_date', today)),
       q(sb.from('word_answers').select('word').eq('student_id', p.id).gte('answered_at', dayStart())),
+      q(sb.from('word_progress').select('word').eq('student_id', p.id)),
+      loadWords().catch(() => []),
     ]);
+    // Kelime listesinin ne kadarını gördü: hepsini gördüyse sayıyı artırmak yeni kart getirmez.
+    const inList = new Set(words.map((w) => w.en));
+    const seenWords = wordSeen.filter((r) => inList.has(r.word)).length;
+    const wordsLine = !words.length ? ''
+      : seenWords >= words.length ? `Listedeki ${words.length} kelimenin hepsini gördü: yeni kelime kalmadı, yalnızca günü gelen tekrarlar gelir; sayıyı artırmak yeni kart getirmez. `
+        : `Listedeki ${words.length} kelimenin ${seenWords} tanesini gördü. `;
     const stat = Object.fromEntries(subjects.map((s) => [s, { n: 0, sec: 0, week: 0, due: 0, items: 0 }]));
     for (const r of rows) {
       const st = stat[r.questions?.subject];
@@ -3851,7 +3865,7 @@ function planSection(p) {
     };
     const wordsRow = switchRow('Kelime kartları (İngilizce sekmesi)', wordsPerDay(p) > 0, wordsPerDay(p), 50, 10,
       'Aile isterse açar; kapalıyken sekme görünmez. Okuldaki İngilizce dersinden ayrı: İngilizce kelimeler, kolaydan zora. '
-        + `Açıkken günde kaç kart gelsin? Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü. `
+        + `Açıkken günde kaç kart gelsin? Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü. ${wordsLine}`
         + 'Kelime kahramanının görünüşü (kız ya da erkek, saç, fotoğraftan benzetme) Aile bölümünde.', '2px');
     const typingRow = switchRow('Klavye dersleri (Klavye sekmesi)', typingPerDay(p) > 0, typingPerDay(p), 10, 2,
       'Aile isterse açar, her sınıfta. On parmak klavye: ekranda klavye ve eller, hangi parmağın hangi tuşa basacağı yanar. '

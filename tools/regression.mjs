@@ -2,7 +2,7 @@
 //  1. Uygulama dosyası hatasız okunuyor mu, sürüm numaraları tutuyor mu; şifresiz giriş bağlantısı yalnızca
 //     test hesaplarına mı üretiliyor (bu deneme Supabase'e gitmez).
 //  2. Takvim ve günlük plan hesapları (tools/test-schedule.mjs), klavye dersleri (tools/test-typing.mjs), konu
-//     çalışmasının soru seçimi (tools/test-practice.mjs).
+//     çalışmasının soru seçimi (tools/test-practice.mjs), kelime listesi ve günün kartları (tools/test-words.mjs).
 //  3. Veritabanı yetkileri: supabase/test-*.sql. Her test kullanıcıların yerine geçip dener ve sonucu
 //     "SONUC {...}" hatasıyla döndürür; hata yüzünden her şey geri alınır, iz kalmaz. Sonuç dosyadaki
 //     "-- beklenen:" satırıyla karşılaştırılır (">0" gibi değerler sayı aralığıdır).
@@ -53,6 +53,10 @@ report(typingOut.length > 0 && !typingBad.length, 'Klavye dersleri', typingBad.l
 const practiceOut = node(['tools/test-practice.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const practiceBad = practiceOut.filter((l) => !l.startsWith('OK'));
 report(practiceOut.length > 0 && !practiceBad.length, 'Konu çalışması', practiceBad.length ? practiceBad.join(' | ') : `${practiceOut.length} kontrol`);
+// Kelime kartları: liste (kelime kaybolmaz, tekrar etmez, grupta şıklar farklı) ve günün kartları (tools/test-words.mjs).
+const wordsOut = node(['tools/test-words.mjs']).trim().split(/\r?\n/).filter(Boolean);
+const wordsBad = wordsOut.filter((l) => !l.startsWith('OK'));
+report(wordsOut.length > 0 && !wordsBad.length, 'Kelime listesi', wordsBad.length ? wordsBad.join(' | ') : `${wordsOut.length} kontrol`);
 
 // 3
 const fits = (want, got) => {

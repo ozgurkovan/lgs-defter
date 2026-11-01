@@ -89,7 +89,14 @@ Her maddenin yanında nasıl denendiği yazar:
 **Kelime kartları** (ayrı "İngilizce" sekmesi, Ayarlar'ın solunda) [A], oynama [E]
 - Okuldaki İngilizce dersinden ayrıdır, günlük plandaki ders sayılarına girmez.
 - Aile isterse açar (Ayarlar → Günlük plan, açma düğmesi), her sınıfta; açılmadıysa kapalı. Açıkken günde kaç kart (varsayılan 10).
-- Liste (`docs/words.json`): 386 kelime, 30 grup, kolaydan zora. Selamlaşma, renkler, sayılarla başlar; meslekler ve fiillerle biter.
+- Liste (`docs/words.json`): 1104 kelime, 80 grup, kolaydan zora. Selamlaşma, renkler, sayılarla başlar; ilk 30 grup temel
+  kelimeler (386). 2026-11-01'de İrfan ve Ömer bunların hepsini görünce 50 grup eklendi: masallar ve uzaydan başlar,
+  fiiller, zıt anlamlılar, zor sıfatlar ve "and, but, because" gibi küçük kelimelerle biter. [O, `test-words.mjs`]
+  - Kelime kimliği İngilizcesidir: önceki sürümdeki hiçbir kelime silinmez ya da yazımı değişmez, yeni gruplar sona eklenir.
+  - Kelimeler tekrar etmez; her grupta en az 4 kelime var ve grupta iki kelimenin Türkçesi aynı değil.
+- Bütün kelimeleri gördüyse ve hiçbirinin günü gelmediyse "Yarın yeni kelimeler gelecek" yazmaz. Bunun yerine
+  "Listedeki N kelimenin hepsini gördün… sıradaki <tarih>" yazar. Velinin Günlük plan satırında "hepsini gördü: … sayıyı
+  artırmak yeni kart getirmez" yazar; değilse "N kelimenin M tanesini gördü". [E]
 - Kart: İngilizce kelime ve altında dört Türkçe şık. Yanlış şıklar aynı gruptan seçilir.
   - İyice bildiği kelimede bazen tersi sorulur.
   - "🔊 Dinle" telefonun İngilizce sesiyle okur.
