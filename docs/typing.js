@@ -181,6 +181,31 @@ function gameWord(words, level, rnd, taken = new Set()) {
   return null;
 }
 const GAME_ROOFS = 5, GAME_ROOF_HP = 2; // beş ev; her çatı iki darbeye dayanır
+// Her yeni seviyede bir çatı baştan sağlam olur (velinin isteği, 2026-11-02): önce uçmuş çatı, yoksa hırpalanmış olan;
+// eşitse soldaki. Bütün çatılar sağlamsa -1.
+function gameRepair(roofs) {
+  let at = -1;
+  roofs.forEach((hp, i) => { if (hp < GAME_ROOF_HP && (at < 0 || hp < roofs[at])) at = i; });
+  return at;
+}
+// Süper kelime (velinin isteği, 2026-11-02): arada bir renkli, biraz uzun bir kelime düşer; onu vuran süper silah kazanır,
+// Ctrl'ye art arda iki kez basınca (en çok yarım saniye arayla) ekrandaki bütün kelimeler patlar. İlk süper kelime 8.
+// kelimede, sonra her 8–12 kelimede bir; süper silahı varken ya da ekranda süper kelime varken gelmez. Biraz daha yavaş
+// düşer (uzun kelimeyi yazmaya vakit kalsın).
+const GAME_SUPER_GAP = 8, GAME_SUPER_SLOW = 1.3, GAME_DOUBLE_MS = 500;
+const gameSuperDue = (game) => game.superIn <= 0 && !game.power && !game.list.some((w) => w.super);
+// Süper kelime seviyenin kelimelerinden biraz uzun (başta 5–8, sonra 7–10 harf), ekrandakilerden farklı ilk harfle. Öyle
+// kelime yoksa (ilk dersler) kelimeler yan yana eklenir: "fjf" + "jfj" → "fjfjfj".
+function gameSuperWord(words, level, rnd, taken = new Set()) {
+  const lo = Math.min(gameLen(level), 6) + 1, hi = lo + 3;
+  const fit = words.filter((w) => w.length >= lo && w.length <= hi), long = words.filter((w) => w.length >= lo);
+  for (const pool of [fit.filter((w) => !taken.has(w[0])), long.filter((w) => !taken.has(w[0])), fit, long]) {
+    if (pool.length) return pool[Math.floor(rnd() * pool.length)];
+  }
+  let text = '';
+  while (words.length && text.length < lo) text += gameWord(words, 99, rnd, text ? new Set() : taken);
+  return text || null;
+}
 
 /* Klavye: ses */
 
@@ -388,7 +413,8 @@ async function viewTyping() {
     h('section', { class: 'card stack', style: 'gap: 8px' },
       h('div', { class: 'spread' }, h('b', {}, '🚀 Kelime roketi'), gameBest() ? h('span', { class: 'small muted num' }, `En iyi puanın: ${gameBest()}`) : null),
       h('p', { class: 'small muted' }, 'Yukarıdan düşen kelimeleri yaz; çatıdan roket kalkıp vursun. Kelime çatıya değerse çatı hırpalanır, '
-        + 'çatılar bitince oyun biter. Kelimeler bitirdiğin derslerin harflerinden; oyun gittikçe hızlanır.'),
+        + 'çatılar bitince oyun biter. Kelimeler bitirdiğin derslerin harflerinden; oyun gittikçe hızlanır. Her yeni seviyede bir çatı '
+        + 'onarılır; renkli 🌟 kelimeyi vurursan süper silah kazanırsın (Ctrl\'ye iki kez bas, bütün kelimeler patlasın).'),
       gameWords(hero.typing.best).length
         ? h('button', { class: 'block', onclick: () => runTypingGame(hero) }, 'Oyna')
         : h('p', { class: 'small' }, `İlk dersi (${TYPING_LESSONS[0].title}) bitirince oyun açılır.`)),
@@ -634,18 +660,24 @@ function gameBest() {
 }
 
 // Oyun Klavye sayfasından açılır; ders gibi alt menü gizli, geri tuşu önce sorar. Pencere arka plana geçince durur, bir
-// harfe basınca sürer. game.spawn ve game.tick duman testi içindir.
+// harfe basınca sürer. game.spawn(süper mi) ve game.tick duman testi içindir.
 function runTypingGame(hero) {
   if (!gameWords(hero.typing.best).length) return;
   const game = {
     track: 'game', hero, words: gameWords(hero.typing.best), level: 1, hits: 0, score: 0, typed: 0, errors: 0,
     list: [], roofs: Array(GAME_ROOFS).fill(GAME_ROOF_HP), target: null, spawnIn: 1, last: 0, paused: false, over: false,
+    power: 0, superIn: GAME_SUPER_GAP - 1, ctrlAt: -Infinity,
     kb: keyboardView(), leaveText: 'Oyundan çıkılsın mı?',
   };
-  game.spawn = () => gameSpawn(game);
+  game.spawn = (superWord) => gameSpawn(game, superWord);
   game.tick = (dt) => gameStep(game, dt);
   const onKey = (e) => {
     if (state.session !== game) { game.detach(); return; }
+    // Süper silah Ctrl'ye art arda iki basışla. Çocuk Ctrl'ye sık basacağı için oyunda Ctrl'li kısayollar çalışmaz
+    // (sayfa yenilenmesin, yazdırma penceresi açılmasın); engellenemeyen Ctrl+W'de tarayıcı çıkmadan önce sorar.
+    if (e.key === 'Control') { if (!e.repeat) gameCtrl(game, performance.now()); return; }
+    game.ctrlAt = -Infinity; // araya başka tuş girdi
+    if (e.ctrlKey && e.key.length === 1) { e.preventDefault(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return; // kısayollar tarayıcının
     if (e.key === 'Tab') e.preventDefault();
     if (e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); return gameRelease(game); }
@@ -657,9 +689,11 @@ function runTypingGame(hero) {
   };
   const onBlur = () => gamePause(game);
   const onVisibility = () => { if (document.hidden) gamePause(game); };
+  const onUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
   game.detach = () => {
     window.removeEventListener('keydown', onKey, true);
     window.removeEventListener('blur', onBlur);
+    window.removeEventListener('beforeunload', onUnload);
     document.removeEventListener('visibilitychange', onVisibility);
     cancelAnimationFrame(game.raf);
   };
@@ -670,6 +704,7 @@ function runTypingGame(hero) {
   state.leaveOverlay = game.detach;
   window.addEventListener('keydown', onKey, true);
   window.addEventListener('blur', onBlur);
+  window.addEventListener('beforeunload', onUnload);
   document.addEventListener('visibilitychange', onVisibility);
   document.activeElement?.blur?.();
   gameDraw(game);
@@ -690,6 +725,7 @@ function gameDraw(game) {
     score: h('b', { class: 'num' }), level: h('b', { class: 'num' }), roofs: h('b', { class: 'num' }),
     guide: h('div', { class: 'ty-guide', role: 'status' }),
     banner: h('div', { class: 'tg-banner', hidden: true }),
+    power: h('div', { class: 'tg-power', hidden: true }, '🌟 Süper silah hazır: Ctrl\'ye iki kez bas!'),
     pause: h('div', { class: 'tg-pause', hidden: true }, 'Oyun durdu. Devam etmek için bir harfe bas.'),
   };
   const town = h('div', { class: 'tg-town' });
@@ -698,7 +734,7 @@ function gameDraw(game) {
     v.houses.push(house);
     town.append(house);
   }
-  v.field.append(v.layer, town, v.banner, v.pause);
+  v.field.append(v.layer, town, v.banner, v.power, v.pause);
   render(
     h('div', { class: 'qhead stack', style: 'gap: 8px' },
       h('div', { class: 'spread' },
@@ -706,7 +742,8 @@ function gameDraw(game) {
         h('b', {}, '🚀 Kelime roketi'),
         h('span', { class: 'small' }, 'Puan ', v.score, ' · Seviye ', v.level, ' · Çatı ', v.roofs))),
     h('section', { class: 'ty-wrap tg-wrap stack' }, v.field, v.guide, game.kb.el,
-      h('p', { class: 'small muted' }, 'Kelimenin ilk harfine basınca o kelime hedef olur. Başka kelimeye geçmek için onun ilk harfine bas; yanlış harfte kelime baştan başlar.')));
+      h('p', { class: 'small muted' }, 'Kelimenin ilk harfine basınca o kelime hedef olur. Başka kelimeye geçmek için onun ilk harfine bas; yanlış harfte kelime baştan başlar. '
+        + 'Renkli 🌟 kelimeyi vurursan süper silah kazanırsın: Ctrl\'ye iki kez bas, ekrandaki bütün kelimeler patlasın. Her yeni seviyede bir çatı onarılır.')));
   window.scrollTo(0, 0); // Klavye sayfasının aşağısından açılınca da gökyüzü baştan görünsün
   gameHud(game);
   gameGuide(game);
@@ -719,7 +756,8 @@ function gameHud(game) {
   v.roofs.textContent = `${game.roofs.filter((n) => n > 0).length}/${GAME_ROOFS}`;
 }
 
-// Yönerge: hedef varsa sıradaki harf ve parmağı (ekrandaki klavyede de yanar); yoksa ne yapacağı.
+// Yönerge: hedef varsa sıradaki harf ve parmağı (ekrandaki klavyede de yanar); yoksa ne yapacağı. Süper silah hazırsa
+// iki Ctrl tuşu yanar.
 function gameGuide(game, missed = false) {
   const v = game.view, t = game.target;
   v.guide.className = 'ty-guide' + (missed ? ' bad' : '');
@@ -728,30 +766,36 @@ function gameGuide(game, missed = false) {
     fill(v.guide, fingerDot(f), `${missed ? 'O tuş değil. ' : ''}${upFirst(FINGER_NAMES[f])} → ${keyName(ch)}`);
     game.kb.show({ codes: [code] });
   } else {
+    const boom = !missed && game.power > 0;
     fill(v.guide, missed === 'reset' ? 'O tuş değil, kelime baştan. Düşen bir kelimenin ilk harfine bas.'
-      : missed ? 'Bu harfle başlayan kelime yok. Düşen bir kelimenin ilk harfine bas.' : 'Düşen bir kelimenin ilk harfine bas, kelimeyi yaz: roket kalksın! 🚀');
-    game.kb.show({});
+      : missed ? 'Bu harfle başlayan kelime yok. Düşen bir kelimenin ilk harfine bas.'
+        : boom ? '🌟 Süper silah hazır: Ctrl\'ye iki kez bas, ekrandaki bütün kelimeler patlasın!'
+          : 'Düşen bir kelimenin ilk harfine bas, kelimeyi yaz: roket kalksın! 🚀');
+    game.kb.show(boom ? { codes: ['ControlLeft', 'ControlRight'] } : {});
   }
 }
 
-// Yeni kelime: sağlam çatılı bir evin üstünden düşer, hızı seviyeye göre.
-function gameSpawn(game) {
+// Yeni kelime: sağlam çatılı bir evin üstünden düşer, hızı seviyeye göre. Sırası gelince süper kelime: renkli, biraz uzun,
+// biraz yavaş.
+function gameSpawn(game, superWord = gameSuperDue(game)) {
   const v = game.view;
   const alive = game.roofs.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
   if (!alive.length) return null;
   const house = alive[Math.floor(Math.random() * alive.length)];
-  const text = gameWord(game.words, game.level, Math.random, new Set(game.list.map((w) => w.text[0])));
+  const text = (superWord ? gameSuperWord : gameWord)(game.words, game.level, Math.random, new Set(game.list.map((w) => w.text[0])));
   if (!text) return null;
   const f = v.field.getBoundingClientRect(), r = v.houses[house].getBoundingClientRect();
-  const w = { text, pos: 0, house, el: h('span', { class: 'tg-word' }), y: -8, ground: r.top - f.top + 10 };
+  const w = { text, pos: 0, house, super: !!superWord, el: h('span', { class: superWord ? 'tg-word super' : 'tg-word' }), y: -8, ground: r.top - f.top + 10 };
   v.layer.append(w.el);
   gamePaintWord(w);
   // Kelime sahadan taşmasın.
   const half = w.el.offsetWidth / 2 + 6;
   w.x = Math.min(f.width - half, Math.max(half, r.left - f.left + r.width / 2 + (Math.random() - 0.5) * r.width * 0.4));
-  w.speed = (w.ground - w.y) / gameFall(game.level);
+  w.speed = (w.ground - w.y) / (gameFall(game.level) * (superWord ? GAME_SUPER_SLOW : 1));
   gamePlace(w);
   game.list.push(w);
+  if (superWord) game.superIn = GAME_SUPER_GAP + Math.floor(Math.random() * 5);
+  else if (!game.power) game.superIn--;
   return w;
 }
 
@@ -878,14 +922,71 @@ function gameFire(game, t) {
 function gameHit(game, t) {
   if (game.over || !game.list.includes(t)) return; // oyun bitti ya da çıkıldı
   gameRemove(game, t);
-  gamePuff(game, t.x, t.y - 14, '💥');
+  gamePuff(game, t.x, t.y - 14, t.super ? '🌟' : '💥');
   game.hits++;
   game.score += t.text.length * game.level;
+  if (t.super) gamePower(game, 1);
+  const up = gameLevelUp(game);
+  if (up || t.super) gameBanner(game, up || '🌟 Süper silah! Ctrl\'ye iki kez bas.');
+  gameHud(game);
+}
+
+// Yeni seviye: kelimeler hızlanır; geçilen her seviye için bir çatı baştan sağlam olur (velinin isteği, 2026-11-02).
+// Seviye atladıysa şeritte yazılacak sözü verir.
+function gameLevelUp(game) {
   const level = gameLevel(game.hits);
-  if (level > game.level) {
-    game.level = level;
-    gameBanner(game, `⭐ Seviye ${level}! Kelimeler hızlanıyor.`);
+  if (level <= game.level) return null;
+  const v = game.view, f = v.field.getBoundingClientRect();
+  let fixed = 0;
+  for (; game.level < level; game.level++) {
+    const i = gameRepair(game.roofs);
+    if (i < 0) continue;
+    game.roofs[i] = GAME_ROOF_HP;
+    const house = v.houses[i], r = house.getBoundingClientRect();
+    house.dataset.hp = GAME_ROOF_HP;
+    house.classList.remove('hit', 'fix');
+    void house.offsetWidth; // animasyon yeniden başlasın
+    house.classList.add('fix');
+    gamePuff(game, r.left - f.left + r.width / 2, r.top - f.top + 12, '🔨');
+    fixed++;
   }
+  return `⭐ Seviye ${level}! ${fixed ? `${fixed > 1 ? fixed : 'Bir'} çatı onarıldı. 🔨` : 'Kelimeler hızlanıyor.'}`;
+}
+
+// Süper silah var mı (sol üstteki rozet ve yönerge).
+function gamePower(game, n) {
+  game.power = n;
+  game.view.power.hidden = !n;
+  gameGuide(game);
+}
+
+// Ctrl'ye art arda iki basış (arada başka tuş yok, en çok yarım saniye): süper silah ateşlenir. Süper silah yoksa ya da
+// ekranda kelime yoksa ne yapacağı söylenir; silah harcanmaz.
+function gameCtrl(game, now) {
+  if (game.over || game.paused) return;
+  if (now - game.ctrlAt > GAME_DOUBLE_MS) { game.ctrlAt = now; return; }
+  game.ctrlAt = -Infinity;
+  if (!game.power) return gameBanner(game, 'Süper silah için renkli 🌟 kelimeyi vur.');
+  if (!game.list.length) return gameBanner(game, 'Ekranda kelime yok; süper silahın duruyor.');
+  gameBoom(game);
+}
+
+// Süper silah: ekrandaki bütün kelimeler patlar, gök bir an parlar. Her kelime vurulmuş sayılır (puan, seviye, çatı onarımı).
+function gameBoom(game) {
+  const words = [...game.list];
+  for (const w of words) {
+    gameRemove(game, w);
+    gamePuff(game, w.x, w.y - 14, '💥');
+    game.hits++;
+    game.score += w.text.length * game.level;
+  }
+  gamePower(game, 0);
+  const field = game.view.field;
+  field.classList.remove('boom');
+  void field.offsetWidth;
+  field.classList.add('boom');
+  setTimeout(() => field.classList.remove('boom'), 650); // sonraki yanlışta saha yine sallansın
+  gameBanner(game, gameLevelUp(game) || `💥 Süper silah! ${words.length} kelime patladı.`);
   gameHud(game);
 }
 

@@ -78,6 +78,13 @@
 .tg-word .done { color: #1F9D5C; }
 .tg-word.target { background: #FFE38A; box-shadow: 0 0 0 3px #F59E0B, 0 0 18px rgba(245, 158, 11, 0.85); }
 .tg-word.locked { background: #CFF5DF; }
+/* Süper kelime: renkli ve parlayan; vurana süper silah. */
+.tg-word.super, .tg-word.super.target { background: linear-gradient(90deg, #FFD54F, #FF9E6B, #F48FB1); color: #3A1030; }
+.tg-word.super { box-shadow: 0 0 0 3px #fff, 0 0 22px rgba(255, 158, 107, 0.95); animation: tg-glow 0.9s ease-in-out infinite alternate; }
+.tg-word.super.target { box-shadow: 0 0 0 3px #F59E0B, 0 0 26px rgba(245, 158, 11, 1); animation: none; }
+.tg-word.super::before { content: '🌟'; font-size: 18px; opacity: 1; }
+.tg-word.super .done { color: #0B6B3A; }
+@keyframes tg-glow { to { box-shadow: 0 0 0 3px #fff, 0 0 34px rgba(255, 213, 79, 1); } }
 .tg-rocket { font-size: 28px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
 .tg-puff { font-size: 36px; animation: tg-puff 0.5s ease-out forwards; }
 @keyframes tg-puff { from { opacity: 1; scale: 0.4; } to { opacity: 0; scale: 1.7; } }
@@ -96,6 +103,21 @@
 .tg-house[data-hp="0"] .roof { transform: translateY(-34px) rotate(-25deg); opacity: 0; }
 .tg-house.hit { animation: tg-bonk 0.35s; }
 @keyframes tg-bonk { 30% { transform: translateY(5px); } }
+.tg-house.fix { animation: tg-fix 0.6s; } /* yeni seviyede onarılan çatı (uçmuşsa yerine geri iner) */
+@keyframes tg-fix { 40% { transform: translateY(-8px) scale(1.06); } }
+/* Süper silah hazır rozeti (sol üstte, düşen kelimelerin arkasında: kelimeyi örtmesin); patlamada gök bir an parlar. */
+.tg-power {
+  position: absolute; left: 10px; top: 10px; z-index: 1; max-width: calc(100% - 20px); padding: 5px 12px; border-radius: 999px;
+  background: linear-gradient(90deg, #FFD54F, #FF9E6B, #F48FB1); color: #3A1030; font-weight: 800; font-size: 0.95rem;
+  box-shadow: 0 0 18px rgba(255, 213, 79, 0.9); animation: tg-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes tg-pulse { to { transform: scale(1.05); } }
+.tg-field.boom { animation: ty-shake 0.3s; }
+.tg-field.boom::after {
+  content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle, rgba(255, 244, 179, 0.95), rgba(255, 158, 107, 0.6) 45%, transparent 75%); animation: tg-boom 0.6s ease-out;
+}
+@keyframes tg-boom { from { opacity: 1; } }
 .tg-banner {
   position: absolute; left: 50%; top: 16%; z-index: 3; transform: translateX(-50%); padding: 8px 16px; border-radius: 999px;
   background: rgba(255, 255, 255, 0.94); color: #3B2F8F; font-weight: 800; white-space: nowrap; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
@@ -103,8 +125,9 @@
 .tg-pause, .tg-over { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 16px; background: rgba(16, 22, 56, 0.6); }
 .tg-pause { color: #fff; font-weight: 800; font-size: 1.2rem; text-align: center; }
 .tg-over .card { max-width: 400px; text-align: center; }
-.tg-banner[hidden], .tg-pause[hidden] { display: none; }
+.tg-banner[hidden], .tg-pause[hidden], .tg-power[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .ty-typed .lit, .ty-typed .bad, .kb .k.erase .kc, .kb .kb-arrow.show, .tg-field.miss, .tg-house.hit, .tg-puff { animation: none; }
+  .ty-typed .lit, .ty-typed .bad, .kb .k.erase .kc, .kb .kb-arrow.show, .tg-field.miss, .tg-house.hit, .tg-puff,
+  .tg-word.super, .tg-house.fix, .tg-power, .tg-field.boom, .tg-field.boom::after { animation: none; }
 }

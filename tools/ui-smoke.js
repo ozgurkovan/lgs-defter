@@ -146,7 +146,7 @@
       go('typing'); await settle();
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
-      let shot = false, bonk = false, reset = false, swap = false;
+      let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, held = false, boom = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -169,6 +169,30 @@
           key('f', 'KeyF'); key('k', 'KeyK'); // a1 yeniden hedef, sonra k ile a2'ye geçer
           swap = g.target === a2 && a2.pos === 1 && a1.pos === 0;
         }
+        // Yeni seviyede bir çatı onarılır: önce uçmuş olan.
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.roofs = [0, 1, 2, 2, 2];
+        g.roofs.forEach((hp, i) => { g.view.houses[i].dataset.hp = hp; });
+        g.hits = 5; g.level = 1; g.paused = false;
+        const w3 = g.spawn(false);
+        if (w3) for (const ch of w3.text) key(ch, TQ_KEY[ch]);
+        await wait(1200);
+        fixed = g.level === 2 && g.roofs.join() === '2,1,2,2,2' && g.view.houses[0].dataset.hp === '2';
+        // Renkli süper kelime süper silah verir; Ctrl'ye art arda iki basınca ekrandaki bütün kelimeler patlar, araya başka
+        // tuş girerse patlamaz.
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.paused = false;
+        const s = g.spawn(true);
+        if (s) for (const ch of s.text) key(ch, TQ_KEY[ch]);
+        await wait(1200);
+        armed = !!s?.super && s.el.classList.contains('super') && s.text.length >= 5 && g.power === 1 && !g.view.power.hidden;
+        [...g.list].forEach((x) => gameRemove(g, x));
+        const b1 = g.spawn(false), b2 = g.spawn(false), hits0 = g.hits;
+        g.paused = false;
+        key('Control', 'ControlLeft'); key('1', 'Digit1'); key('Control', 'ControlLeft');
+        held = g.list.length === 2 && g.power === 1;
+        key('Control', 'ControlLeft');
+        boom = !!b1 && !!b2 && g.list.length === 0 && g.hits === hits0 + 2 && g.power === 0 && g.view.power.hidden;
       }
       history.back(); await settle();
       check('Kelime roketi: yazılan kelimeyi roket vurur, çatıya değen kelime çatıyı hırpalar, geri tuşu Klavye sayfasına döner',
@@ -176,6 +200,9 @@
         [g?.track !== 'game' && 'açılmadı', !shot && 'vurmadı', !bonk && 'çatı hırpalanmadı', state.tab !== 'typing' && `açılan ${state.tab}`].filter(Boolean).join('; '));
       check('Kelime roketi: yanlış harf kelimeyi baştan başlatır, başka kelimenin ilk harfi ona geçirir', reset && swap,
         [!reset && 'yanlışta bırakılmadı', !swap && 'başka kelimeye geçmedi'].filter(Boolean).join('; '));
+      check('Kelime roketi: yeni seviyede bir çatı onarılır (önce uçmuş olan)', fixed, g ? `seviye ${g.level}, çatılar ${g.roofs.join()}` : '');
+      check('Kelime roketi: renkli kelime süper silah verir; Ctrl\'ye art arda iki basınca bütün kelimeler patlar', armed && held && boom,
+        [!armed && 'süper silah gelmedi', !held && 'araya tuş girince de patladı', !boom && 'patlamadı'].filter(Boolean).join('; '));
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).

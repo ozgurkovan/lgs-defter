@@ -203,6 +203,16 @@ Her maddenin yanında nasıl denendiği yazar:
   - Çatıya değen kelime çatıyı hırpalar: ilk darbede yara bandı 🩹, ikincide çatı uçar. Beş çatı da gidince oyun biter.
   - Gittikçe zorlaşır: her 6 kelimede bir seviye; düşüş 12 sn'den en az 4 sn'ye, iki kelime arası 3,2 sn'den en az 0,9 sn'ye,
     ekranda en çok 7 kelime; kelimeler uzar (başta en çok 4 harf). [O]
+  - Her yeni seviyede bir çatı baştan sağlam olur (velinin isteği, 2026-11-02): önce uçmuş olan (çatı yerine iner, 🔨),
+    yoksa hırpalanmış olan, eşitse soldaki. Şerit: "⭐ Seviye N! Bir çatı onarıldı." Çatılar sağlamsa "Kelimeler hızlanıyor". [O]
+  - Süper kelime (velinin isteği, 2026-11-02): ilki 8. kelimede, sonra her 8–12 kelimede bir renkli, parlayan, 🌟'lı bir
+    kelime düşer. Biraz uzundur (başta 5–8, sonra 7–10 harf; ilk derslerde alıştırmalar yan yana) ve biraz yavaş düşer.
+    Süper silahı varken ya da ekranda süper kelime varken gelmez. Çatıya değerse o da çatıyı hırpalar. [O]
+  - Süper kelimeyi vuran süper silah kazanır: sol üstte "🌟 Süper silah hazır" rozeti (kelimelerin arkasında), yönergede
+    "Ctrl'ye iki kez bas", ekrandaki klavyede iki Ctrl tuşu yanar. Ctrl'ye art arda iki kez basınca (en çok yarım saniye arayla,
+    arada başka tuş yok) ekrandaki bütün kelimeler patlar, gök bir an parlar; her biri vurulmuş sayılır (puan, seviye, çatı
+    onarımı). Silah yokken "renkli kelimeyi vur", ekranda kelime yokken "silahın duruyor" der; silah harcanmaz.
+  - Oyunda Ctrl'li kısayollar çalışmaz (Ctrl+R, Ctrl+P…); Ctrl+W ya da sayfayı yenileme tarayıcıda "çıkılsın mı?" sorar.
   - Bitişte puan, vurulan kelime, seviye, doğruluk, en iyi puan (bu tarayıcıda; "Yeni rekor!"), "Tekrar oyna".
   - Pencere arka plana geçince oyun durur, bir harfe basınca sürer. Geri tuşu önce sorar. Oyun hiçbir şey kaydetmez.
 - Klavye kahramanı da büyütür. Kelime sayfası, mağaza ve rapor bunu sayar; güç arttıysa kutlama olur. Kahraman Klavye

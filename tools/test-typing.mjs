@@ -18,7 +18,8 @@ const code = [
   pick(src, '/* Klavye dersleri: saf kısım', '/* Klavye: ses */'),
   pick(src, 'const TQ_ROWS', 'const KB = '),
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
-    + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP };',
+    + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
+    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS };',
 ].join('\n');
 const T = new Function(code)();
 
@@ -126,5 +127,21 @@ check('kelime seçimi: başta kısa kelimeler, ekrandakilerden farklı ilk harf;
   picks.every((w) => w.length <= 4 && !'ka'.includes(w[0])) && T.gameWord(['fj', 'jf'], 1, rnd, new Set(['f', 'j'])) != null
   && T.gameWord([], 1, rnd) === null && T.gameLen(1) === 4 && T.gameLen(5) === 99);
 check('beş ev, her çatı iki darbe', T.GAME_ROOFS === 5 && T.GAME_ROOF_HP === 2);
+// Her yeni seviyede bir çatı onarılır (velinin isteği): önce uçmuş olan, yoksa hırpalanmış olan, eşitse soldaki.
+check('yeni seviyede onarılan çatı: önce uçmuş, sonra hırpalanmış, eşitse soldaki; hepsi sağlamsa yok',
+  T.gameRepair([2, 2, 2, 2, 2]) === -1 && T.gameRepair([2, 1, 0, 2, 0]) === 2 && T.gameRepair([2, 1, 2, 1, 2]) === 1
+  && T.gameRepair([0, 0, 0, 0, 1]) === 0);
+// Süper kelime (velinin isteği): arada bir renkli, biraz uzun kelime; vurana süper silah, Ctrl'ye iki kez basınca patlar.
+seed = 5;
+const sup1 = Array.from({ length: 40 }, () => T.gameSuperWord(all, 1, rnd, new Set(['k', 'a'])));
+const sup5 = Array.from({ length: 40 }, () => T.gameSuperWord(all, 5, rnd));
+const supFj = Array.from({ length: 20 }, () => T.gameSuperWord(first, 1, rnd));
+check('süper kelime biraz uzun: başta 5–8, sonra 7–10 harf, farklı ilk harf; ilk derste kelimeler yan yana (yalnızca F ve J)',
+  sup1.every((w) => w.length >= 5 && w.length <= 8 && !'ka'.includes(w[0])) && sup5.every((w) => w.length >= 7 && w.length <= 10)
+  && supFj.every((w) => w.length >= 5 && /^[fj]+$/.test(w)) && T.gameSuperWord([], 1, rnd) === null, `${sup1[0]}, ${sup5[0]}, ${supFj[0]}`);
+const due = (o) => T.gameSuperDue({ superIn: 0, power: 0, list: [], ...o });
+check('süper kelime sırası gelince; süper silah varken ya da ekranda süper kelime varken gelmez; Ctrl iki basış yarım saniyede',
+  due({}) && due({ list: [{ super: false }] }) && !due({ superIn: 3 }) && !due({ power: 1 }) && !due({ list: [{ super: true }] })
+  && T.GAME_SUPER_GAP === 8 && T.GAME_SUPER_SLOW > 1 && T.GAME_DOUBLE_MS === 500);
 
 process.exit(fails ? 1 : 0);
