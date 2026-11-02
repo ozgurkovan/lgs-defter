@@ -195,7 +195,7 @@ function gameRepair(roofs) {
 // evlerin arasında ateşe hazır roketler olarak durur; her iki Ctrl birini ateşler.
 const GAME_SUPER_GAP = 8, GAME_SUPER_SLOW = 1.3, GAME_DOUBLE_MS = 500, GAME_POWER_MAX = GAME_ROOFS - 1;
 const gameSuperDue = (game) => game.superIn <= 0 && game.power < GAME_POWER_MAX && !game.list.some((w) => w.super);
-// Süper kelime seviyenin kelimelerinden biraz uzun (başta 5–8, sonra 7–10 harf), ekrandakilerden farklı ilk harfle. Öyle
+// Süper kelime (buzlu kelime de) seviyenin kelimelerinden biraz uzun (başta 5–8, sonra 7–10 harf), ekrandakilerden farklı ilk harfle. Öyle
 // kelime yoksa (ilk dersler) kelimeler yan yana eklenir: "fjf" + "jfj" → "fjfjfj".
 function gameSuperWord(words, level, rnd, taken = new Set()) {
   const lo = Math.min(gameLen(level), 6) + 1, hi = lo + 3;
@@ -217,6 +217,32 @@ const gameVolley = (list) => list.filter((w) => !w.locked).sort((a, b) => (a.gro
 const GAME_GUARD_S = 0.8;
 const gameGuard = (game, w) => game.power > 0 && !game.volley && game.roofs[w.house] > 0
   && game.roofs.filter((hp) => hp > 0).length === 1 && w.ground - w.y <= w.speed * GAME_GUARD_S;
+// Buz makinesi (velinin isteği, 2026-11-02): oyun biraz hızlanınca (3. seviyeden sonra) arada bir buzlu ❄️, biraz uzun bir
+// kelime düşer (süper kelime gibi seçilir, biraz yavaş). Onu vuranın, kelimenin düştüğü çatısına buz makinesi takılır; makine o
+// çatının ve yanındaki bir çatının sütununa düşen kelimelere kendiliğinden buzlu su püskürtür, ıslanan kelime yarı hızla düşer.
+// Her kelime bir kez ıslanır; iki püskürtme arası GAME_ICE_COOL saniye. Makinede sekiz buz var, bitince erir; çatısı uçarsa
+// makine de gider. Makine varken ya da ekranda buzlu kelime varken yenisi gelmez: ilki 3. seviyenin üçüncü kelimesinde, sonra
+// her 10–14 kelimede bir (makine giderken sayılmaz).
+const GAME_ICE_LEVEL = 3, GAME_ICE_GAP = 10, GAME_ICE_SHOTS = 8, GAME_ICE_SLOW = 0.5, GAME_ICE_COOL = 0.6, GAME_ICE_FROM = 0.15;
+const gameIceDue = (game) => game.level >= GAME_ICE_LEVEL && !game.ice && game.iceIn <= 0 && !game.list.some((w) => w.ice);
+// Makinenin çatısı: buzlu kelimenin düştüğü çatı; o uçtuysa en yakın sağlam çatı (eşitse soldaki). Sağlam çatı yoksa -1.
+function gameIceRoof(roofs, house) {
+  let at = -1;
+  roofs.forEach((hp, i) => { if (hp > 0 && (at < 0 || Math.abs(i - house) < Math.abs(at - house))) at = i; });
+  return at;
+}
+// Makinenin iki sütunu (soldan sağa): kendi çatısı ve yanındakilerden biri: sağlam olan; ikisi de sağlamsa hırpalanmış olan,
+// eşitse ortaya yakın olan, o da eşitse soldaki.
+function gameIceCols(roofs, house) {
+  const mid = (roofs.length - 1) / 2;
+  const [side] = [house - 1, house + 1].filter((i) => i >= 0 && i < roofs.length)
+    .sort((a, b) => (roofs[b] > 0) - (roofs[a] > 0) || roofs[a] - roofs[b] || Math.abs(a - mid) - Math.abs(b - mid) || a - b);
+  return [house, side].sort((a, b) => a - b);
+}
+// Sıradaki püskürtme: makinenin sütunlarındaki, roketi yolda olmayan, henüz ıslanmamış ve gökyüzüne girmiş (yolunun
+// GAME_ICE_FROM kadarını geçmiş) kelimelerden çatısına en yakın olanı; yoksa null.
+const gameIceAim = (list, cols) => list.filter((w) => cols.includes(w.house) && !w.locked && !w.iced && w.y >= w.ground * GAME_ICE_FROM)
+  .sort((a, b) => (a.ground - a.y) - (b.ground - b.y))[0] || null;
 
 /* Klavye: ses */
 
@@ -426,7 +452,8 @@ async function viewTyping() {
       h('p', { class: 'small muted' }, 'Yukarıdan düşen kelimeleri yaz; çatıdan roket kalkıp vursun. Kelime çatıya değerse çatı hırpalanır, '
         + 'çatılar bitince oyun biter. Kelimeler bitirdiğin derslerin harflerinden; oyun gittikçe hızlanır. Her yeni seviyede bir çatı '
         + 'onarılır; renkli 🌟 kelimeyi vurursan süper silah kazanırsın, dört taneye kadar biriktirebilirsin (Ctrl\'ye iki kez bas, roketler '
-        + 'bütün kelimeleri sırayla vursun; son çatı kalınca kendiliğinden ateşlenir).'),
+        + 'bütün kelimeleri sırayla vursun; son çatı kalınca kendiliğinden ateşlenir). Oyun hızlanınca gelen buzlu ❄️ kelime çatıya buz '
+        + 'makinesi takar; makine yakındaki kelimelere kendiliğinden buzlu su püskürtüp onları yavaşlatır.'),
       gameWords(hero.typing.best).length
         ? h('button', { class: 'block', onclick: () => runTypingGame(hero) }, 'Oyna')
         : h('p', { class: 'small' }, `İlk dersi (${TYPING_LESSONS[0].title}) bitirince oyun açılır.`)),
@@ -672,16 +699,16 @@ function gameBest() {
 }
 
 // Oyun Klavye sayfasından açılır; ders gibi alt menü gizli, geri tuşu önce sorar. Pencere arka plana geçince durur, bir
-// harfe basınca sürer. game.spawn(süper mi) ve game.tick duman testi içindir.
+// harfe basınca sürer. game.spawn(tür: '', 'super' ya da 'ice') ve game.tick duman testi içindir.
 function runTypingGame(hero) {
   if (!gameWords(hero.typing.best).length) return;
   const game = {
     track: 'game', hero, words: gameWords(hero.typing.best), level: 1, hits: 0, score: 0, typed: 0, errors: 0,
     list: [], roofs: Array(GAME_ROOFS).fill(GAME_ROOF_HP), target: null, spawnIn: 1, last: 0, paused: false, over: false,
-    power: 0, superIn: GAME_SUPER_GAP - 1, ctrlAt: -Infinity, volley: null,
+    power: 0, superIn: GAME_SUPER_GAP - 1, ctrlAt: -Infinity, volley: null, ice: null, iceIn: 2,
     kb: keyboardView(), leaveText: 'Oyundan çıkılsın mı?',
   };
-  game.spawn = (superWord) => gameSpawn(game, superWord);
+  game.spawn = (kind) => gameSpawn(game, kind);
   game.tick = (dt) => gameStep(game, dt);
   const onKey = (e) => {
     if (state.session !== game) { game.detach(); return; }
@@ -758,7 +785,9 @@ function gameDraw(game) {
       h('p', { class: 'small muted' }, 'Kelimenin ilk harfine basınca o kelime hedef olur. Başka kelimeye geçmek için onun ilk harfine bas; yanlış harfte kelime baştan başlar. '
         + 'Renkli 🌟 kelimeyi vurursan süper silah kazanırsın; dört taneye kadar biriktirebilirsin, evlerin arasında hazır bekler. Ctrl\'ye iki kez bas: '
         + 'evlerden roketler kalkıp ekrandaki bütün kelimeleri en alttakinden başlayarak sırayla vursun. Son çatı kaldığında kelimeler ona çok '
-        + 'yaklaşınca süper silah kendiliğinden ateşlenir. Her yeni seviyede bir çatı onarılır.')));
+        + 'yaklaşınca süper silah kendiliğinden ateşlenir. Her yeni seviyede bir çatı onarılır. Oyun hızlanınca buzlu ❄️ kelime gelir: '
+        + 'onu vurursan çatıya buz makinesi takılır; o çatının ve yanındaki çatının üstüne düşen kelimelere kendiliğinden buzlu su '
+        + 'püskürtüp onları yavaşlatır. Buzu bitince erir.')));
   window.scrollTo(0, 0); // Klavye sayfasının aşağısından açılınca da gökyüzü baştan görünsün
   gameHud(game);
   gameGuide(game);
@@ -791,27 +820,30 @@ function gameGuide(game, missed = false) {
   }
 }
 
-// Yeni kelime: sağlam çatılı bir evin üstünden düşer, hızı seviyeye göre. Sırası gelince süper kelime: renkli, biraz uzun,
-// biraz yavaş.
-function gameSpawn(game, superWord = gameSuperDue(game)) {
+// Yeni kelime: sağlam çatılı bir evin üstünden düşer, hızı seviyeye göre. Sırası gelince süper kelime (renkli) ya da buzlu
+// kelime: biraz uzun, biraz yavaş; ikisinin birden sırası geldiyse önce süper kelime. kind: '' sıradan, 'super', 'ice'.
+function gameSpawn(game, kind = gameSuperDue(game) ? 'super' : gameIceDue(game) ? 'ice' : '') {
   const v = game.view;
   const alive = game.roofs.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
   if (!alive.length) return null;
   const house = alive[Math.floor(Math.random() * alive.length)];
-  const text = (superWord ? gameSuperWord : gameWord)(game.words, game.level, Math.random, new Set(game.list.map((w) => w.text[0])));
+  const text = (kind ? gameSuperWord : gameWord)(game.words, game.level, Math.random, new Set(game.list.map((w) => w.text[0])));
   if (!text) return null;
   const f = v.field.getBoundingClientRect(), r = v.houses[house].getBoundingClientRect();
-  const w = { text, pos: 0, house, super: !!superWord, el: h('span', { class: superWord ? 'tg-word super' : 'tg-word' }), y: -8, ground: r.top - f.top + 10 };
+  const w = { text, pos: 0, house, super: kind === 'super', ice: kind === 'ice', el: h('span', { class: kind ? `tg-word ${kind}` : 'tg-word' }),
+    y: -8, ground: r.top - f.top + 10 };
   v.layer.append(w.el);
   gamePaintWord(w);
   // Kelime sahadan taşmasın.
   const half = w.el.offsetWidth / 2 + 6;
   w.x = Math.min(f.width - half, Math.max(half, r.left - f.left + r.width / 2 + (Math.random() - 0.5) * r.width * 0.4));
-  w.speed = (w.ground - w.y) / (gameFall(game.level) * (superWord ? GAME_SUPER_SLOW : 1));
+  w.speed = (w.ground - w.y) / (gameFall(game.level) * (kind ? GAME_SUPER_SLOW : 1));
   gamePlace(w);
   game.list.push(w);
-  if (superWord) game.superIn = GAME_SUPER_GAP + Math.floor(Math.random() * 5);
+  if (w.super) game.superIn = GAME_SUPER_GAP + Math.floor(Math.random() * 5);
   else if (game.power < GAME_POWER_MAX) game.superIn--;
+  if (w.ice) game.iceIn = GAME_ICE_GAP + Math.floor(Math.random() * 5);
+  else if (game.level >= GAME_ICE_LEVEL && !game.ice) game.iceIn--;
   return w;
 }
 
@@ -835,6 +867,7 @@ function gameStep(game, dt) {
     if (gameGuard(game, w)) gameBoom(game, true); // son çatı: süper silah kendiliğinden
     else if (w.y >= w.ground) gameLand(game, w);
   }
+  if (game.ice && !game.volley && !game.over) gameIceStep(game, dt);
 }
 
 function gameRemove(game, w) {
@@ -843,7 +876,8 @@ function gameRemove(game, w) {
   if (game.target === w) { game.target = null; gameGuide(game); }
 }
 
-// Kelime çatıya değdi: çatı bir darbe alır (önce yara bandı, sonra uçar). Bütün çatılar gidince oyun biter.
+// Kelime çatıya değdi: çatı bir darbe alır (önce yara bandı, sonra uçar; üstünde buz makinesi varsa o da gider). Bütün
+// çatılar gidince oyun biter.
 function gameLand(game, w) {
   gameRemove(game, w);
   gamePuff(game, w.x, w.ground - 6, '💨');
@@ -854,6 +888,7 @@ function gameLand(game, w) {
     house.classList.remove('hit');
     void house.offsetWidth; // animasyon yeniden başlasın
     house.classList.add('hit');
+    if (!hp && game.ice?.house === w.house) gameIceOff(game, '💨 Çatı uçtu, buz makinesi de gitti.');
   }
   gameHud(game);
   if (game.roofs.every((n) => n === 0)) gameOver(game);
@@ -939,12 +974,16 @@ function gameFire(game, t, volley = false) {
 function gameHit(game, t) {
   if (game.over || !game.list.includes(t)) return; // oyun bitti ya da çıkıldı
   gameRemove(game, t);
-  gamePuff(game, t.x, t.y - 14, t.super ? '🌟' : '💥');
+  gamePuff(game, t.x, t.y - 14, t.super ? '🌟' : t.ice ? '❄️' : '💥');
   game.hits++;
   game.score += t.text.length * game.level;
   if (t.super) gamePower(game, Math.min(GAME_POWER_MAX, game.power + 1));
+  if (t.ice) gameIceOn(game, t);
   const up = gameLevelUp(game);
-  if (up || t.super) gameBanner(game, up || (game.power > 1 ? `🌟 Süper silah! Elinde ${game.power} tane var.` : '🌟 Süper silah! Ctrl\'ye iki kez bas.'));
+  if (up || t.super || t.ice) {
+    gameBanner(game, up || (t.ice ? '❄️ Buz makinesi takıldı: kelimeleri yavaşlatacak!'
+      : game.power > 1 ? `🌟 Süper silah! Elinde ${game.power} tane var.` : '🌟 Süper silah! Ctrl\'ye iki kez bas.'));
+  }
   gameHud(game);
 }
 
@@ -1011,13 +1050,15 @@ function gameBoom(game, auto = false) {
 }
 
 // Süper silahın roketi vurdu: kelime büyük bir 💥 ile patlar, vurulmuş sayılır (puan, seviye, çatı onarımı; süper kelimeyse
-// süper silah). Sonuncusunda gök bir an parlar, şeritte kaç kelime patladığı (seviye atladıysa seviye) yazar.
+// süper silah, buzlu kelimeyse buz makinesi). Sonuncusunda gök bir an parlar, şeritte kaç kelime patladığı (seviye atladıysa
+// seviye) yazar.
 function gameBlast(game, w) {
   if (game.over || !game.volley) return;
   if (game.list.includes(w)) {
     gameRemove(game, w);
-    gamePuff(game, w.x, w.y - 14, w.super ? '🌟' : '💥', true);
+    gamePuff(game, w.x, w.y - 14, w.super ? '🌟' : w.ice ? '❄️' : '💥', 'big');
     if (w.super) gamePower(game, Math.min(GAME_POWER_MAX, game.power + 1));
+    if (w.ice) gameIceOn(game, w);
     game.hits++;
     game.score += w.text.length * game.level;
     gameHud(game);
@@ -1035,10 +1076,63 @@ function gameBlast(game, w) {
   gameGuide(game);
 }
 
-function gamePuff(game, x, y, emoji, big = false) {
-  const el = h('span', { class: big ? 'tg-puff big' : 'tg-puff', 'aria-hidden': 'true', style: `transform: translate(${x}px, ${y}px) translate(-50%, -50%)` }, emoji);
+// kind: '' ya da 'big' (süper silah), 'snow' (buzlu su; kelimenin arkasında kalır).
+function gamePuff(game, x, y, emoji, kind = '') {
+  const el = h('span', { class: `tg-puff ${kind}`.trim(), 'aria-hidden': 'true', style: `transform: translate(${x}px, ${y}px) translate(-50%, -50%)` }, emoji);
   game.view.layer.append(el);
   setTimeout(() => el.remove(), 550);
+}
+
+// Buzlu kelime vuruldu: düştüğü çatıya (uçtuysa en yakın sağlam çatıya) buz makinesi takılır. Koruduğu iki sütun gökyüzünde
+// buğulu, kar yağan bir şeritle görünür (kelimelerin arkasında). Makine zaten varsa (olmaması gerekir) buzu dolar.
+function gameIceOn(game, w) {
+  if (game.ice) { game.ice.shots = GAME_ICE_SHOTS; game.ice.el.style.setProperty('--k', 1); return; }
+  const at = gameIceRoof(game.roofs, w.house);
+  if (at < 0) return;
+  const v = game.view, cols = gameIceCols(game.roofs, at), f = v.field.getBoundingClientRect();
+  const a = v.houses[cols[0]].getBoundingClientRect(), b = v.houses[cols[1]].getBoundingClientRect(), pad = a.width * 0.3;
+  const band = h('div', { class: 'tg-frost', 'aria-hidden': 'true',
+    style: `left: ${(100 * (a.left - f.left - pad)) / f.width}%; width: ${(100 * (b.right - a.left + 2 * pad)) / f.width}%` });
+  const el = h('span', { class: 'tg-ice', 'aria-hidden': 'true' }, '❄️');
+  v.field.prepend(band);
+  v.houses[at].append(el);
+  game.ice = { house: at, cols, shots: GAME_ICE_SHOTS, cool: 0, el, band };
+}
+
+// Buz makinesi kendiliğinden püskürtür (velinin isteği): sırası gelen kelimeye buzlu su; kelime yarı hıza iner, buz mavisi olur
+// (❄️). Su makinenin ağzından kelimenin altına uzanır ve kelimelerin arkasında kalır, kelimeyi örtmez. Buz bitince makine erir.
+function gameIceStep(game, dt) {
+  const ice = game.ice;
+  if ((ice.cool -= dt) > 0) return;
+  const w = gameIceAim(game.list, ice.cols);
+  if (!w) return; // bekler; kelime gelince hemen püskürtür
+  ice.cool = GAME_ICE_COOL;
+  w.iced = true;
+  w.speed *= GAME_ICE_SLOW;
+  w.el.classList.add('iced');
+  const v = game.view, f = v.field.getBoundingClientRect(), m = ice.el.getBoundingClientRect();
+  const from = { x: m.left - f.left + m.width / 2, y: m.top - f.top - 8 }; // makinenin ağzı
+  const len = Math.hypot(w.x - from.x, w.y - from.y), angle = (Math.atan2(w.y - from.y, w.x - from.x) * 180) / Math.PI;
+  const jet = h('span', { class: 'tg-spray', 'aria-hidden': 'true', style: `width: ${len}px; transform: translate(${from.x}px, ${from.y}px) rotate(${angle}deg)` });
+  v.layer.prepend(jet);
+  setTimeout(() => jet.remove(), 500);
+  gamePuff(game, w.x, w.y - 16, '❄️', 'snow');
+  ice.el.classList.remove('puff');
+  void ice.el.offsetWidth; // animasyon yeniden başlasın
+  ice.el.classList.add('puff');
+  ice.el.style.setProperty('--k', --ice.shots / GAME_ICE_SHOTS);
+  if (!ice.shots) gameIceOff(game, '💧 Buz makinesinin buzu bitti.');
+}
+
+// Makine gitti (buzu bitti ya da çatısı uçtu): erir, 💧; şeritte nedeni yazar. Yeni buzlu kelime birkaç kelime sonra gelir.
+function gameIceOff(game, text) {
+  const ice = game.ice, v = game.view, f = v.field.getBoundingClientRect(), m = ice.el.getBoundingClientRect();
+  game.ice = null;
+  ice.band.remove();
+  ice.el.classList.add('melt');
+  setTimeout(() => ice.el.remove(), 450);
+  gamePuff(game, m.left - f.left + m.width / 2, m.top - f.top + m.height / 2, '💧');
+  gameBanner(game, text);
 }
 
 function gameBanner(game, text) {

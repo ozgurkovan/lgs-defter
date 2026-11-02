@@ -20,7 +20,8 @@ const code = [
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
     + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
     + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX,'
-    + ' gameGuard, GAME_GUARD_S };',
+    + ' gameGuard, GAME_GUARD_S, gameIceDue, gameIceRoof, gameIceCols, gameIceAim, GAME_ICE_LEVEL, GAME_ICE_GAP, GAME_ICE_SHOTS,'
+    + ' GAME_ICE_SLOW, GAME_ICE_COOL };',
 ].join('\n');
 const T = new Function(code)();
 
@@ -155,5 +156,26 @@ check('son çatı: ona çok yaklaşan kelime süper silahı kendiliğinden ateş
   T.gameGuard(last, near) && !T.gameGuard(last, { ...near, y: 200 }) && !T.gameGuard({ ...last, power: 0 }, near)
   && !T.gameGuard({ ...last, roofs: [0, 1, 2, 0, 0] }, near) && !T.gameGuard({ ...last, volley: {} }, near)
   && !T.gameGuard(last, { ...near, house: 1 }) && T.GAME_GUARD_S > 0 && T.GAME_GUARD_S <= 1);
+// Buz makinesi (velinin isteği): oyun hızlanınca buzlu kelime; vurana çatısında buz makinesi, iki sütununa düşen kelimeleri
+// kendiliğinden ıslatıp yavaşlatır.
+const iceDue = (o) => T.gameIceDue({ level: 3, ice: null, iceIn: 0, list: [], ...o });
+check('buzlu kelime 3. seviyeden sonra sırası gelince; makine varken ya da ekranda buzlu kelime varken gelmez',
+  iceDue({}) && iceDue({ level: 9, list: [{ super: true }] }) && !iceDue({ level: 2 }) && !iceDue({ iceIn: 1 }) && !iceDue({ ice: {} })
+  && !iceDue({ list: [{ ice: true }] }) && T.GAME_ICE_LEVEL === 3 && T.GAME_ICE_GAP >= 8);
+check('buz makinesinin çatısı: kelimenin düştüğü çatı; uçtuysa en yakın sağlam çatı, eşitse soldaki; hiç yoksa yok',
+  T.gameIceRoof([2, 2, 2, 2, 2], 3) === 3 && T.gameIceRoof([2, 2, 0, 2, 2], 2) === 1 && T.gameIceRoof([2, 0, 0, 0, 1], 2) === 0
+  && T.gameIceRoof([0, 0, 0, 0, 1], 0) === 4 && T.gameIceRoof([0, 0, 0, 0, 0], 2) === -1);
+const iceCols = (roofs, i) => T.gameIceCols(roofs, i).join();
+check('buz makinesinin iki sütunu: kendi çatısı ve yanındaki; önce sağlam, sonra hırpalanmış, sonra ortaya yakın, sonra soldaki',
+  iceCols([2, 2, 2, 2, 2], 0) === '0,1' && iceCols([2, 2, 2, 2, 2], 4) === '3,4' && iceCols([2, 2, 2, 2, 2], 1) === '1,2'
+  && iceCols([2, 2, 2, 2, 2], 3) === '2,3' && iceCols([2, 2, 2, 2, 2], 2) === '1,2' && iceCols([2, 2, 2, 1, 2], 2) === '2,3'
+  && iceCols([2, 0, 2, 2, 2], 2) === '2,3' && iceCols([1, 2, 2, 2, 2], 1) === '0,1' && iceCols([0, 2, 2, 2, 2], 1) === '1,2',
+  iceCols([2, 2, 2, 2, 2], 2));
+const rain = [{ id: 'a', house: 1, y: 100, ground: 300 }, { id: 'b', house: 2, y: 250, ground: 300 }, { id: 'c', house: 1, y: 280, ground: 300, locked: true },
+  { id: 'd', house: 2, y: 290, ground: 300, iced: true }, { id: 'e', house: 3, y: 295, ground: 300 }, { id: 'f', house: 1, y: 20, ground: 300 }];
+check('buzlu su: makinenin sütunlarında, roketi yolda olmayan, ıslanmamış, gökyüzüne girmiş kelimelerden çatısına en yakın olana',
+  T.gameIceAim(rain, [1, 2])?.id === 'b' && T.gameIceAim(rain.filter((w) => w.id !== 'b'), [1, 2])?.id === 'a'
+  && T.gameIceAim([rain[5]], [1, 2]) === null && T.gameIceAim(rain, [4]) === null && T.GAME_ICE_SLOW > 0 && T.GAME_ICE_SLOW < 1
+  && T.GAME_ICE_SHOTS > 0 && T.GAME_ICE_COOL > 0, T.gameIceAim(rain, [1, 2])?.id);
 
 process.exit(fails ? 1 : 0);

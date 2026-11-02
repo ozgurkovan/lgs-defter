@@ -222,6 +222,20 @@ Her maddenin yanında nasıl denendiği yazar:
     elde süper silah varsa biri kendiliğinden ateşlenir (şerit: "🚨 Son çatı! Süper silah kendiliğinden ateşlendi."), roketler
     ekrandaki bütün kelimeleri vurur. Her seferinde yalnızca bir silah; kelimeler yine çok yaklaşınca sıradaki ateşlenir. Silah
     yoksa kelime çatıya değer. [O]
+  - Buz makinesi (velinin isteği, 2026-11-02): oyun biraz hızlanınca (3. seviyeden sonra; ilki 3. seviyenin üçüncü kelimesinde,
+    sonra her 10–14 kelimede bir) buz mavisi, parlayan, ❄️'lı bir kelime düşer. Süper kelime gibi biraz uzundur ve biraz yavaş
+    düşer. Makine varken ya da ekranda buzlu kelime varken gelmez; süper kelimeyle aynı anda sırası gelirse önce süper kelime.
+    Onu vuranın (süper silahın roketi de olur) kelimenin düştüğü çatısına buz makinesi takılır, uçtuysa en yakın sağlam çatıya.
+    Şerit: "❄️ Buz makinesi takıldı: kelimeleri yavaşlatacak!" [O]
+  - Makine çatının tepesinde buz mavisi bir kutudur (❄️, ağzı yukarıda, altındaki çizgi kalan buz). O çatının ve yanındaki bir
+    çatının sütununu korur: yanındakilerden sağlam olanı; ikisi de sağlamsa hırpalanmış olanı, eşitse ortaya yakını. İki sütun
+    gökyüzünde buğulu, kar yağan bir şeritle görünür. [O]
+  - Bu iki sütuna düşen kelimeye kendiliğinden buzlu su püskürtür: makineden kelimenin altına genişleyen kısa bir su huzmesi,
+    kelimenin çevresinde kar. Kelime buz mavisi olur, köşesinde ❄️, yarı hızla düşer. Su, kar ve şerit kelimelerin arkasında
+    kalır; kelimeyi örtmez (velinin isteği). Çatısına en yakın kelime önce; her kelime bir kez ıslanır, iki püskürtme arası
+    0,6 sn. Roketi yolda olan kelimeye, süper silahın roketleri yoldayken ve oyun dururken püskürtmez. [O]
+  - Makinede 8 buz var; bitince erir ("💧 Buz makinesinin buzu bitti."), yeni buzlu kelime 10–14 kelime sonra gelir. Çatısı
+    uçarsa makine de gider ("💨 Çatı uçtu, buz makinesi de gitti."). [O]
   - Oyunda Ctrl'li kısayollar çalışmaz (Ctrl+R, Ctrl+P…); Ctrl+W ya da sayfayı yenileme tarayıcıda "çıkılsın mı?" sorar.
   - Bitişte puan, vurulan kelime, seviye, doğruluk, en iyi puan (bu tarayıcıda; "Yeni rekor!"), "Tekrar oyna".
   - Pencere arka plana geçince oyun durur, bir harfe basınca sürer. Geri tuşu önce sorar. Oyun hiçbir şey kaydetmez.

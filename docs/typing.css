@@ -76,6 +76,10 @@
 }
 .tg-word::before { content: '✨'; position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font-size: 14px; opacity: 0.85; }
 .tg-word .done { color: #1F9D5C; }
+/* Buzlu su değen kelime: buz mavisi, köşesinde ❄️, yarı hızla düşer. Yazısı açık kalır (su kelimeyi örtmez). Hedef ya da
+   roketi yolda olunca o renge döner; ❄️ kalır. */
+.tg-word.iced { background: #DDF3FF; box-shadow: 0 0 0 3px rgba(179, 229, 252, 0.95), 0 0 14px rgba(129, 212, 250, 0.9), 0 6px 14px rgba(0, 0, 0, 0.3); }
+.tg-word.iced::after { content: '❄️'; position: absolute; right: -8px; top: -10px; font-size: 15px; line-height: 1; }
 .tg-word.target { background: #FFE38A; box-shadow: 0 0 0 3px #F59E0B, 0 0 18px rgba(245, 158, 11, 0.85); }
 .tg-word.locked { background: #CFF5DF; }
 /* Süper kelime: renkli ve parlayan; vurana süper silah. */
@@ -85,12 +89,29 @@
 .tg-word.super::before { content: '🌟'; font-size: 18px; opacity: 1; }
 .tg-word.super .done { color: #0B6B3A; }
 @keyframes tg-glow { to { box-shadow: 0 0 0 3px #fff, 0 0 34px rgba(255, 213, 79, 1); } }
+/* Buzlu kelime: buz mavisi ve parlayan (❄️); vurana buz makinesi. */
+.tg-word.ice, .tg-word.ice.target { background: linear-gradient(90deg, #E1F5FE, #B3E5FC, #81D4FA); color: #0B3954; }
+.tg-word.ice { box-shadow: 0 0 0 3px #fff, 0 0 22px rgba(129, 212, 250, 0.95); animation: tg-frosty 0.9s ease-in-out infinite alternate; }
+.tg-word.ice.target { box-shadow: 0 0 0 3px #F59E0B, 0 0 26px rgba(245, 158, 11, 1); animation: none; }
+.tg-word.ice::before { content: '❄️'; font-size: 18px; opacity: 1; }
+.tg-word.ice .done { color: #0B6B3A; }
+@keyframes tg-frosty { to { box-shadow: 0 0 0 3px #fff, 0 0 34px rgba(179, 229, 252, 1); } }
 .tg-rocket { font-size: 28px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
 .tg-puff { font-size: 36px; animation: tg-puff 0.5s ease-out forwards; }
 @keyframes tg-puff { from { opacity: 1; scale: 0.4; } to { opacity: 0; scale: 1.7; } }
 /* Süper silahın roketleri büyük ve parlak; vurdukları kelime büyük bir 💥 ile patlar. */
 .tg-rocket.volley { font-size: 38px; filter: drop-shadow(0 0 6px #FFD54F) drop-shadow(0 0 14px rgba(255, 112, 67, 0.9)); }
 .tg-puff.big { font-size: 60px; }
+/* Buzlu su: makinenin ağzından kelimenin altına uzanan, genişleyen kısa bir huzme ve kelimenin çevresinde kar. İkisi de
+   kelimelerin arkasında kalır (velinin isteği: su kelimeleri örtmesin). */
+.tg-puff.snow { z-index: -1; font-size: 30px; }
+.tg-spray {
+  position: absolute; left: 0; top: -8px; z-index: -1; height: 16px; transform-origin: 0 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 2px, transparent 2.5px) 0 0 / 10px 100% repeat-x,
+    linear-gradient(90deg, rgba(179, 229, 252, 0.9), rgba(129, 212, 250, 0.45));
+  clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 60%); animation: tg-spray 0.5s ease-out forwards;
+}
+@keyframes tg-spray { to { background-position: 40px 0, 0 0; opacity: 0; } }
 /* Evler: çatı üçgen; ilk darbede yara bandı, ikincide çatı uçar. */
 .tg-town { position: absolute; left: 0; right: 0; bottom: 0; height: 92px; z-index: 1; display: flex; justify-content: space-around; align-items: flex-end; padding: 0 3%; }
 .tg-house { position: relative; width: 14%; max-width: 100px; height: 88px; }
@@ -108,6 +129,39 @@
 @keyframes tg-bonk { 30% { transform: translateY(5px); } }
 .tg-house.fix { animation: tg-fix 0.6s; } /* yeni seviyede onarılan çatı (uçmuşsa yerine geri iner) */
 @keyframes tg-fix { 40% { transform: translateY(-8px) scale(1.06); } }
+/* Buz makinesi: takıldığı çatının tepesinde buz mavisi bir kutu (❄️), ağzı yukarıda; alttaki çizgi kalan buz. Her püskürtmede
+   zıplar; buzu bitince ya da çatısı uçunca erir. Koruduğu iki sütun gökyüzünde buğulu, kar yağan bir şerit (kelimelerin
+   arkasında). */
+.tg-ice {
+  position: absolute; left: 50%; bottom: calc(100% - 14px); width: 38px; height: 30px; transform: translateX(-50%);
+  display: grid; place-items: center; padding-bottom: 3px; font-size: 18px; line-height: 1; border: 2px solid #fff;
+  border-radius: 11px 11px 7px 7px; background: linear-gradient(#E1F5FE, #81D4FA);
+  box-shadow: 0 0 12px rgba(129, 212, 250, 0.95), 0 3px 6px rgba(0, 0, 0, 0.35);
+}
+.tg-ice::before {
+  content: ''; position: absolute; left: 50%; bottom: 100%; width: 10px; height: 8px; transform: translateX(-50%);
+  border: 2px solid #fff; border-bottom: 0; border-radius: 5px 5px 0 0; background: #4FA3D9;
+}
+.tg-ice::after {
+  content: ''; position: absolute; left: 4px; bottom: 3px; width: calc((100% - 8px) * var(--k, 1)); height: 4px;
+  border-radius: 2px; background: #0B6FB8; transition: width 0.3s;
+}
+.tg-ice.puff { animation: tg-squirt 0.3s; }
+@keyframes tg-squirt { 40% { transform: translateX(-50%) scale(1.15, 0.85); } }
+.tg-ice.melt { animation: tg-melt 0.45s ease-in forwards; }
+@keyframes tg-melt { to { transform: translateX(-50%) translateY(10px) scale(0.3); opacity: 0; } }
+.tg-frost {
+  position: absolute; top: 0; bottom: 0; z-index: 0; overflow: hidden; pointer-events: none; border-radius: 18px 18px 0 0;
+  border: 1px dashed rgba(225, 245, 254, 0.3); border-bottom: 0; background: linear-gradient(rgba(179, 229, 252, 0.04), rgba(179, 229, 252, 0.2));
+}
+.tg-frost::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -90px; bottom: 0; animation: tg-snow 3s linear infinite;
+  background: radial-gradient(1.6px 1.6px at 12% 20%, #fff 50%, transparent), radial-gradient(1.4px 1.4px at 38% 62%, #fff 50%, transparent),
+    radial-gradient(1.8px 1.8px at 61% 8%, #fff 50%, transparent), radial-gradient(1.4px 1.4px at 83% 47%, #fff 50%, transparent),
+    radial-gradient(1.6px 1.6px at 27% 88%, #fff 50%, transparent), radial-gradient(1.5px 1.5px at 72% 78%, #fff 50%, transparent);
+  background-size: 100% 90px; opacity: 0.75;
+}
+@keyframes tg-snow { to { transform: translateY(90px); } }
 /* Süper silah hazır rozeti (sol üstte, düşen kelimelerin arkasında: kelimeyi örtmesin). Saydam (velinin isteği, 2026-11-02):
    gökyüzü arkasından görünür; kaç silah olduğunu evlerin arasındaki roketler de gösterir. Patlamada gök bir an parlar. */
 .tg-power {
@@ -146,5 +200,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ty-typed .lit, .ty-typed .bad, .kb .k.erase .kc, .kb .kb-arrow.show, .tg-field.miss, .tg-house.hit, .tg-puff,
-  .tg-word.super, .tg-house.fix, .tg-pad.on::before, .tg-pad.go::before, .tg-field.boom, .tg-field.boom::after { animation: none; }
+  .tg-word.super, .tg-house.fix, .tg-pad.on::before, .tg-pad.go::before, .tg-field.boom, .tg-field.boom::after,
+  .tg-word.ice, .tg-spray, .tg-ice.puff, .tg-ice.melt, .tg-frost::before { animation: none; }
 }

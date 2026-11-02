@@ -147,7 +147,7 @@
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
       let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, stacked = false, held = false, frozen = false,
-        calm = false, boom = false, guard = false;
+        calm = false, boom = false, guard = false, iceOn = false, sprayed = false, melted = false, lost = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -175,7 +175,7 @@
         g.roofs = [0, 1, 2, 2, 2];
         g.roofs.forEach((hp, i) => { g.view.houses[i].dataset.hp = hp; });
         g.hits = 5; g.level = 1; g.paused = false;
-        const w3 = g.spawn(false);
+        const w3 = g.spawn('');
         if (w3) for (const ch of w3.text) key(ch, TQ_KEY[ch]);
         await wait(1200);
         fixed = g.level === 2 && g.roofs.join() === '2,1,2,2,2' && g.view.houses[0].dataset.hp === '2';
@@ -183,7 +183,7 @@
         // tuş girerse patlamaz.
         [...g.list].forEach((x) => gameRemove(g, x));
         g.paused = false;
-        const s = g.spawn(true);
+        const s = g.spawn('super');
         if (s) for (const ch of s.text) key(ch, TQ_KEY[ch]);
         await wait(1200);
         const ready = () => g.view.pads.filter((p) => p.classList.contains('on')).length;
@@ -191,12 +191,12 @@
         // Silahlar birikir: ikinci süper kelimeyle iki tane olur, evlerin arasında iki hazır roket durur.
         [...g.list].forEach((x) => gameRemove(g, x));
         g.paused = false;
-        const s2 = g.spawn(true);
+        const s2 = g.spawn('super');
         if (s2) for (const ch of s2.text) key(ch, TQ_KEY[ch]);
         await wait(1200);
         stacked = g.power === 2 && ready() === 2 && /2 süper silah/.test(g.view.power.textContent);
         [...g.list].forEach((x) => gameRemove(g, x));
-        const b1 = g.spawn(false), b2 = g.spawn(false), hits0 = g.hits;
+        const b1 = g.spawn(''), b2 = g.spawn(''), hits0 = g.hits;
         g.paused = false;
         key('Control', 'ControlLeft'); key('1', 'Digit1'); key('Control', 'ControlLeft');
         held = g.list.length === 2 && g.power === 2;
@@ -220,11 +220,63 @@
         g.roofs = [0, 0, 1, 0, 0];
         g.roofs.forEach((hp, i) => { g.view.houses[i].dataset.hp = hp; });
         g.paused = false; g.spawnIn = 99;
-        const d = g.spawn(false), power0 = g.power;
+        const d = g.spawn(''), power0 = g.power;
         if (d) { d.y = d.ground - 4; g.tick(0.016); }
         const fired = !!d && power0 > 0 && d.locked && !!g.volley && g.power === power0 - 1 && /Son çatı/.test(g.view.banner.textContent);
         for (let i = 0; i < 50 && g.volley; i++) await wait(100);
         guard = fired && !g.list.includes(d) && g.roofs.join() === '0,0,1,0,0' && !g.over;
+        // Buz makinesi: buzlu kelimeyi vuranın çatısına makine takılır; iki sütununa düşen kelimelere kendiliğinden, sırayla buzlu
+        // su püskürtür (yarı hız, ❄️), öbür sütunlara dokunmaz; su kelimelerin arkasında kalır. Buzu bitince erir, çatısı uçarsa gider.
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.roofs = [2, 2, 2, 2, 2];
+        g.roofs.forEach((hp, i) => { g.view.houses[i].dataset.hp = hp; });
+        g.hits = 12; g.level = 3; g.paused = false; g.spawnIn = 99;
+        const c = g.spawn('ice');
+        if (c) for (const ch of c.text) key(ch, TQ_KEY[ch]);
+        await wait(1200);
+        const ice = g.ice;
+        iceOn = !!c?.ice && c.el.classList.contains('ice') && c.text.length >= 7 && !!ice && ice.house === c.house && ice.cols.length === 2
+          && ice.cols.includes(c.house) && g.view.houses[c.house].querySelector('.tg-ice') === ice.el && ice.band.isConnected
+          && /Buz makinesi/.test(g.view.banner.textContent);
+        if (ice) {
+          const p = g.spawn(''), p2 = g.spawn(''), r = g.spawn('');
+          if (p && p2 && r) {
+            p.house = ice.cols[1]; p.y = p.ground * 0.5; p2.house = ice.cols[0]; p2.y = p2.ground * 0.4;
+            r.house = [0, 1, 2, 3, 4].find((i) => !ice.cols.includes(i)); r.y = r.ground * 0.6;
+            const speed0 = p.speed, shots0 = ice.shots;
+            g.paused = false; g.tick(0.016);
+            const jet = g.view.layer.querySelector('.tg-spray');
+            sprayed = p.iced && p.el.classList.contains('iced') && Math.abs(p.speed - speed0 * GAME_ICE_SLOW) < 1e-9 && !p2.iced
+              && ice.shots === shots0 - 1 && !!jet && getComputedStyle(jet).zIndex === '-1';
+            g.tick(0.016); // makine soğumadan ikinci kelimeye püskürtmez
+            sprayed &&= !p2.iced;
+            g.tick(GAME_ICE_COOL);
+            sprayed &&= p2.iced && !r.iced && ice.shots === shots0 - 2;
+          }
+          [...g.list].forEach((x) => gameRemove(g, x));
+          for (let i = 0; i < 2 * GAME_ICE_SHOTS && g.ice; i++) {
+            const x = g.spawn('');
+            if (!x) break;
+            x.house = ice.cols[i % 2]; x.y = x.ground * 0.5;
+            g.paused = false; g.tick(GAME_ICE_COOL + 0.01);
+            gameRemove(g, x);
+          }
+          melted = !g.ice && !ice.band.isConnected && g.iceIn > 0 && /buzu bitti/.test(g.view.banner.textContent);
+          for (let i = 0; i < 30 && ice.el.isConnected; i++) await wait(100);
+          melted &&= !ice.el.isConnected;
+        }
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.paused = false;
+        const c2 = g.spawn('ice');
+        if (c2) for (const ch of c2.text) key(ch, TQ_KEY[ch]);
+        await wait(1200);
+        const at = g.ice?.house;
+        if (at != null) {
+          g.roofs[at] = 1; g.view.houses[at].dataset.hp = 1;
+          const z = g.spawn('');
+          if (z) { z.house = at; z.y = z.ground; g.paused = false; g.tick(0.016); }
+        }
+        lost = at != null && !g.ice && g.roofs[at] === 0 && !g.over && /buz makinesi de gitti/.test(g.view.banner.textContent);
       }
       history.back(); await settle();
       check('Kelime roketi: yazılan kelimeyi roket vurur, çatıya değen kelime çatıyı hırpalar, geri tuşu Klavye sayfasına döner',
@@ -240,6 +292,11 @@
           !calm && 'roketler yoldayken harf sayıldı ya da kelime düştü', !boom && 'hepsi sırayla patlamadı'].filter(Boolean).join('; '));
       check('Kelime roketi: son çatı kalınca ona çok yaklaşan kelime bir süper silahı kendiliğinden ateşler, çatı sağlam kalır', guard,
         g ? `silah ${g.power}, çatılar ${g.roofs.join()}` : '');
+      check('Kelime roketi: buzlu kelime çatıya buz makinesi takar; makine iki sütununa düşen kelimelere kendiliğinden, sırayla buzlu su '
+        + 'püskürtür (yarı hız), su kelimelerin arkasında kalır', iceOn && sprayed,
+        [!iceOn && 'makine takılmadı', !sprayed && 'püskürtmedi, yanlış kelimeye püskürttü ya da su öne geçti'].filter(Boolean).join('; '));
+      check('Kelime roketi: buz makinesi buzu bitince erir, çatısı uçarsa gider', melted && lost,
+        [!melted && 'buzu bitince erimedi', !lost && 'çatı uçunca gitmedi'].filter(Boolean).join('; '));
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).
