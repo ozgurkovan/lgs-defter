@@ -147,7 +147,7 @@
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
       let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, stacked = false, held = false, frozen = false,
-        calm = false, boom = false;
+        calm = false, boom = false, guard = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -215,6 +215,16 @@
         for (let i = 0; i < 50 && g.volley; i++) await wait(100); // arka plandaki sayfada zamanlayıcı yavaşlar
         seen.disconnect();
         boom = !!b1 && !!b2 && !g.volley && g.list.length === 0 && g.hits === hits0 + 2 && popped[0] === b2.el && popped[1] === b1.el;
+        // Son çatı kalınca ona çok yaklaşan kelime bir süper silahı kendiliğinden ateşler; çatı sağlam kalır.
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.roofs = [0, 0, 1, 0, 0];
+        g.roofs.forEach((hp, i) => { g.view.houses[i].dataset.hp = hp; });
+        g.paused = false; g.spawnIn = 99;
+        const d = g.spawn(false), power0 = g.power;
+        if (d) { d.y = d.ground - 4; g.tick(0.016); }
+        const fired = !!d && power0 > 0 && d.locked && !!g.volley && g.power === power0 - 1 && /Son çatı/.test(g.view.banner.textContent);
+        for (let i = 0; i < 50 && g.volley; i++) await wait(100);
+        guard = fired && !g.list.includes(d) && g.roofs.join() === '0,0,1,0,0' && !g.over;
       }
       history.back(); await settle();
       check('Kelime roketi: yazılan kelimeyi roket vurur, çatıya değen kelime çatıyı hırpalar, geri tuşu Klavye sayfasına döner',
@@ -228,6 +238,8 @@
         armed && stacked && held && frozen && calm && boom,
         [!armed && 'süper silah gelmedi', !stacked && 'silahlar birikmedi', !held && 'araya tuş girince de patladı', !frozen && 'kelimeler donmadı ya da silah azalmadı',
           !calm && 'roketler yoldayken harf sayıldı ya da kelime düştü', !boom && 'hepsi sırayla patlamadı'].filter(Boolean).join('; '));
+      check('Kelime roketi: son çatı kalınca ona çok yaklaşan kelime bir süper silahı kendiliğinden ateşler, çatı sağlam kalır', guard,
+        g ? `silah ${g.power}, çatılar ${g.roofs.join()}` : '');
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).

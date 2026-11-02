@@ -211,6 +211,12 @@ function gameSuperWord(words, level, rnd, taken = new Set()) {
 // kelime önce. Roketi zaten yolda olan kelime atlanır. Roketler GAME_VOLLEY_MS arayla kalkar.
 const GAME_VOLLEY_MS = 140;
 const gameVolley = (list) => list.filter((w) => !w.locked).sort((a, b) => (a.ground - a.y) - (b.ground - b.y));
+// Son çatı koruması (velinin isteği, 2026-11-02): yalnızca bir çatı kalmışken ona düşen kelime değmesine GAME_GUARD_S saniye
+// kalınca, elde süper silah varsa biri kendiliğinden ateşlenir (roketler ekrandakilerin hepsini vurur). Kelimeler yine çok
+// yaklaşınca sıradaki ateşlenir; her seferinde yalnızca bir silah.
+const GAME_GUARD_S = 0.8;
+const gameGuard = (game, w) => game.power > 0 && !game.volley && game.roofs[w.house] > 0
+  && game.roofs.filter((hp) => hp > 0).length === 1 && w.ground - w.y <= w.speed * GAME_GUARD_S;
 
 /* Klavye: ses */
 
@@ -420,7 +426,7 @@ async function viewTyping() {
       h('p', { class: 'small muted' }, 'Yukarıdan düşen kelimeleri yaz; çatıdan roket kalkıp vursun. Kelime çatıya değerse çatı hırpalanır, '
         + 'çatılar bitince oyun biter. Kelimeler bitirdiğin derslerin harflerinden; oyun gittikçe hızlanır. Her yeni seviyede bir çatı '
         + 'onarılır; renkli 🌟 kelimeyi vurursan süper silah kazanırsın, dört taneye kadar biriktirebilirsin (Ctrl\'ye iki kez bas, roketler '
-        + 'bütün kelimeleri sırayla vursun).'),
+        + 'bütün kelimeleri sırayla vursun; son çatı kalınca kendiliğinden ateşlenir).'),
       gameWords(hero.typing.best).length
         ? h('button', { class: 'block', onclick: () => runTypingGame(hero) }, 'Oyna')
         : h('p', { class: 'small' }, `İlk dersi (${TYPING_LESSONS[0].title}) bitirince oyun açılır.`)),
@@ -751,7 +757,8 @@ function gameDraw(game) {
     h('section', { class: 'ty-wrap tg-wrap stack' }, v.field, v.guide, game.kb.el,
       h('p', { class: 'small muted' }, 'Kelimenin ilk harfine basınca o kelime hedef olur. Başka kelimeye geçmek için onun ilk harfine bas; yanlış harfte kelime baştan başlar. '
         + 'Renkli 🌟 kelimeyi vurursan süper silah kazanırsın; dört taneye kadar biriktirebilirsin, evlerin arasında hazır bekler. Ctrl\'ye iki kez bas: '
-        + 'evlerden roketler kalkıp ekrandaki bütün kelimeleri en alttakinden başlayarak sırayla vursun. Her yeni seviyede bir çatı onarılır.')));
+        + 'evlerden roketler kalkıp ekrandaki bütün kelimeleri en alttakinden başlayarak sırayla vursun. Son çatı kaldığında kelimeler ona çok '
+        + 'yaklaşınca süper silah kendiliğinden ateşlenir. Her yeni seviyede bir çatı onarılır.')));
   window.scrollTo(0, 0); // Klavye sayfasının aşağısından açılınca da gökyüzü baştan görünsün
   gameHud(game);
   gameGuide(game);
@@ -825,7 +832,8 @@ function gameStep(game, dt) {
     if (w.locked) continue; // roket yolda
     w.y += w.speed * dt;
     gamePlace(w);
-    if (w.y >= w.ground) gameLand(game, w);
+    if (gameGuard(game, w)) gameBoom(game, true); // son çatı: süper silah kendiliğinden
+    else if (w.y >= w.ground) gameLand(game, w);
   }
 }
 
@@ -990,23 +998,26 @@ function gameCtrl(game, now) {
 }
 
 // Süper silah (velinin isteği, 2026-11-02): ekrandaki kelimeler donar; çatısına en yakın olandan başlayarak her birine
-// evlerden sırayla büyük bir roket kalkar. Roketler yoldayken yeni kelime düşmez, basılan harf sayılmaz.
-function gameBoom(game) {
+// evlerden sırayla büyük bir roket kalkar. Roketler yoldayken yeni kelime düşmez, basılan harf sayılmaz. auto: son çatı
+// koruması ateşledi (gameGuard).
+function gameBoom(game, auto = false) {
   const words = gameVolley(game.list);
   game.volley = { left: words.length, total: words.length };
   gamePower(game, game.power - 1);
   gameRelease(game);
   for (const w of words) { w.locked = true; w.el.classList.add('locked'); }
+  if (auto) gameBanner(game, '🚨 Son çatı! Süper silah kendiliğinden ateşlendi.');
   words.forEach((w, i) => setTimeout(() => gameFire(game, w, true), i * GAME_VOLLEY_MS));
 }
 
-// Süper silahın roketi vurdu: kelime büyük bir 💥 ile patlar, vurulmuş sayılır (puan, seviye, çatı onarımı). Sonuncusunda
-// gök bir an parlar, şeritte kaç kelime patladığı (seviye atladıysa seviye) yazar.
+// Süper silahın roketi vurdu: kelime büyük bir 💥 ile patlar, vurulmuş sayılır (puan, seviye, çatı onarımı; süper kelimeyse
+// süper silah). Sonuncusunda gök bir an parlar, şeritte kaç kelime patladığı (seviye atladıysa seviye) yazar.
 function gameBlast(game, w) {
   if (game.over || !game.volley) return;
   if (game.list.includes(w)) {
     gameRemove(game, w);
-    gamePuff(game, w.x, w.y - 14, '💥', true);
+    gamePuff(game, w.x, w.y - 14, w.super ? '🌟' : '💥', true);
+    if (w.super) gamePower(game, Math.min(GAME_POWER_MAX, game.power + 1));
     game.hits++;
     game.score += w.text.length * game.level;
     gameHud(game);

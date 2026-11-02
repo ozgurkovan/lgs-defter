@@ -216,7 +216,12 @@ Her maddenin yanında nasıl denendiği yazar:
     büyük, parlak bir roket kalkar (velinin isteği, 2026-11-02), kelimeler büyük 💥 ile aşağıdan yukarı patlar, sonuncusunda
     gök bir an parlar ve şeritte "N kelime patladı" (seviye atladıysa seviye) yazar. Roketler yoldayken yeni kelime düşmez,
     basılan harf yanlış sayılmaz, Ctrl bir şey yapmaz. Her kelime vurulmuş sayılır (puan, seviye, çatı onarımı). Silah yokken
-    "renkli kelimeyi vur", ekranda kelime yokken "silahın duruyor" der; silah harcanmaz.
+    "renkli kelimeyi vur", ekranda kelime yokken "silahın duruyor" der; silah harcanmaz. Roketlerin vurduğu süper kelime de
+    süper silah verir.
+  - Son çatı koruması (velinin isteği, 2026-11-02): yalnızca bir çatı kalmışken ona düşen kelime değmesine 0,8 saniye kalınca,
+    elde süper silah varsa biri kendiliğinden ateşlenir (şerit: "🚨 Son çatı! Süper silah kendiliğinden ateşlendi."), roketler
+    ekrandaki bütün kelimeleri vurur. Her seferinde yalnızca bir silah; kelimeler yine çok yaklaşınca sıradaki ateşlenir. Silah
+    yoksa kelime çatıya değer. [O]
   - Oyunda Ctrl'li kısayollar çalışmaz (Ctrl+R, Ctrl+P…); Ctrl+W ya da sayfayı yenileme tarayıcıda "çıkılsın mı?" sorar.
   - Bitişte puan, vurulan kelime, seviye, doğruluk, en iyi puan (bu tarayıcıda; "Yeni rekor!"), "Tekrar oyna".
   - Pencere arka plana geçince oyun durur, bir harfe basınca sürer. Geri tuşu önce sorar. Oyun hiçbir şey kaydetmez.

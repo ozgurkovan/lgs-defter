@@ -19,7 +19,8 @@ const code = [
   pick(src, 'const TQ_ROWS', 'const KB = '),
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
     + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
-    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX };',
+    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX,'
+    + ' gameGuard, GAME_GUARD_S };',
 ].join('\n');
 const T = new Function(code)();
 
@@ -148,5 +149,11 @@ const sky = [{ id: 'a', y: 10, ground: 300 }, { id: 'b', y: 250, ground: 300 }, 
 const volley = T.gameVolley(sky).map((w) => w.id).join('');
 check('süper silah: roketler çatısına en yakın kelimeden başlar, roketi yolda olan atlanır', volley === 'bda'
   && sky.map((w) => w.id).join('') === 'abcd' && T.gameVolley([]).length === 0 && T.GAME_VOLLEY_MS > 0, volley);
+// Son çatı koruması (velinin isteği): tek çatı kalmışken ona çok yaklaşan kelime bir süper silahı kendiliğinden ateşler.
+const last = { power: 1, volley: null, roofs: [0, 0, 2, 0, 0] }, near = { house: 2, ground: 300, y: 290, speed: 30 };
+check('son çatı: ona çok yaklaşan kelime süper silahı kendiliğinden ateşler; silah yoksa, çatı çoksa, roketler yoldaysa ya da kelime uzaksa ateşlemez',
+  T.gameGuard(last, near) && !T.gameGuard(last, { ...near, y: 200 }) && !T.gameGuard({ ...last, power: 0 }, near)
+  && !T.gameGuard({ ...last, roofs: [0, 1, 2, 0, 0] }, near) && !T.gameGuard({ ...last, volley: {} }, near)
+  && !T.gameGuard(last, { ...near, house: 1 }) && T.GAME_GUARD_S > 0 && T.GAME_GUARD_S <= 1);
 
 process.exit(fails ? 1 : 0);
