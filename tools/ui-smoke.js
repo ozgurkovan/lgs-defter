@@ -146,7 +146,8 @@
       go('typing'); await settle();
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
-      let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, held = false, frozen = false, calm = false, boom = false;
+      let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, stacked = false, held = false, frozen = false,
+        calm = false, boom = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -185,12 +186,20 @@
         const s = g.spawn(true);
         if (s) for (const ch of s.text) key(ch, TQ_KEY[ch]);
         await wait(1200);
-        armed = !!s?.super && s.el.classList.contains('super') && s.text.length >= 5 && g.power === 1 && !g.view.power.hidden;
+        const ready = () => g.view.pads.filter((p) => p.classList.contains('on')).length;
+        armed = !!s?.super && s.el.classList.contains('super') && s.text.length >= 5 && g.power === 1 && !g.view.power.hidden && ready() === 1;
+        // Silahlar birikir: ikinci süper kelimeyle iki tane olur, evlerin arasında iki hazır roket durur.
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.paused = false;
+        const s2 = g.spawn(true);
+        if (s2) for (const ch of s2.text) key(ch, TQ_KEY[ch]);
+        await wait(1200);
+        stacked = g.power === 2 && ready() === 2 && /2 süper silah/.test(g.view.power.textContent);
         [...g.list].forEach((x) => gameRemove(g, x));
         const b1 = g.spawn(false), b2 = g.spawn(false), hits0 = g.hits;
         g.paused = false;
         key('Control', 'ControlLeft'); key('1', 'Digit1'); key('Control', 'ControlLeft');
-        held = g.list.length === 2 && g.power === 1;
+        held = g.list.length === 2 && g.power === 2;
         // Kelimeler donar, roketler çatısına en yakın kelimeden başlayıp sırayla vurur (b2 aşağıda, önce o patlar). Roketler
         // yoldayken yeni kelime düşmez, basılan harf yanlış sayılmaz.
         if (b1 && b2) { b1.y = 20; b2.y = b2.ground - 40; }
@@ -199,7 +208,7 @@
         seen.observe(g.view.layer, { childList: true });
         const errors0 = g.errors; // yukarıdaki "1" yanlış sayıldı
         key('Control', 'ControlLeft');
-        frozen = g.list.length === 2 && g.list.every((x) => x.locked) && !!g.volley && g.power === 0 && g.view.power.hidden;
+        frozen = g.list.length === 2 && g.list.every((x) => x.locked) && !!g.volley && g.power === 1 && !g.view.power.hidden && ready() === 1;
         key('k', 'KeyK'); g.spawnIn = 0; g.tick(0.016);
         calm = g.errors === errors0 && g.list.length === 2;
         g.spawnIn = 99; // beklerken yeni kelime düşmesin
@@ -214,9 +223,10 @@
       check('Kelime roketi: yanlış harf kelimeyi baştan başlatır, başka kelimenin ilk harfi ona geçirir', reset && swap,
         [!reset && 'yanlışta bırakılmadı', !swap && 'başka kelimeye geçmedi'].filter(Boolean).join('; '));
       check('Kelime roketi: yeni seviyede bir çatı onarılır (önce uçmuş olan)', fixed, g ? `seviye ${g.level}, çatılar ${g.roofs.join()}` : '');
-      check('Kelime roketi: renkli kelime süper silah verir; Ctrl\'ye art arda iki basınca roketler en alttaki kelimeden başlayıp hepsini sırayla vurur',
-        armed && held && frozen && calm && boom,
-        [!armed && 'süper silah gelmedi', !held && 'araya tuş girince de patladı', !frozen && 'kelimeler donmadı',
+      check('Kelime roketi: renkli kelime süper silah verir, silahlar birikir ve evlerin arasında hazır durur; Ctrl\'ye art arda iki basınca '
+        + 'biri ateşlenir, roketler en alttaki kelimeden başlayıp hepsini sırayla vurur',
+        armed && stacked && held && frozen && calm && boom,
+        [!armed && 'süper silah gelmedi', !stacked && 'silahlar birikmedi', !held && 'araya tuş girince de patladı', !frozen && 'kelimeler donmadı ya da silah azalmadı',
           !calm && 'roketler yoldayken harf sayıldı ya da kelime düştü', !boom && 'hepsi sırayla patlamadı'].filter(Boolean).join('; '));
     }
 

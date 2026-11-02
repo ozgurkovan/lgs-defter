@@ -207,10 +207,12 @@ Her maddenin yanında nasıl denendiği yazar:
     yoksa hırpalanmış olan, eşitse soldaki. Şerit: "⭐ Seviye N! Bir çatı onarıldı." Çatılar sağlamsa "Kelimeler hızlanıyor". [O]
   - Süper kelime (velinin isteği, 2026-11-02): ilki 8. kelimede, sonra her 8–12 kelimede bir renkli, parlayan, 🌟'lı bir
     kelime düşer. Biraz uzundur (başta 5–8, sonra 7–10 harf; ilk derslerde alıştırmalar yan yana) ve biraz yavaş düşer.
-    Süper silahı varken ya da ekranda süper kelime varken gelmez. Çatıya değerse o da çatıyı hırpalar. [O]
-  - Süper kelimeyi vuran süper silah kazanır: sol üstte "🌟 Süper silah hazır" rozeti (kelimelerin arkasında), yönergede
-    "Ctrl'ye iki kez bas", ekrandaki klavyede iki Ctrl tuşu yanar. Ctrl'ye art arda iki kez basınca (en çok yarım saniye arayla,
-    arada başka tuş yok) ekrandaki kelimeler donar (yeşil); çatısına en yakın olandan başlayarak her birine evlerden sırayla
+    Elinde dört süper silah varken ya da ekranda süper kelime varken gelmez. Çatıya değerse o da çatıyı hırpalar. [O]
+  - Süper kelimeyi vuran süper silah kazanır; silahlar dörde kadar birikir (velinin isteği, 2026-11-02). Elindekiler evlerin
+    arasında soldan sağa dik duran, parlayan, ateşe hazır roketler olarak görünür. Sol üstte saydam "🌟 Süper silah hazır" rozeti
+    (birden çoksa "2 süper silah hazır"; kelimelerin arkasında), yönergede "Ctrl'ye iki kez bas", ekrandaki klavyede iki Ctrl tuşu
+    yanar. Ctrl'ye art arda iki kez basınca (en çok yarım saniye arayla, arada başka tuş yok) bir silah harcanır: en sağdaki hazır
+    roket havalanıp kaybolur, ekrandaki kelimeler donar (yeşil); çatısına en yakın olandan başlayarak her birine evlerden sırayla
     büyük, parlak bir roket kalkar (velinin isteği, 2026-11-02), kelimeler büyük 💥 ile aşağıdan yukarı patlar, sonuncusunda
     gök bir an parlar ve şeritte "N kelime patladı" (seviye atladıysa seviye) yazar. Roketler yoldayken yeni kelime düşmez,
     basılan harf yanlış sayılmaz, Ctrl bir şey yapmaz. Her kelime vurulmuş sayılır (puan, seviye, çatı onarımı). Silah yokken

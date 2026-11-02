@@ -108,13 +108,27 @@
 @keyframes tg-bonk { 30% { transform: translateY(5px); } }
 .tg-house.fix { animation: tg-fix 0.6s; } /* yeni seviyede onarılan çatı (uçmuşsa yerine geri iner) */
 @keyframes tg-fix { 40% { transform: translateY(-8px) scale(1.06); } }
-/* Süper silah hazır rozeti (sol üstte, düşen kelimelerin arkasında: kelimeyi örtmesin); patlamada gök bir an parlar. */
+/* Süper silah hazır rozeti (sol üstte, düşen kelimelerin arkasında: kelimeyi örtmesin). Saydam (velinin isteği, 2026-11-02):
+   gökyüzü arkasından görünür; kaç silah olduğunu evlerin arasındaki roketler de gösterir. Patlamada gök bir an parlar. */
 .tg-power {
-  position: absolute; left: 10px; top: 10px; z-index: 1; max-width: calc(100% - 20px); padding: 5px 12px; border-radius: 999px;
-  background: linear-gradient(90deg, #FFD54F, #FF9E6B, #F48FB1); color: #3A1030; font-weight: 800; font-size: 0.95rem;
-  box-shadow: 0 0 18px rgba(255, 213, 79, 0.9); animation: tg-pulse 0.8s ease-in-out infinite alternate;
+  position: absolute; left: 10px; top: 10px; z-index: 1; max-width: calc(100% - 20px); padding: 4px 12px; border-radius: 999px;
+  background: rgba(255, 213, 79, 0.14); border: 1px solid rgba(255, 213, 79, 0.4); color: rgba(255, 244, 214, 0.85);
+  font-weight: 700; font-size: 0.9rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
-@keyframes tg-pulse { to { transform: scale(1.05); } }
+/* Elde tutulan süper silahlar: evlerin arasında dik duran, ateşe hazır roketler (en çok dört). Ateşlenen havalanıp kaybolur. */
+.tg-pad { position: relative; flex: 0 1 34px; min-width: 0; align-self: stretch; }
+.tg-pad::before {
+  content: '🚀'; position: absolute; left: 50%; bottom: 8px; font-size: clamp(18px, 3.6vw, 30px); line-height: 1; opacity: 0;
+  transform: translateX(-50%) rotate(-45deg); filter: drop-shadow(0 0 5px #FFD54F) drop-shadow(0 0 12px rgba(255, 112, 67, 0.8));
+}
+.tg-pad.on::after, .tg-pad.go::after {
+  content: ''; position: absolute; left: 50%; bottom: 0; width: 70%; max-width: 26px; height: 6px; transform: translateX(-50%);
+  border-radius: 3px; background: #5B6080;
+}
+.tg-pad.on::before { opacity: 1; animation: tg-ready 0.9s ease-in-out infinite alternate; }
+.tg-pad.go::before { opacity: 1; animation: tg-liftoff 0.45s ease-in forwards; }
+@keyframes tg-ready { to { transform: translateX(-50%) translateY(-3px) rotate(-45deg); } }
+@keyframes tg-liftoff { to { transform: translateX(-50%) translateY(-140px) rotate(-45deg); opacity: 0; } }
 .tg-field.boom { animation: ty-shake 0.3s; }
 .tg-field.boom::after {
   content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
@@ -132,5 +146,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ty-typed .lit, .ty-typed .bad, .kb .k.erase .kc, .kb .kb-arrow.show, .tg-field.miss, .tg-house.hit, .tg-puff,
-  .tg-word.super, .tg-house.fix, .tg-power, .tg-field.boom, .tg-field.boom::after { animation: none; }
+  .tg-word.super, .tg-house.fix, .tg-pad.on::before, .tg-pad.go::before, .tg-field.boom, .tg-field.boom::after { animation: none; }
 }

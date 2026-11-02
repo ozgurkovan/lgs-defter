@@ -19,7 +19,7 @@ const code = [
   pick(src, 'const TQ_ROWS', 'const KB = '),
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
     + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
-    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS };',
+    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX };',
 ].join('\n');
 const T = new Function(code)();
 
@@ -140,9 +140,9 @@ check('süper kelime biraz uzun: başta 5–8, sonra 7–10 harf, farklı ilk ha
   sup1.every((w) => w.length >= 5 && w.length <= 8 && !'ka'.includes(w[0])) && sup5.every((w) => w.length >= 7 && w.length <= 10)
   && supFj.every((w) => w.length >= 5 && /^[fj]+$/.test(w)) && T.gameSuperWord([], 1, rnd) === null, `${sup1[0]}, ${sup5[0]}, ${supFj[0]}`);
 const due = (o) => T.gameSuperDue({ superIn: 0, power: 0, list: [], ...o });
-check('süper kelime sırası gelince; süper silah varken ya da ekranda süper kelime varken gelmez; Ctrl iki basış yarım saniyede',
-  due({}) && due({ list: [{ super: false }] }) && !due({ superIn: 3 }) && !due({ power: 1 }) && !due({ list: [{ super: true }] })
-  && T.GAME_SUPER_GAP === 8 && T.GAME_SUPER_SLOW > 1 && T.GAME_DOUBLE_MS === 500);
+check('süper kelime sırası gelince; silahlar dörde kadar birikir, dördü varken ya da ekranda süper kelime varken gelmez; Ctrl iki basış yarım saniyede',
+  due({}) && due({ list: [{ super: false }] }) && !due({ superIn: 3 }) && due({ power: 3 }) && !due({ power: 4 }) && !due({ list: [{ super: true }] })
+  && T.GAME_POWER_MAX === 4 && T.GAME_SUPER_GAP === 8 && T.GAME_SUPER_SLOW > 1 && T.GAME_DOUBLE_MS === 500);
 // Süper silahın roketleri (velinin isteği): çatısına en yakın kelimeden başlayıp sırayla kalkar; roketi yolda olan atlanır.
 const sky = [{ id: 'a', y: 10, ground: 300 }, { id: 'b', y: 250, ground: 300 }, { id: 'c', y: 290, ground: 300, locked: true }, { id: 'd', y: 200, ground: 260 }];
 const volley = T.gameVolley(sky).map((w) => w.id).join('');
