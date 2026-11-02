@@ -146,7 +146,7 @@
       go('typing'); await settle();
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
-      let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, held = false, boom = false;
+      let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, held = false, frozen = false, calm = false, boom = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -191,8 +191,21 @@
         g.paused = false;
         key('Control', 'ControlLeft'); key('1', 'Digit1'); key('Control', 'ControlLeft');
         held = g.list.length === 2 && g.power === 1;
+        // Kelimeler donar, roketler çatısına en yakın kelimeden başlayıp sırayla vurur (b2 aşağıda, önce o patlar). Roketler
+        // yoldayken yeni kelime düşmez, basılan harf yanlış sayılmaz.
+        if (b1 && b2) { b1.y = 20; b2.y = b2.ground - 40; }
+        const popped = [];
+        const seen = new MutationObserver((ms) => ms.forEach((m) => m.removedNodes.forEach((n) => n.classList?.contains('tg-word') && popped.push(n))));
+        seen.observe(g.view.layer, { childList: true });
+        const errors0 = g.errors; // yukarıdaki "1" yanlış sayıldı
         key('Control', 'ControlLeft');
-        boom = !!b1 && !!b2 && g.list.length === 0 && g.hits === hits0 + 2 && g.power === 0 && g.view.power.hidden;
+        frozen = g.list.length === 2 && g.list.every((x) => x.locked) && !!g.volley && g.power === 0 && g.view.power.hidden;
+        key('k', 'KeyK'); g.spawnIn = 0; g.tick(0.016);
+        calm = g.errors === errors0 && g.list.length === 2;
+        g.spawnIn = 99; // beklerken yeni kelime düşmesin
+        for (let i = 0; i < 50 && g.volley; i++) await wait(100); // arka plandaki sayfada zamanlayıcı yavaşlar
+        seen.disconnect();
+        boom = !!b1 && !!b2 && !g.volley && g.list.length === 0 && g.hits === hits0 + 2 && popped[0] === b2.el && popped[1] === b1.el;
       }
       history.back(); await settle();
       check('Kelime roketi: yazılan kelimeyi roket vurur, çatıya değen kelime çatıyı hırpalar, geri tuşu Klavye sayfasına döner',
@@ -201,8 +214,10 @@
       check('Kelime roketi: yanlış harf kelimeyi baştan başlatır, başka kelimenin ilk harfi ona geçirir', reset && swap,
         [!reset && 'yanlışta bırakılmadı', !swap && 'başka kelimeye geçmedi'].filter(Boolean).join('; '));
       check('Kelime roketi: yeni seviyede bir çatı onarılır (önce uçmuş olan)', fixed, g ? `seviye ${g.level}, çatılar ${g.roofs.join()}` : '');
-      check('Kelime roketi: renkli kelime süper silah verir; Ctrl\'ye art arda iki basınca bütün kelimeler patlar', armed && held && boom,
-        [!armed && 'süper silah gelmedi', !held && 'araya tuş girince de patladı', !boom && 'patlamadı'].filter(Boolean).join('; '));
+      check('Kelime roketi: renkli kelime süper silah verir; Ctrl\'ye art arda iki basınca roketler en alttaki kelimeden başlayıp hepsini sırayla vurur',
+        armed && held && frozen && calm && boom,
+        [!armed && 'süper silah gelmedi', !held && 'araya tuş girince de patladı', !frozen && 'kelimeler donmadı',
+          !calm && 'roketler yoldayken harf sayıldı ya da kelime düştü', !boom && 'hepsi sırayla patlamadı'].filter(Boolean).join('; '));
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).

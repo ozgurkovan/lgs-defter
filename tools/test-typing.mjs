@@ -19,7 +19,7 @@ const code = [
   pick(src, 'const TQ_ROWS', 'const KB = '),
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
     + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
-    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS };',
+    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS };',
 ].join('\n');
 const T = new Function(code)();
 
@@ -143,5 +143,10 @@ const due = (o) => T.gameSuperDue({ superIn: 0, power: 0, list: [], ...o });
 check('süper kelime sırası gelince; süper silah varken ya da ekranda süper kelime varken gelmez; Ctrl iki basış yarım saniyede',
   due({}) && due({ list: [{ super: false }] }) && !due({ superIn: 3 }) && !due({ power: 1 }) && !due({ list: [{ super: true }] })
   && T.GAME_SUPER_GAP === 8 && T.GAME_SUPER_SLOW > 1 && T.GAME_DOUBLE_MS === 500);
+// Süper silahın roketleri (velinin isteği): çatısına en yakın kelimeden başlayıp sırayla kalkar; roketi yolda olan atlanır.
+const sky = [{ id: 'a', y: 10, ground: 300 }, { id: 'b', y: 250, ground: 300 }, { id: 'c', y: 290, ground: 300, locked: true }, { id: 'd', y: 200, ground: 260 }];
+const volley = T.gameVolley(sky).map((w) => w.id).join('');
+check('süper silah: roketler çatısına en yakın kelimeden başlar, roketi yolda olan atlanır', volley === 'bda'
+  && sky.map((w) => w.id).join('') === 'abcd' && T.gameVolley([]).length === 0 && T.GAME_VOLLEY_MS > 0, volley);
 
 process.exit(fails ? 1 : 0);

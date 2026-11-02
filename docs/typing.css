@@ -88,6 +88,9 @@
 .tg-rocket { font-size: 28px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
 .tg-puff { font-size: 36px; animation: tg-puff 0.5s ease-out forwards; }
 @keyframes tg-puff { from { opacity: 1; scale: 0.4; } to { opacity: 0; scale: 1.7; } }
+/* Süper silahın roketleri büyük ve parlak; vurdukları kelime büyük bir 💥 ile patlar. */
+.tg-rocket.volley { font-size: 38px; filter: drop-shadow(0 0 6px #FFD54F) drop-shadow(0 0 14px rgba(255, 112, 67, 0.9)); }
+.tg-puff.big { font-size: 60px; }
 /* Evler: çatı üçgen; ilk darbede yara bandı, ikincide çatı uçar. */
 .tg-town { position: absolute; left: 0; right: 0; bottom: 0; height: 92px; z-index: 1; display: flex; justify-content: space-around; align-items: flex-end; padding: 0 3%; }
 .tg-house { position: relative; width: 14%; max-width: 100px; height: 88px; }
