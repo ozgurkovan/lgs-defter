@@ -205,9 +205,10 @@ Her maddenin yanında nasıl denendiği yazar:
     ekranda en çok 7 kelime; kelimeler uzar (başta en çok 4 harf). [O]
   - Her yeni seviyede bir çatı baştan sağlam olur (velinin isteği, 2026-11-02): önce uçmuş olan (çatı yerine iner, 🔨),
     yoksa hırpalanmış olan, eşitse soldaki. Şerit: "⭐ Seviye N! Bir çatı onarıldı." Çatılar sağlamsa "Kelimeler hızlanıyor". [O]
-  - Süper kelime (velinin isteği, 2026-11-02): ilki 8. kelimede, sonra her 8–12 kelimede bir renkli, parlayan, 🌟'lı bir
-    kelime düşer. Biraz uzundur (başta 5–8, sonra 7–10 harf; ilk derslerde alıştırmalar yan yana) ve biraz yavaş düşer.
-    Elinde dört süper silah varken ya da ekranda süper kelime varken gelmez. Çatıya değerse o da çatıyı hırpalar. [O]
+  - Süper kelime (velinin isteği, 2026-11-02): ilki 15. kelimede, sonra her 15–20 kelimede bir renkli, parlayan, 🌟'lı bir
+    kelime düşer (velinin isteği, 2026-11-02: 8–12 kelimede bir çok sık geliyordu). Biraz uzundur (başta 5–8, sonra 7–10 harf;
+    ilk derslerde alıştırmalar yan yana) ve biraz yavaş düşer. Elinde dört süper silah varken ya da ekranda süper ya da buzlu
+    kelime varken gelmez (bir seferde tek özel kelime). Çatıya değerse o da çatıyı hırpalar. [O]
   - Süper kelimeyi vuran süper silah kazanır; silahlar dörde kadar birikir (velinin isteği, 2026-11-02). Elindekiler evlerin
     arasında soldan sağa dik duran, parlayan, ateşe hazır roketler olarak görünür. Sol üstte saydam "🌟 Süper silah hazır" rozeti
     (birden çoksa "2 süper silah hazır"; kelimelerin arkasında), yönergede "Ctrl'ye iki kez bas", ekrandaki klavyede iki Ctrl tuşu
@@ -224,8 +225,10 @@ Her maddenin yanında nasıl denendiği yazar:
     yoksa kelime çatıya değer. [O]
   - Buz makinesi (velinin isteği, 2026-11-02): oyun biraz hızlanınca (3. seviyeden sonra; ilki 3. seviyenin üçüncü kelimesinde,
     sonra her 10–14 kelimede bir) buz mavisi, parlayan, ❄️'lı bir kelime düşer. Süper kelime gibi biraz uzundur ve biraz yavaş
-    düşer. Makine varken ya da ekranda buzlu kelime varken gelmez; süper kelimeyle aynı anda sırası gelirse önce süper kelime.
-    Onu vuranın (süper silahın roketi de olur) kelimenin düştüğü çatısına buz makinesi takılır, uçtuysa en yakın sağlam çatıya.
+    düşer. Makine varken ya da ekranda süper ya da buzlu kelime varken gelmez; ikisinin birden sırası gelirse önce süper kelime.
+    Bir önceki buz makinesinin evine düşmez, başka sağlam çatı yoksa düşer (velinin isteği, 2026-11-02: makine hep aynı sütuna
+    geliyordu). Onu vuranın (süper silahın roketi de olur) kelimenin düştüğü çatısına buz makinesi takılır, uçtuysa en yakın
+    sağlam çatıya.
     Şerit: "❄️ Buz makinesi takıldı: kelimeleri yavaşlatacak!" [O]
   - Makine çatının tepesinde buz mavisi bir kutudur (❄️, ağzı yukarıda, altındaki çizgi kalan buz). O çatının ve yanındaki bir
     çatının sütununu korur: yanındakilerden sağlam olanı; ikisi de sağlamsa hırpalanmış olanı, eşitse ortaya yakını. İki sütun

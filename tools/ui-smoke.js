@@ -147,7 +147,7 @@
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
       let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, stacked = false, held = false, frozen = false,
-        calm = false, boom = false, guard = false, iceOn = false, sprayed = false, melted = false, lost = false;
+        calm = false, boom = false, guard = false, iceOn = false, sprayed = false, melted = false, moved = false, lost = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -265,9 +265,11 @@
           for (let i = 0; i < 30 && ice.el.isConnected; i++) await wait(100);
           melted &&= !ice.el.isConnected;
         }
+        // Sıradaki buzlu kelime bir önceki makinenin evine düşmez (velinin isteği: makine hep aynı sütuna geliyordu).
         [...g.list].forEach((x) => gameRemove(g, x));
         g.paused = false;
         const c2 = g.spawn('ice');
+        moved = !!c && !!c2 && c2.house !== c.house;
         if (c2) for (const ch of c2.text) key(ch, TQ_KEY[ch]);
         await wait(1200);
         const at = g.ice?.house;
@@ -295,8 +297,8 @@
       check('Kelime roketi: buzlu kelime çatıya buz makinesi takar; makine iki sütununa düşen kelimelere kendiliğinden, sırayla buzlu su '
         + 'püskürtür (yarı hız), su kelimelerin arkasında kalır', iceOn && sprayed,
         [!iceOn && 'makine takılmadı', !sprayed && 'püskürtmedi, yanlış kelimeye püskürttü ya da su öne geçti'].filter(Boolean).join('; '));
-      check('Kelime roketi: buz makinesi buzu bitince erir, çatısı uçarsa gider', melted && lost,
-        [!melted && 'buzu bitince erimedi', !lost && 'çatı uçunca gitmedi'].filter(Boolean).join('; '));
+      check('Kelime roketi: buz makinesi buzu bitince erir, sıradaki buzlu kelime başka eve düşer, çatısı uçan makine gider', melted && moved && lost,
+        [!melted && 'buzu bitince erimedi', !moved && 'yeni buzlu kelime aynı eve düştü', !lost && 'çatı uçunca gitmedi'].filter(Boolean).join('; '));
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).

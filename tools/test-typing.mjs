@@ -20,7 +20,7 @@ const code = [
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
     + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
     + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX,'
-    + ' gameGuard, GAME_GUARD_S, gameIceDue, gameIceRoof, gameIceCols, gameIceAim, GAME_ICE_LEVEL, GAME_ICE_GAP, GAME_ICE_SHOTS,'
+    + ' gameGuard, GAME_GUARD_S, gameHouse, gameIceDue, gameIceRoof, gameIceCols, gameIceAim, GAME_ICE_LEVEL, GAME_ICE_GAP, GAME_ICE_SHOTS,'
     + ' GAME_ICE_SLOW, GAME_ICE_COOL };',
 ].join('\n');
 const T = new Function(code)();
@@ -142,9 +142,10 @@ check('süper kelime biraz uzun: başta 5–8, sonra 7–10 harf, farklı ilk ha
   sup1.every((w) => w.length >= 5 && w.length <= 8 && !'ka'.includes(w[0])) && sup5.every((w) => w.length >= 7 && w.length <= 10)
   && supFj.every((w) => w.length >= 5 && /^[fj]+$/.test(w)) && T.gameSuperWord([], 1, rnd) === null, `${sup1[0]}, ${sup5[0]}, ${supFj[0]}`);
 const due = (o) => T.gameSuperDue({ superIn: 0, power: 0, list: [], ...o });
-check('süper kelime sırası gelince; silahlar dörde kadar birikir, dördü varken ya da ekranda süper kelime varken gelmez; Ctrl iki basış yarım saniyede',
+check('süper kelime sırası gelince (15–20 kelimede bir); silahlar dörde kadar birikir, dördü varken ya da ekranda süper ya da buzlu kelime varken '
+  + 'gelmez; Ctrl iki basış yarım saniyede',
   due({}) && due({ list: [{ super: false }] }) && !due({ superIn: 3 }) && due({ power: 3 }) && !due({ power: 4 }) && !due({ list: [{ super: true }] })
-  && T.GAME_POWER_MAX === 4 && T.GAME_SUPER_GAP === 8 && T.GAME_SUPER_SLOW > 1 && T.GAME_DOUBLE_MS === 500);
+  && !due({ list: [{ ice: true }] }) && T.GAME_POWER_MAX === 4 && T.GAME_SUPER_GAP === 15 && T.GAME_SUPER_SLOW > 1 && T.GAME_DOUBLE_MS === 500);
 // Süper silahın roketleri (velinin isteği): çatısına en yakın kelimeden başlayıp sırayla kalkar; roketi yolda olan atlanır.
 const sky = [{ id: 'a', y: 10, ground: 300 }, { id: 'b', y: 250, ground: 300 }, { id: 'c', y: 290, ground: 300, locked: true }, { id: 'd', y: 200, ground: 260 }];
 const volley = T.gameVolley(sky).map((w) => w.id).join('');
@@ -159,9 +160,19 @@ check('son çatı: ona çok yaklaşan kelime süper silahı kendiliğinden ateş
 // Buz makinesi (velinin isteği): oyun hızlanınca buzlu kelime; vurana çatısında buz makinesi, iki sütununa düşen kelimeleri
 // kendiliğinden ıslatıp yavaşlatır.
 const iceDue = (o) => T.gameIceDue({ level: 3, ice: null, iceIn: 0, list: [], ...o });
-check('buzlu kelime 3. seviyeden sonra sırası gelince; makine varken ya da ekranda buzlu kelime varken gelmez',
-  iceDue({}) && iceDue({ level: 9, list: [{ super: true }] }) && !iceDue({ level: 2 }) && !iceDue({ iceIn: 1 }) && !iceDue({ ice: {} })
-  && !iceDue({ list: [{ ice: true }] }) && T.GAME_ICE_LEVEL === 3 && T.GAME_ICE_GAP >= 8);
+check('buzlu kelime 3. seviyeden sonra sırası gelince; makine varken ya da ekranda süper ya da buzlu kelime varken gelmez',
+  iceDue({}) && iceDue({ level: 9, list: [{ super: false }] }) && !iceDue({ level: 2 }) && !iceDue({ iceIn: 1 }) && !iceDue({ ice: {} })
+  && !iceDue({ list: [{ ice: true }] }) && !iceDue({ list: [{ super: true }] }) && T.GAME_ICE_LEVEL === 3 && T.GAME_ICE_GAP >= 8);
+// Kelimenin evi rastgele; buzlu kelime bir önceki buz makinesinin evine düşmez (velinin isteği: hep aynı sütuna geliyordu).
+seed = 3;
+const homes = Array(5).fill(0);
+for (let i = 0; i < 5000; i++) homes[T.gameHouse([2, 2, 2, 2, 2], rnd)]++;
+const nth = (n, f) => Array.from({ length: n }, f);
+check('kelimenin evi: sağlam çatılılardan rastgele (her ev aşağı yukarı eşit); kaçınılan eve düşmez, başka sağlam çatı yoksa düşer',
+  homes.every((n) => n > 850 && n < 1150) && nth(200, () => T.gameHouse([2, 2, 2, 2, 2], rnd, 2)).every((x) => x !== 2)
+  && nth(50, () => T.gameHouse([0, 1, 0, 2, 0], rnd, 3)).every((x) => x === 1) && T.gameHouse([0, 0, 2, 0, 0], rnd, 2) === 2
+  && nth(50, () => T.gameHouse([2, 0, 2, 0, 2], rnd)).every((x) => x % 2 === 0) && T.gameHouse([0, 0, 0, 0, 0], rnd) === -1,
+  homes.join());
 check('buz makinesinin çatısı: kelimenin düştüğü çatı; uçtuysa en yakın sağlam çatı, eşitse soldaki; hiç yoksa yok',
   T.gameIceRoof([2, 2, 2, 2, 2], 3) === 3 && T.gameIceRoof([2, 2, 0, 2, 2], 2) === 1 && T.gameIceRoof([2, 0, 0, 0, 1], 2) === 0
   && T.gameIceRoof([0, 0, 0, 0, 1], 0) === 4 && T.gameIceRoof([0, 0, 0, 0, 0], 2) === -1);
