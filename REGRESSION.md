@@ -209,6 +209,9 @@ Her maddenin yanında nasıl denendiği yazar:
     kelime düşer (velinin isteği, 2026-11-02: 8–12 kelimede bir çok sık geliyordu). Biraz uzundur (başta 5–8, sonra 7–10 harf;
     ilk derslerde alıştırmalar yan yana) ve biraz yavaş düşer. Elinde dört süper silah varken ya da ekranda süper ya da buzlu
     kelime varken gelmez (bir seferde tek özel kelime). Çatıya değerse o da çatıyı hırpalar. [O]
+  - Süper ya da buzlu kelime düşerken onun sütununa başka kelime düşmez (başka sağlam çatı yoksa düşer); kelimeler üst üste
+    binerse özel kelime öbürlerinin, yazılan (hedef) kelime hepsinin üstünde görünür (velinin isteği, 2026-11-03: arkadan gelen
+    hızlı kelimeler yavaş düşen özel kelimenin üstünü örtüyordu). Roketler ve 💥 en üstte. [O]
   - Süper kelimeyi vuran süper silah kazanır; silahlar dörde kadar birikir (velinin isteği, 2026-11-02). Elindekiler evlerin
     arasında soldan sağa dik duran, parlayan, ateşe hazır roketler olarak görünür. Sol üstte saydam "🌟 Süper silah hazır" rozeti
     (birden çoksa "2 süper silah hazır"; kelimelerin arkasında), yönergede "Ctrl'ye iki kez bas", ekrandaki klavyede iki Ctrl tuşu
@@ -233,6 +236,9 @@ Her maddenin yanında nasıl denendiği yazar:
   - Makine çatının tepesinde buz mavisi bir kutudur (❄️, ağzı yukarıda, altındaki çizgi kalan buz). O çatının ve yanındaki bir
     çatının sütununu korur: yanındakilerden sağlam olanı; ikisi de sağlamsa hırpalanmış olanı, eşitse ortaya yakını. İki sütun
     gökyüzünde buğulu, kar yağan bir şeritle görünür. [O]
+  - Yanındaki çatı uçarsa makine öbür yandaki sağlam çatının sütununa döner, şerit oraya kayar; şerit: "❄️ Buz makinesi öbür
+    yana döndü!" (velinin isteği, 2026-11-03). Öbür yan yoksa (kenardaki ev) ya da o da uçmuşsa yerinde kalır; öbür yan sonra
+    yeni seviyede onarılınca ona döner. Yan çatı hırpalanınca dönmez. Oyundaki yardım yazısı da söyler. [O]
   - Bu iki sütuna düşen kelimeye kendiliğinden buzlu su püskürtür: makineden kelimenin altına genişleyen kısa bir su huzmesi,
     kelimenin çevresinde kar. Kelime buz mavisi olur, köşesinde ❄️, yarı hızla düşer. Su, kar ve şerit kelimelerin arkasında
     kalır; kelimeyi örtmez (velinin isteği). Çatısına en yakın kelime önce; her kelime bir kez ıslanır, iki püskürtme arası

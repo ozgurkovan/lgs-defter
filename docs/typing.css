@@ -96,6 +96,11 @@
 .tg-word.ice::before { content: '❄️'; font-size: 18px; opacity: 1; }
 .tg-word.ice .done { color: #0B6B3A; }
 @keyframes tg-frosty { to { box-shadow: 0 0 0 3px #fff, 0 0 34px rgba(179, 229, 252, 1); } }
+/* Kelimeler üst üste binerse özel kelime (süper, buzlu) öbürlerinin, yazılan kelime hepsinin üstünde (velinin isteği,
+   2026-11-03: arkadan gelen hızlı kelimeler özel kelimenin üstünü örtüyordu). Roketler ve patlamalar en üstte. */
+.tg-word.super, .tg-word.ice { z-index: 1; }
+.tg-word.target { z-index: 2; }
+.tg-rocket, .tg-puff { z-index: 3; }
 .tg-rocket { font-size: 28px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
 .tg-puff { font-size: 36px; animation: tg-puff 0.5s ease-out forwards; }
 @keyframes tg-puff { from { opacity: 1; scale: 0.4; } to { opacity: 0; scale: 1.7; } }
@@ -153,6 +158,7 @@
 .tg-frost {
   position: absolute; top: 0; bottom: 0; z-index: 0; overflow: hidden; pointer-events: none; border-radius: 18px 18px 0 0;
   border: 1px dashed rgba(225, 245, 254, 0.3); border-bottom: 0; background: linear-gradient(rgba(179, 229, 252, 0.04), rgba(179, 229, 252, 0.2));
+  transition: left 0.45s ease-in-out; /* makine öbür yana dönünce şerit kayar */
 }
 .tg-frost::before {
   content: ''; position: absolute; left: 0; right: 0; top: -90px; bottom: 0; animation: tg-snow 3s linear infinite;
@@ -202,4 +208,5 @@
   .ty-typed .lit, .ty-typed .bad, .kb .k.erase .kc, .kb .kb-arrow.show, .tg-field.miss, .tg-house.hit, .tg-puff,
   .tg-word.super, .tg-house.fix, .tg-pad.on::before, .tg-pad.go::before, .tg-field.boom, .tg-field.boom::after,
   .tg-word.ice, .tg-spray, .tg-ice.puff, .tg-ice.melt, .tg-frost::before { animation: none; }
+  .tg-frost { transition: none; }
 }

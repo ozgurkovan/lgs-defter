@@ -20,7 +20,7 @@ const code = [
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
     + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
     + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX,'
-    + ' gameGuard, GAME_GUARD_S, gameHouse, gameIceDue, gameIceRoof, gameIceCols, gameIceAim, GAME_ICE_LEVEL, GAME_ICE_GAP, GAME_ICE_SHOTS,'
+    + ' gameGuard, GAME_GUARD_S, gameHouse, gameAvoid, gameIceDue, gameIceRoof, gameIceCols, gameIceSide, gameIceAim, GAME_ICE_LEVEL, GAME_ICE_GAP, GAME_ICE_SHOTS,'
     + ' GAME_ICE_SLOW, GAME_ICE_COOL };',
 ].join('\n');
 const T = new Function(code)();
@@ -173,6 +173,12 @@ check('kelimenin evi: sağlam çatılılardan rastgele (her ev aşağı yukarı 
   && nth(50, () => T.gameHouse([0, 1, 0, 2, 0], rnd, 3)).every((x) => x === 1) && T.gameHouse([0, 0, 2, 0, 0], rnd, 2) === 2
   && nth(50, () => T.gameHouse([2, 0, 2, 0, 2], rnd)).every((x) => x % 2 === 0) && T.gameHouse([0, 0, 0, 0, 0], rnd) === -1,
   homes.join());
+// Hızlı kelimeler yavaş düşen özel kelimeye yetişip üstünü örtmesin (velinin isteği, 2026-11-03): özel kelimenin sütunundan kaçınılır.
+const aloft = (list, iceAt = -1) => ({ list, iceAt });
+check('kaçınılan ev: buzlu kelime son makinenin evinden; ötekiler ekrandaki süper ya da buzlu kelimenin sütunundan; yoksa hiçbiri',
+  T.gameAvoid(aloft([{ house: 1, super: true }], 3), 'ice') === 3 && T.gameAvoid(aloft([{ house: 0 }, { house: 1, super: true }], 3), '') === 1
+  && T.gameAvoid(aloft([{ house: 0 }, { house: 4, ice: true }]), '') === 4 && T.gameAvoid(aloft([{ house: 2, ice: true }]), 'super') === 2
+  && T.gameAvoid(aloft([{ house: 0 }], 3), '') === -1 && T.gameAvoid(aloft([]), 'super') === -1);
 check('buz makinesinin çatısı: kelimenin düştüğü çatı; uçtuysa en yakın sağlam çatı, eşitse soldaki; hiç yoksa yok',
   T.gameIceRoof([2, 2, 2, 2, 2], 3) === 3 && T.gameIceRoof([2, 2, 0, 2, 2], 2) === 1 && T.gameIceRoof([2, 0, 0, 0, 1], 2) === 0
   && T.gameIceRoof([0, 0, 0, 0, 1], 0) === 4 && T.gameIceRoof([0, 0, 0, 0, 0], 2) === -1);
@@ -182,6 +188,12 @@ check('buz makinesinin iki sütunu: kendi çatısı ve yanındaki; önce sağlam
   && iceCols([2, 2, 2, 2, 2], 3) === '2,3' && iceCols([2, 2, 2, 2, 2], 2) === '1,2' && iceCols([2, 2, 2, 1, 2], 2) === '2,3'
   && iceCols([2, 0, 2, 2, 2], 2) === '2,3' && iceCols([1, 2, 2, 2, 2], 1) === '0,1' && iceCols([0, 2, 2, 2, 2], 1) === '1,2',
   iceCols([2, 2, 2, 2, 2], 2));
+const keep = [1, 2], iceSide = (roofs, i, cols) => T.gameIceSide(roofs, i, cols).join();
+check('yanındaki çatı uçunca makine öbür yana döner; yan çatı sağlamken, öbür yan yokken ya da o da uçmuşken yerinde kalır',
+  iceSide([2, 0, 2, 2, 2], 2, [1, 2]) === '2,3' && iceSide([2, 2, 2, 0, 2], 2, [2, 3]) === '1,2' && iceSide([2, 0, 2, 1, 2], 2, [1, 2]) === '2,3'
+  && T.gameIceSide([2, 1, 2, 2, 2], 2, keep) === keep && T.gameIceSide([2, 0, 2, 0, 2], 2, keep) === keep
+  && iceSide([2, 0, 2, 2, 2], 0, [0, 1]) === '0,1' && iceSide([2, 2, 2, 0, 1], 4, [3, 4]) === '3,4' && iceSide([0, 2, 1, 2, 2], 1, [0, 1]) === '1,2',
+  iceSide([2, 0, 2, 2, 2], 2, [1, 2]));
 const rain = [{ id: 'a', house: 1, y: 100, ground: 300 }, { id: 'b', house: 2, y: 250, ground: 300 }, { id: 'c', house: 1, y: 280, ground: 300, locked: true },
   { id: 'd', house: 2, y: 290, ground: 300, iced: true }, { id: 'e', house: 3, y: 295, ground: 300 }, { id: 'f', house: 1, y: 20, ground: 300 }];
 check('buzlu su: makinenin sütunlarında, roketi yolda olmayan, ıslanmamış, gökyüzüne girmiş kelimelerden çatısına en yakın olana',

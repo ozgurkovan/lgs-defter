@@ -147,7 +147,8 @@
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
       let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, stacked = false, held = false, frozen = false,
-        calm = false, boom = false, guard = false, iceOn = false, sprayed = false, melted = false, moved = false, lost = false;
+        calm = false, boom = false, guard = false, iceOn = false, sprayed = false, melted = false, moved = false, lost = false,
+        clear = false, turned = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -279,6 +280,34 @@
           if (z) { z.house = at; z.y = z.ground; g.paused = false; g.tick(0.016); }
         }
         lost = at != null && !g.ice && g.roofs[at] === 0 && !g.over && /buz makinesi de gitti/.test(g.view.banner.textContent);
+        // Süper ya da buzlu kelime düşerken onun sütununa başka kelime düşmez; özel kelime öbürlerinin, yazılan kelime hepsinin
+        // üstünde görünür (velinin isteği, 2026-11-03: arkadan gelen hızlı kelimeler özel kelimenin üstünü örtüyordu).
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.roofs = [2, 2, 2, 2, 2];
+        g.roofs.forEach((hp, i) => { g.view.houses[i].dataset.hp = hp; });
+        g.paused = false; g.spawnIn = 99;
+        const zOf = (x) => getComputedStyle(x.el).zIndex;
+        const s3 = g.spawn('super'), after3 = Array.from({ length: 20 }, () => g.spawn(''));
+        clear = !!s3 && after3.every((x) => x && x.house !== s3.house) && zOf(s3) === '1' && zOf(after3[0]) === 'auto';
+        if (clear) { after3[0].el.classList.add('target'); clear = zOf(after3[0]) === '2'; }
+        [...g.list].forEach((x) => gameRemove(g, x));
+        const i3 = g.spawn('ice'), after4 = Array.from({ length: 20 }, () => g.spawn(''));
+        clear &&= !!i3 && after4.every((x) => x && x.house !== i3.house) && zOf(i3) === '1';
+        // Buz makinesinin yanındaki çatı uçunca makine öbür yandaki çatıya döner, şerit oraya kayar (velinin isteği, 2026-11-03).
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.paused = false; g.spawnIn = 99;
+        const c3 = g.spawn('ice');
+        if (c3) { c3.house = 2; for (const ch of c3.text) key(ch, TQ_KEY[ch]); }
+        await wait(1200);
+        const ice3 = g.ice;
+        if (ice3?.house === 2) {
+          const side = ice3.cols.find((i) => i !== 2), left0 = ice3.band.style.left;
+          g.roofs[side] = 1; g.view.houses[side].dataset.hp = 1;
+          const y = g.spawn('');
+          if (y) { y.house = side; y.y = y.ground; g.paused = false; g.spawnIn = 99; g.tick(0.016); }
+          turned = g.ice === ice3 && g.roofs[side] === 0 && ice3.cols.join() === [2, 4 - side].sort((a, b) => a - b).join()
+            && ice3.band.isConnected && ice3.band.style.left !== left0 && /öbür yana/.test(g.view.banner.textContent);
+        }
       }
       history.back(); await settle();
       check('Kelime roketi: yazılan kelimeyi roket vurur, çatıya değen kelime çatıyı hırpalar, geri tuşu Klavye sayfasına döner',
@@ -299,6 +328,10 @@
         [!iceOn && 'makine takılmadı', !sprayed && 'püskürtmedi, yanlış kelimeye püskürttü ya da su öne geçti'].filter(Boolean).join('; '));
       check('Kelime roketi: buz makinesi buzu bitince erir, sıradaki buzlu kelime başka eve düşer, çatısı uçan makine gider', melted && moved && lost,
         [!melted && 'buzu bitince erimedi', !moved && 'yeni buzlu kelime aynı eve düştü', !lost && 'çatı uçunca gitmedi'].filter(Boolean).join('; '));
+      check('Kelime roketi: süper ya da buzlu kelimenin sütununa başka kelime düşmez; özel kelime öbürlerinin, yazılan kelime hepsinin üstünde',
+        clear, 'özel kelimenin sütununa kelime düştü ya da kelimeler yanlış sırada');
+      check('Kelime roketi: buz makinesinin yanındaki çatı uçunca makine öbür yana döner, şerit oraya kayar', turned,
+        g?.ice ? `sütunlar ${g.ice.cols.join()}, çatılar ${g.roofs.join()}` : 'makine yok');
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).
