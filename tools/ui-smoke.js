@@ -148,7 +148,7 @@
       const g = state.session;
       let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, stacked = false, held = false, frozen = false,
         calm = false, boom = false, guard = false, iceOn = false, sprayed = false, melted = false, moved = false, lost = false,
-        clear = false, turned = false;
+        clear = false, turned = false, fair = false, thrifty = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
@@ -226,6 +226,21 @@
         const fired = !!d && power0 > 0 && d.locked && !!g.volley && g.power === power0 - 1 && /Son çatı/.test(g.view.banner.textContent);
         for (let i = 0; i < 50 && g.volley; i++) await wait(100);
         guard = fired && !g.list.includes(d) && g.roofs.join() === '0,0,1,0,0' && !g.over;
+        // Roketlerin vurduğu süper ya da buzlu kelime bir şey kazandırmaz (süper silah ve makine yalnızca yazana); süper silah
+        // ateşlenince sonraki 10 kelimede özel kelime gelmez (velinin isteği, 2026-11-03: patlamadan hemen sonra yeni silah ya
+        // da su sıkıcı geliyor, oyun hiç bitmiyordu).
+        [...g.list].forEach((x) => gameRemove(g, x));
+        g.roofs = [2, 2, 2, 2, 2];
+        g.roofs.forEach((hp, i) => { g.view.houses[i].dataset.hp = hp; });
+        gamePower(g, 1);
+        g.paused = false; g.spawnIn = 99;
+        const f1 = g.spawn('super'), f2 = g.spawn('ice'), f3 = g.spawn('');
+        g.superIn = 0; g.iceIn = 0;
+        key('Control', 'ControlLeft'); key('Control', 'ControlLeft');
+        const fired2 = !!g.volley;
+        for (let i = 0; i < 50 && g.volley; i++) await wait(100);
+        fair = fired2 && !!f1 && !!f2 && !!f3 && !g.volley && !g.list.length && g.power === 0 && !g.ice
+          && g.superIn === GAME_CALM && g.iceIn === GAME_CALM;
         // Buz makinesi: buzlu kelimeyi vuranın çatısına makine takılır; iki sütununa düşen kelimelere kendiliğinden, sırayla buzlu
         // su püskürtür (yarı hız, ❄️), öbür sütunlara dokunmaz; su kelimelerin arkasında kalır. Buzu bitince erir, çatısı uçarsa gider.
         [...g.list].forEach((x) => gameRemove(g, x));
@@ -307,6 +322,19 @@
           if (y) { y.house = side; y.y = y.ground; g.paused = false; g.spawnIn = 99; g.tick(0.016); }
           turned = g.ice === ice3 && g.roofs[side] === 0 && ice3.cols.join() === [2, 4 - side].sort((a, b) => a - b).join()
             && ice3.band.isConnected && ice3.band.style.left !== left0 && /öbür yana/.test(g.view.banner.textContent);
+          // Öbür yan da uçarsa dönecek yer yok, makine yerinde kalır; uçmuş çatıya düşen (zararsız) kelimeye buz harcamaz.
+          const far = ice3.cols.find((i) => i !== 2);
+          g.roofs[far] = 1; g.view.houses[far].dataset.hp = 1;
+          const y2 = g.spawn('');
+          if (y2) { y2.house = far; y2.y = y2.ground; g.paused = false; g.spawnIn = 99; g.tick(0.016); }
+          const q = g.spawn(''), k = g.spawn('');
+          if (q && k && g.ice === ice3) {
+            q.house = far; q.y = q.ground * 0.6; k.house = 2; k.y = k.ground * 0.3;
+            const shots1 = ice3.shots;
+            g.paused = false; g.spawnIn = 99; g.tick(GAME_ICE_COOL + 0.01);
+            g.paused = false; g.tick(GAME_ICE_COOL + 0.01);
+            thrifty = g.roofs[far] === 0 && ice3.cols.includes(far) && k.iced && !q.iced && ice3.shots === shots1 - 1;
+          }
         }
       }
       history.back(); await settle();
@@ -330,8 +358,12 @@
         [!melted && 'buzu bitince erimedi', !moved && 'yeni buzlu kelime aynı eve düştü', !lost && 'çatı uçunca gitmedi'].filter(Boolean).join('; '));
       check('Kelime roketi: süper ya da buzlu kelimenin sütununa başka kelime düşmez; özel kelime öbürlerinin, yazılan kelime hepsinin üstünde',
         clear, 'özel kelimenin sütununa kelime düştü ya da kelimeler yanlış sırada');
-      check('Kelime roketi: buz makinesinin yanındaki çatı uçunca makine öbür yana döner, şerit oraya kayar', turned,
-        g?.ice ? `sütunlar ${g.ice.cols.join()}, çatılar ${g.roofs.join()}` : 'makine yok');
+      check('Kelime roketi: buz makinesinin yanındaki çatı uçunca makine öbür yana döner, şerit oraya kayar; dönecek yer yoksa yerinde kalır, '
+        + 'uçmuş çatıya düşen kelimeye buz harcamaz', turned && thrifty,
+        [!turned && 'öbür yana dönmedi', !thrifty && 'uçmuş çatıya düşen kelimeye buz harcadı',
+          g?.ice ? `sütunlar ${g.ice.cols.join()}, çatılar ${g.roofs.join()}` : 'makine yok'].filter(Boolean).join('; '));
+      check('Kelime roketi: süper silahın roketlerinin vurduğu süper ya da buzlu kelime bir şey kazandırmaz; ateşlenince 10 kelime özel kelime gelmez',
+        fair, 'roketlerin vurduğu özel kelime silah ya da makine verdi, ya da sonraki özel kelime ertelenmedi');
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).

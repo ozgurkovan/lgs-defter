@@ -19,8 +19,9 @@ const code = [
   pick(src, 'const TQ_ROWS', 'const KB = '),
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
     + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
-    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX,'
-    + ' gameGuard, GAME_GUARD_S, gameHouse, gameAvoid, gameIceDue, gameIceRoof, gameIceCols, gameIceSide, gameIceAim, GAME_ICE_LEVEL, GAME_ICE_GAP, GAME_ICE_SHOTS,'
+    + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX, GAME_CALM,'
+    + ' gameGuard, GAME_GUARD_S, gameHouse, gameAvoid, gameIceDue, gameIceRoof, gameIceCols, gameIceSide, gameIceAim, GAME_ICE_LEVEL, GAME_ICE_FIRST,'
+    + ' GAME_ICE_GAP, GAME_ICE_SHOTS,'
     + ' GAME_ICE_SLOW, GAME_ICE_COOL };',
 ].join('\n');
 const T = new Function(code)();
@@ -118,9 +119,11 @@ check('oyun kelimeleri: boşluk, nokta, tek harf yok; kelime çoksa tuş alışt
   all.every((w) => /^[a-zçğıöşü]{2,}$/u.test(w)) && !all.includes('fff') && !all.includes('yaz geldi.') && all.includes('kedi'), `${all.length} kelime`);
 const levels = Array.from({ length: 25 }, (_, i) => i + 1);
 const falls = levels.map(T.gameFall), gaps = levels.map(T.gameEvery);
-check('oyun gittikçe hızlanır: düşüş 12 sn → en az 4 sn, aralık 3,2 sn → en az 0,9 sn, ekranda en çok 7 kelime',
-  falls[0] === 12 && falls.every((f, i) => i === 0 || f <= falls[i - 1]) && Math.min(...falls) === 4 && falls[1] < falls[0]
-  && gaps[0] === 3.2 && gaps.every((g, i) => i === 0 || g <= gaps[i - 1]) && Math.min(...gaps) === 0.9
+// Hızlanma 12. seviyeden sonra da sürer (velinin isteği, 2026-11-03: hızlı yazınca oyun hiç bitmiyordu).
+check('oyun gittikçe hızlanır: düşüş 12 sn → en az 2,5 sn, aralık 3,2 sn → en az 0,6 sn, 12. seviyeden sonra da; ekranda en çok 7 kelime',
+  falls[0] === 12 && falls.every((f, i) => i === 0 || f <= falls[i - 1]) && Math.min(...falls) === 2.5 && falls[1] < falls[0]
+  && gaps[0] === 3.2 && gaps.every((g, i) => i === 0 || g <= gaps[i - 1]) && Math.min(...gaps) === 0.6
+  && falls[14] < falls[11] && gaps[15] < gaps[12] && T.gameFall(5) > 7.5
   && T.gameMax(1) === 3 && T.gameMax(25) === 7 && T.gameLevel(0) === 1 && T.gameLevel(5) === 1 && T.gameLevel(6) === 2,
   `seviye 5: ${T.gameFall(5).toFixed(1)} sn düşüş, ${T.gameEvery(5).toFixed(1)} sn aralık`);
 seed = 11;
@@ -142,10 +145,11 @@ check('süper kelime biraz uzun: başta 5–8, sonra 7–10 harf, farklı ilk ha
   sup1.every((w) => w.length >= 5 && w.length <= 8 && !'ka'.includes(w[0])) && sup5.every((w) => w.length >= 7 && w.length <= 10)
   && supFj.every((w) => w.length >= 5 && /^[fj]+$/.test(w)) && T.gameSuperWord([], 1, rnd) === null, `${sup1[0]}, ${sup5[0]}, ${supFj[0]}`);
 const due = (o) => T.gameSuperDue({ superIn: 0, power: 0, list: [], ...o });
-check('süper kelime sırası gelince (15–20 kelimede bir); silahlar dörde kadar birikir, dördü varken ya da ekranda süper ya da buzlu kelime varken '
-  + 'gelmez; Ctrl iki basış yarım saniyede',
+check('süper kelime sırası gelince (30–40 kelimede bir; patlamadan sonra 10 kelime gelmez); silahlar dörde kadar birikir, dördü varken ya da '
+  + 'ekranda süper ya da buzlu kelime varken gelmez; Ctrl iki basış yarım saniyede',
   due({}) && due({ list: [{ super: false }] }) && !due({ superIn: 3 }) && due({ power: 3 }) && !due({ power: 4 }) && !due({ list: [{ super: true }] })
-  && !due({ list: [{ ice: true }] }) && T.GAME_POWER_MAX === 4 && T.GAME_SUPER_GAP === 15 && T.GAME_SUPER_SLOW > 1 && T.GAME_DOUBLE_MS === 500);
+  && !due({ list: [{ ice: true }] }) && T.GAME_POWER_MAX === 4 && T.GAME_SUPER_GAP === 30 && T.GAME_CALM === 10 && T.GAME_SUPER_SLOW > 1
+  && T.GAME_DOUBLE_MS === 500);
 // Süper silahın roketleri (velinin isteği): çatısına en yakın kelimeden başlayıp sırayla kalkar; roketi yolda olan atlanır.
 const sky = [{ id: 'a', y: 10, ground: 300 }, { id: 'b', y: 250, ground: 300 }, { id: 'c', y: 290, ground: 300, locked: true }, { id: 'd', y: 200, ground: 260 }];
 const volley = T.gameVolley(sky).map((w) => w.id).join('');
@@ -160,9 +164,11 @@ check('son çatı: ona çok yaklaşan kelime süper silahı kendiliğinden ateş
 // Buz makinesi (velinin isteği): oyun hızlanınca buzlu kelime; vurana çatısında buz makinesi, iki sütununa düşen kelimeleri
 // kendiliğinden ıslatıp yavaşlatır.
 const iceDue = (o) => T.gameIceDue({ level: 3, ice: null, iceIn: 0, list: [], ...o });
-check('buzlu kelime 3. seviyeden sonra sırası gelince; makine varken ya da ekranda süper ya da buzlu kelime varken gelmez',
+check('buzlu kelime 3. seviyeden sonra sırası gelince (ilki 11. kelimede, sonra 20–28 kelimede bir); makine varken ya da ekranda süper ya da '
+  + 'buzlu kelime varken gelmez',
   iceDue({}) && iceDue({ level: 9, list: [{ super: false }] }) && !iceDue({ level: 2 }) && !iceDue({ iceIn: 1 }) && !iceDue({ ice: {} })
-  && !iceDue({ list: [{ ice: true }] }) && !iceDue({ list: [{ super: true }] }) && T.GAME_ICE_LEVEL === 3 && T.GAME_ICE_GAP >= 8);
+  && !iceDue({ list: [{ ice: true }] }) && !iceDue({ list: [{ super: true }] }) && T.GAME_ICE_LEVEL === 3 && T.GAME_ICE_FIRST === 10
+  && T.GAME_ICE_GAP === 20);
 // Kelimenin evi rastgele; buzlu kelime bir önceki buz makinesinin evine düşmez (velinin isteği: hep aynı sütuna geliyordu).
 seed = 3;
 const homes = Array(5).fill(0);
@@ -196,9 +202,11 @@ check('yanındaki çatı uçunca makine öbür yana döner; yan çatı sağlamke
   iceSide([2, 0, 2, 2, 2], 2, [1, 2]));
 const rain = [{ id: 'a', house: 1, y: 100, ground: 300 }, { id: 'b', house: 2, y: 250, ground: 300 }, { id: 'c', house: 1, y: 280, ground: 300, locked: true },
   { id: 'd', house: 2, y: 290, ground: 300, iced: true }, { id: 'e', house: 3, y: 295, ground: 300 }, { id: 'f', house: 1, y: 20, ground: 300 }];
-check('buzlu su: makinenin sütunlarında, roketi yolda olmayan, ıslanmamış, gökyüzüne girmiş kelimelerden çatısına en yakın olana',
-  T.gameIceAim(rain, [1, 2])?.id === 'b' && T.gameIceAim(rain.filter((w) => w.id !== 'b'), [1, 2])?.id === 'a'
-  && T.gameIceAim([rain[5]], [1, 2]) === null && T.gameIceAim(rain, [4]) === null && T.GAME_ICE_SLOW > 0 && T.GAME_ICE_SLOW < 1
-  && T.GAME_ICE_SHOTS > 0 && T.GAME_ICE_COOL > 0, T.gameIceAim(rain, [1, 2])?.id);
+const whole = [2, 2, 2, 2, 2];
+check('buzlu su: makinenin sütunlarında, çatısı sağlam, roketi yolda olmayan, ıslanmamış, gökyüzüne girmiş kelimelerden çatısına en yakın olana',
+  T.gameIceAim(rain, [1, 2], whole)?.id === 'b' && T.gameIceAim(rain.filter((w) => w.id !== 'b'), [1, 2], whole)?.id === 'a'
+  && T.gameIceAim([rain[5]], [1, 2], whole) === null && T.gameIceAim(rain, [4], whole) === null
+  && T.gameIceAim(rain, [1, 2], [2, 2, 0, 2, 2])?.id === 'a' && T.gameIceAim(rain, [1, 2], [2, 0, 0, 2, 2]) === null
+  && T.GAME_ICE_SLOW > 0 && T.GAME_ICE_SLOW < 1 && T.GAME_ICE_SHOTS > 0 && T.GAME_ICE_COOL > 0, T.gameIceAim(rain, [1, 2], whole)?.id);
 
 process.exit(fails ? 1 : 0);

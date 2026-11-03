@@ -164,11 +164,12 @@ function gameWords(best) {
   }
   return words.size >= 12 ? [...words] : [...new Set([...words, ...drills])];
 }
-// Zorluk: her 6 kelimede bir seviye. Kelimenin çatıya düşüşü 12 sn'den başlar, her seviyede %10 kısalır (en az 4 sn);
-// iki kelime arası 3,2 sn'den başlar (en az 0,9 sn); ekranda en çok 2 + seviye kelime (en çok 7); kelimeler uzar.
+// Zorluk: her 6 kelimede bir seviye. Kelimenin çatıya düşüşü 12 sn'den başlar, her seviyede %10 kısalır (en az 2,5 sn);
+// iki kelime arası 3,2 sn'den başlar (en az 0,6 sn); ekranda en çok 2 + seviye kelime (en çok 7); kelimeler uzar. Hızlanma
+// 12. seviyeden sonra da sürer (velinin isteği, 2026-11-03: hızlı yazınca oyun hiç bitmiyordu; eskiden 4 sn ve 0,9 sn'de dururdu).
 const gameLevel = (hits) => 1 + Math.floor(hits / 6);
-const gameFall = (level) => Math.max(4, 12 * 0.9 ** (level - 1));
-const gameEvery = (level) => Math.max(0.9, 3.2 * 0.9 ** (level - 1));
+const gameFall = (level) => Math.max(2.5, 12 * 0.9 ** (level - 1));
+const gameEvery = (level) => Math.max(0.6, 3.2 * 0.9 ** (level - 1));
 const gameMax = (level) => Math.min(7, 2 + level);
 const gameLen = (level) => (level <= 2 ? 4 : level <= 4 ? 6 : 99);
 // Sıradaki kelime: seviyenin uzunluğunu geçmeyen ve ekrandaki kelimelerden farklı harfle başlayan (hangi kelimeyi
@@ -199,13 +200,15 @@ function gameHouse(roofs, rnd, avoid = -1) {
 // geliyordu); öteki kelimeler ekrandaki süper ya da buzlu kelimenin sütununa düşmez (velinin isteği, 2026-11-03: arkadan gelen
 // hızlı kelimeler yavaş düşen özel kelimeye yetişip üstünü örtüyordu). Yoksa -1.
 const gameAvoid = (game, kind) => (kind === 'ice' ? game.iceAt : game.list.find((w) => w.super || w.ice)?.house ?? -1);
-// Süper kelime (velinin isteği, 2026-11-02): arada bir renkli, biraz uzun bir kelime düşer; onu vuran süper silah kazanır,
-// Ctrl'ye art arda iki kez basınca (en çok yarım saniye arayla) ekrandaki bütün kelimeler patlar. İlk süper kelime 15.
-// kelimede, sonra her 15–20 kelimede bir (velinin isteği, 2026-11-02: 8–12'de bir çok sık geliyordu); elinde dört süper silah
-// varken ya da ekranda süper ya da buzlu kelime varken gelmez (bir seferde tek özel kelime). Biraz daha yavaş düşer (uzun
-// kelimeyi yazmaya vakit kalsın). Süper silahlar birikir (velinin isteği, 2026-11-02): en çok dört, evlerin arasında ateşe hazır
-// roketler olarak durur; her iki Ctrl birini ateşler.
-const GAME_SUPER_GAP = 15, GAME_SUPER_SLOW = 1.3, GAME_DOUBLE_MS = 500, GAME_POWER_MAX = GAME_ROOFS - 1;
+// Süper kelime (velinin isteği, 2026-11-02): arada bir renkli, biraz uzun bir kelime düşer; onu yazıp vuran süper silah
+// kazanır, Ctrl'ye art arda iki kez basınca (en çok yarım saniye arayla) ekrandaki bütün kelimeler patlar. İlk süper kelime
+// 30. kelimede, sonra her 30–40 kelimede bir (velinin isteği: 8–12'de bir, sonra 15–20'de bir de çok sık geliyordu; 2026-11-03:
+// oyun hiç bitmiyordu); elinde dört süper silah varken ya da ekranda süper ya da buzlu kelime varken gelmez (bir seferde tek
+// özel kelime). Biraz daha yavaş düşer (uzun kelimeyi yazmaya vakit kalsın). Süper silahlar birikir (velinin isteği,
+// 2026-11-02): en çok dört, evlerin arasında ateşe hazır roketler olarak durur; her iki Ctrl birini ateşler. Ateşlenince
+// sonraki GAME_CALM kelimede süper ya da buzlu kelime gelmez (velinin isteği, 2026-11-03: patlamadan hemen sonra yeni süper
+// ya da buzlu kelime geliyor, oyun hep yavaş kalıyordu).
+const GAME_SUPER_GAP = 30, GAME_SUPER_SLOW = 1.3, GAME_DOUBLE_MS = 500, GAME_POWER_MAX = GAME_ROOFS - 1, GAME_CALM = 10;
 const gameSuperDue = (game) => game.superIn <= 0 && game.power < GAME_POWER_MAX && !game.list.some((w) => w.super || w.ice);
 // Süper kelime (buzlu kelime de) seviyenin kelimelerinden biraz uzun (başta 5–8, sonra 7–10 harf), ekrandakilerden farklı ilk harfle. Öyle
 // kelime yoksa (ilk dersler) kelimeler yan yana eklenir: "fjf" + "jfj" → "fjfjfj".
@@ -230,12 +233,14 @@ const GAME_GUARD_S = 0.8;
 const gameGuard = (game, w) => game.power > 0 && !game.volley && game.roofs[w.house] > 0
   && game.roofs.filter((hp) => hp > 0).length === 1 && w.ground - w.y <= w.speed * GAME_GUARD_S;
 // Buz makinesi (velinin isteği, 2026-11-02): oyun biraz hızlanınca (3. seviyeden sonra) arada bir buzlu ❄️, biraz uzun bir
-// kelime düşer (süper kelime gibi seçilir, biraz yavaş). Onu vuranın, kelimenin düştüğü çatısına buz makinesi takılır; makine o
-// çatının ve yanındaki bir çatının sütununa düşen kelimelere kendiliğinden buzlu su püskürtür, ıslanan kelime yarı hızla düşer.
-// Her kelime bir kez ıslanır; iki püskürtme arası GAME_ICE_COOL saniye. Makinede sekiz buz var, bitince erir; çatısı uçarsa
-// makine de gider. Makine varken ya da ekranda süper ya da buzlu kelime varken yenisi gelmez: ilki 3. seviyenin üçüncü
-// kelimesinde, sonra her 10–14 kelimede bir (makine giderken sayılmaz). Bir önceki makinenin evine düşmez (gameHouse).
-const GAME_ICE_LEVEL = 3, GAME_ICE_GAP = 10, GAME_ICE_SHOTS = 8, GAME_ICE_SLOW = 0.5, GAME_ICE_COOL = 0.6, GAME_ICE_FROM = 0.15;
+// kelime düşer (süper kelime gibi seçilir, biraz yavaş). Onu yazıp vuranın, kelimenin düştüğü çatısına buz makinesi takılır;
+// makine o çatının ve yanındaki bir çatının sütununa düşen kelimelere kendiliğinden buzlu su püskürtür, ıslanan kelime yarı
+// hızla düşer. Her kelime bir kez ıslanır; iki püskürtme arası GAME_ICE_COOL saniye. Makinede sekiz buz var, bitince erir;
+// çatısı uçarsa makine de gider. Makine varken ya da ekranda süper ya da buzlu kelime varken yenisi gelmez: ilki 3. seviyeden
+// sonraki 11. kelimede, sonra her 20–28 kelimede bir (makine çalışırken sayılmaz; velinin isteği, 2026-11-03: 3. kelimede ve
+// 10–14 kelimede bir çok sık geliyordu). Bir önceki makinenin evine düşmez (gameAvoid).
+const GAME_ICE_LEVEL = 3, GAME_ICE_FIRST = 10, GAME_ICE_GAP = 20, GAME_ICE_SHOTS = 8, GAME_ICE_SLOW = 0.5, GAME_ICE_COOL = 0.6,
+  GAME_ICE_FROM = 0.15;
 const gameIceDue = (game) => game.level >= GAME_ICE_LEVEL && !game.ice && game.iceIn <= 0 && !game.list.some((w) => w.ice || w.super);
 // Makinenin çatısı: buzlu kelimenin düştüğü çatı; o uçtuysa en yakın sağlam çatı (eşitse soldaki). Sağlam çatı yoksa -1.
 function gameIceRoof(roofs, house) {
@@ -258,10 +263,11 @@ function gameIceSide(roofs, house, cols) {
   const side = cols[0] === house ? cols[1] : cols[0], other = 2 * house - side;
   return roofs[side] > 0 || !(roofs[other] > 0) ? cols : [house, other].sort((a, b) => a - b);
 }
-// Sıradaki püskürtme: makinenin sütunlarındaki, roketi yolda olmayan, henüz ıslanmamış ve gökyüzüne girmiş (yolunun
-// GAME_ICE_FROM kadarını geçmiş) kelimelerden çatısına en yakın olanı; yoksa null.
-const gameIceAim = (list, cols) => list.filter((w) => cols.includes(w.house) && !w.locked && !w.iced && w.y >= w.ground * GAME_ICE_FROM)
-  .sort((a, b) => (a.ground - a.y) - (b.ground - b.y))[0] || null;
+// Sıradaki püskürtme: makinenin sütunlarındaki, çatısı sağlam (uçmuş çatıya düşen kelime zararsız, ona buz harcanmaz;
+// 2026-11-03), roketi yolda olmayan, henüz ıslanmamış ve gökyüzüne girmiş (yolunun GAME_ICE_FROM kadarını geçmiş) kelimelerden
+// çatısına en yakın olanı; yoksa null.
+const gameIceAim = (list, cols, roofs) => list.filter((w) => cols.includes(w.house) && roofs[w.house] > 0 && !w.locked && !w.iced
+  && w.y >= w.ground * GAME_ICE_FROM).sort((a, b) => (a.ground - a.y) - (b.ground - b.y))[0] || null;
 
 /* Klavye: ses */
 
@@ -470,9 +476,9 @@ async function viewTyping() {
       h('div', { class: 'spread' }, h('b', {}, '🚀 Kelime roketi'), gameBest() ? h('span', { class: 'small muted num' }, `En iyi puanın: ${gameBest()}`) : null),
       h('p', { class: 'small muted' }, 'Yukarıdan düşen kelimeleri yaz; çatıdan roket kalkıp vursun. Kelime çatıya değerse çatı hırpalanır, '
         + 'çatılar bitince oyun biter. Kelimeler bitirdiğin derslerin harflerinden; oyun gittikçe hızlanır. Her yeni seviyede bir çatı '
-        + 'onarılır; renkli 🌟 kelimeyi vurursan süper silah kazanırsın, dört taneye kadar biriktirebilirsin (Ctrl\'ye iki kez bas, roketler '
-        + 'bütün kelimeleri sırayla vursun; son çatı kalınca kendiliğinden ateşlenir). Oyun hızlanınca gelen buzlu ❄️ kelime çatıya buz '
-        + 'makinesi takar; makine yakındaki kelimelere kendiliğinden buzlu su püskürtüp onları yavaşlatır.'),
+        + 'onarılır; renkli 🌟 kelimeyi yazarsan süper silah kazanırsın, dört taneye kadar biriktirebilirsin (Ctrl\'ye iki kez bas, roketler '
+        + 'bütün kelimeleri sırayla vursun; son çatı kalınca kendiliğinden ateşlenir). Oyun hızlanınca gelen buzlu ❄️ kelimeyi yazarsan '
+        + 'çatıya buz makinesi takılır; makine yakındaki kelimelere kendiliğinden buzlu su püskürtüp onları yavaşlatır.'),
       gameWords(hero.typing.best).length
         ? h('button', { class: 'block', onclick: () => runTypingGame(hero) }, 'Oyna')
         : h('p', { class: 'small' }, `İlk dersi (${TYPING_LESSONS[0].title}) bitirince oyun açılır.`)),
@@ -724,7 +730,7 @@ function runTypingGame(hero) {
   const game = {
     track: 'game', hero, words: gameWords(hero.typing.best), level: 1, hits: 0, score: 0, typed: 0, errors: 0,
     list: [], roofs: Array(GAME_ROOFS).fill(GAME_ROOF_HP), target: null, spawnIn: 1, last: 0, paused: false, over: false,
-    power: 0, superIn: GAME_SUPER_GAP - 1, ctrlAt: -Infinity, volley: null, ice: null, iceIn: 2, iceAt: -1,
+    power: 0, superIn: GAME_SUPER_GAP - 1, ctrlAt: -Infinity, volley: null, ice: null, iceIn: GAME_ICE_FIRST, iceAt: -1,
     kb: keyboardView(), leaveText: 'Oyundan çıkılsın mı?',
   };
   game.spawn = (kind) => gameSpawn(game, kind);
@@ -802,10 +808,10 @@ function gameDraw(game) {
         h('span', { class: 'small' }, 'Puan ', v.score, ' · Seviye ', v.level, ' · Çatı ', v.roofs))),
     h('section', { class: 'ty-wrap tg-wrap stack' }, v.field, v.guide, game.kb.el,
       h('p', { class: 'small muted' }, 'Kelimenin ilk harfine basınca o kelime hedef olur. Başka kelimeye geçmek için onun ilk harfine bas; yanlış harfte kelime baştan başlar. '
-        + 'Renkli 🌟 kelimeyi vurursan süper silah kazanırsın; dört taneye kadar biriktirebilirsin, evlerin arasında hazır bekler. Ctrl\'ye iki kez bas: '
-        + 'evlerden roketler kalkıp ekrandaki bütün kelimeleri en alttakinden başlayarak sırayla vursun. Son çatı kaldığında kelimeler ona çok '
-        + 'yaklaşınca süper silah kendiliğinden ateşlenir. Her yeni seviyede bir çatı onarılır. Oyun hızlanınca buzlu ❄️ kelime gelir: '
-        + 'onu vurursan çatıya buz makinesi takılır; o çatının ve yanındaki çatının üstüne düşen kelimelere kendiliğinden buzlu su '
+        + 'Renkli 🌟 kelimeyi yazarsan süper silah kazanırsın; dört taneye kadar biriktirebilirsin, evlerin arasında hazır bekler. Ctrl\'ye iki kez bas: '
+        + 'evlerden roketler kalkıp ekrandaki bütün kelimeleri en alttakinden başlayarak sırayla vursun (roketlerin vurduğu 🌟 ya da ❄️ kelime '
+        + 'bir şey kazandırmaz). Son çatı kaldığında kelimeler ona çok yaklaşınca süper silah kendiliğinden ateşlenir. Her yeni seviyede bir '
+        + 'çatı onarılır. Oyun hızlanınca buzlu ❄️ kelime gelir: onu yazarsan çatıya buz makinesi takılır; o çatının ve yanındaki çatının üstüne düşen kelimelere kendiliğinden buzlu su '
         + 'püskürtüp onları yavaşlatır. Yanındaki çatı uçarsa öbür yana döner; buzu bitince erir.')));
   window.scrollTo(0, 0); // Klavye sayfasının aşağısından açılınca da gökyüzü baştan görünsün
   gameHud(game);
@@ -859,9 +865,9 @@ function gameSpawn(game, kind = gameSuperDue(game) ? 'super' : gameIceDue(game) 
   w.speed = (w.ground - w.y) / (gameFall(game.level) * (kind ? GAME_SUPER_SLOW : 1));
   gamePlace(w);
   game.list.push(w);
-  if (w.super) game.superIn = GAME_SUPER_GAP + Math.floor(Math.random() * 6);
+  if (w.super) game.superIn = GAME_SUPER_GAP + Math.floor(Math.random() * 11);
   else if (game.power < GAME_POWER_MAX) game.superIn--;
-  if (w.ice) { game.iceIn = GAME_ICE_GAP + Math.floor(Math.random() * 5); game.iceAt = house; }
+  if (w.ice) { game.iceIn = GAME_ICE_GAP + Math.floor(Math.random() * 9); game.iceAt = house; }
   else if (game.level >= GAME_ICE_LEVEL && !game.ice) game.iceIn--;
   return w;
 }
@@ -1058,11 +1064,13 @@ function gameCtrl(game, now) {
 }
 
 // Süper silah (velinin isteği, 2026-11-02): ekrandaki kelimeler donar; çatısına en yakın olandan başlayarak her birine
-// evlerden sırayla büyük bir roket kalkar. Roketler yoldayken yeni kelime düşmez, basılan harf sayılmaz. auto: son çatı
-// koruması ateşledi (gameGuard).
+// evlerden sırayla büyük bir roket kalkar. Roketler yoldayken yeni kelime düşmez, basılan harf sayılmaz; sonraki GAME_CALM
+// kelimede süper ya da buzlu kelime gelmez. auto: son çatı koruması ateşledi (gameGuard).
 function gameBoom(game, auto = false) {
   const words = gameVolley(game.list);
   game.volley = { left: words.length, total: words.length };
+  game.superIn = Math.max(game.superIn, GAME_CALM);
+  game.iceIn = Math.max(game.iceIn, GAME_CALM);
   gamePower(game, game.power - 1);
   gameRelease(game);
   for (const w of words) { w.locked = true; w.el.classList.add('locked'); }
@@ -1070,16 +1078,15 @@ function gameBoom(game, auto = false) {
   words.forEach((w, i) => setTimeout(() => gameFire(game, w, true), i * GAME_VOLLEY_MS));
 }
 
-// Süper silahın roketi vurdu: kelime büyük bir 💥 ile patlar, vurulmuş sayılır (puan, seviye, çatı onarımı; süper kelimeyse
-// süper silah, buzlu kelimeyse buz makinesi). Sonuncusunda gök bir an parlar, şeritte kaç kelime patladığı (seviye atladıysa
-// seviye) yazar.
+// Süper silahın roketi vurdu: kelime büyük bir 💥 ile patlar, vurulmuş sayılır (puan, seviye, çatı onarımı). Süper ya da
+// buzlu kelimeyse ödül yok; süper silah da buz makinesi de yalnızca kelimeyi yazana (velinin isteği, 2026-11-03: patlamadan
+// hemen sonra yeni silah ya da su sıkıcı geliyor, oyun hiç bitmiyordu). Sonuncusunda gök bir an parlar, şeritte kaç kelime
+// patladığı (seviye atladıysa seviye) yazar.
 function gameBlast(game, w) {
   if (game.over || !game.volley) return;
   if (game.list.includes(w)) {
     gameRemove(game, w);
-    gamePuff(game, w.x, w.y - 14, w.super ? '🌟' : w.ice ? '❄️' : '💥', 'big');
-    if (w.super) gamePower(game, Math.min(GAME_POWER_MAX, game.power + 1));
-    if (w.ice) gameIceOn(game, w);
+    gamePuff(game, w.x, w.y - 14, '💥', 'big');
     game.hits++;
     game.score += w.text.length * game.level;
     gameHud(game);
@@ -1139,7 +1146,7 @@ function gameIceTurn(game, text) {
 function gameIceStep(game, dt) {
   const ice = game.ice;
   if ((ice.cool -= dt) > 0) return;
-  const w = gameIceAim(game.list, ice.cols);
+  const w = gameIceAim(game.list, ice.cols, game.roofs);
   if (!w) return; // bekler; kelime gelince hemen püskürtür
   ice.cool = GAME_ICE_COOL;
   w.iced = true;

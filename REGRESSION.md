@@ -201,12 +201,14 @@ Her maddenin yanında nasıl denendiği yazar:
     sonra kelimede takılı kalıyorlardı). Basılan harfle başlayan başka bir kelime varsa hemen o kelimeye geçer; başka
     kelimeye geçmek tek tuş, bu yanlış sayılmaz. ⌫ ya da Esc de hedefi bırakır.
   - Çatıya değen kelime çatıyı hırpalar: ilk darbede yara bandı 🩹, ikincide çatı uçar. Beş çatı da gidince oyun biter.
-  - Gittikçe zorlaşır: her 6 kelimede bir seviye; düşüş 12 sn'den en az 4 sn'ye, iki kelime arası 3,2 sn'den en az 0,9 sn'ye,
-    ekranda en çok 7 kelime; kelimeler uzar (başta en çok 4 harf). [O]
+  - Gittikçe zorlaşır: her 6 kelimede bir seviye; düşüş 12 sn'den en az 2,5 sn'ye, iki kelime arası 3,2 sn'den en az 0,6 sn'ye
+    (12. seviyeden sonra da hızlanır; velinin isteği, 2026-11-03: hızlı yazınca oyun hiç bitmiyordu, eskiden 4 sn ve 0,9 sn'de
+    dururdu), ekranda en çok 7 kelime; kelimeler uzar (başta en çok 4 harf). İlk 10 seviye değişmedi. [O]
   - Her yeni seviyede bir çatı baştan sağlam olur (velinin isteği, 2026-11-02): önce uçmuş olan (çatı yerine iner, 🔨),
     yoksa hırpalanmış olan, eşitse soldaki. Şerit: "⭐ Seviye N! Bir çatı onarıldı." Çatılar sağlamsa "Kelimeler hızlanıyor". [O]
-  - Süper kelime (velinin isteği, 2026-11-02): ilki 15. kelimede, sonra her 15–20 kelimede bir renkli, parlayan, 🌟'lı bir
-    kelime düşer (velinin isteği, 2026-11-02: 8–12 kelimede bir çok sık geliyordu). Biraz uzundur (başta 5–8, sonra 7–10 harf;
+  - Süper kelime (velinin isteği, 2026-11-02): ilki 30. kelimede, sonra her 30–40 kelimede bir renkli, parlayan, 🌟'lı bir
+    kelime düşer (velinin isteği: 8–12'de bir, sonra 15–20'de bir de çok sık geliyordu; 2026-11-03: oyun hiç bitmiyordu).
+    Süper silah ateşlenince sonraki 10 kelimede süper ya da buzlu kelime gelmez. Biraz uzundur (başta 5–8, sonra 7–10 harf;
     ilk derslerde alıştırmalar yan yana) ve biraz yavaş düşer. Elinde dört süper silah varken ya da ekranda süper ya da buzlu
     kelime varken gelmez (bir seferde tek özel kelime). Çatıya değerse o da çatıyı hırpalar. [O]
   - Süper ya da buzlu kelime düşerken onun sütununa başka kelime düşmez (başka sağlam çatı yoksa düşer); kelimeler üst üste
@@ -220,18 +222,20 @@ Her maddenin yanında nasıl denendiği yazar:
     büyük, parlak bir roket kalkar (velinin isteği, 2026-11-02), kelimeler büyük 💥 ile aşağıdan yukarı patlar, sonuncusunda
     gök bir an parlar ve şeritte "N kelime patladı" (seviye atladıysa seviye) yazar. Roketler yoldayken yeni kelime düşmez,
     basılan harf yanlış sayılmaz, Ctrl bir şey yapmaz. Her kelime vurulmuş sayılır (puan, seviye, çatı onarımı). Silah yokken
-    "renkli kelimeyi vur", ekranda kelime yokken "silahın duruyor" der; silah harcanmaz. Roketlerin vurduğu süper kelime de
-    süper silah verir.
+    "renkli kelimeyi vur", ekranda kelime yokken "silahın duruyor" der; silah harcanmaz. Roketlerin vurduğu süper ya da buzlu
+    kelime (o da 💥 ile) patlar ama bir şey kazandırmaz: süper silah ve buz makinesi yalnızca kelimeyi yazana (velinin isteği,
+    2026-11-03: patlamadan hemen sonra yeni silah ya da su sıkıcı geliyor, oyun hiç bitmiyordu). Oyundaki yardım yazısı da söyler.
   - Son çatı koruması (velinin isteği, 2026-11-02): yalnızca bir çatı kalmışken ona düşen kelime değmesine 0,8 saniye kalınca,
     elde süper silah varsa biri kendiliğinden ateşlenir (şerit: "🚨 Son çatı! Süper silah kendiliğinden ateşlendi."), roketler
     ekrandaki bütün kelimeleri vurur. Her seferinde yalnızca bir silah; kelimeler yine çok yaklaşınca sıradaki ateşlenir. Silah
     yoksa kelime çatıya değer. [O]
-  - Buz makinesi (velinin isteği, 2026-11-02): oyun biraz hızlanınca (3. seviyeden sonra; ilki 3. seviyenin üçüncü kelimesinde,
-    sonra her 10–14 kelimede bir) buz mavisi, parlayan, ❄️'lı bir kelime düşer. Süper kelime gibi biraz uzundur ve biraz yavaş
+  - Buz makinesi (velinin isteği, 2026-11-02): oyun biraz hızlanınca (3. seviyeden sonra; ilki 3. seviyeden sonraki 11.
+    kelimede, sonra makine yokken her 20–28 kelimede bir; velinin isteği, 2026-11-03: 3. kelimede ve 10–14'te bir çok sık
+    geliyordu) buz mavisi, parlayan, ❄️'lı bir kelime düşer. Süper kelime gibi biraz uzundur ve biraz yavaş
     düşer. Makine varken ya da ekranda süper ya da buzlu kelime varken gelmez; ikisinin birden sırası gelirse önce süper kelime.
     Bir önceki buz makinesinin evine düşmez, başka sağlam çatı yoksa düşer (velinin isteği, 2026-11-02: makine hep aynı sütuna
-    geliyordu). Onu vuranın (süper silahın roketi de olur) kelimenin düştüğü çatısına buz makinesi takılır, uçtuysa en yakın
-    sağlam çatıya.
+    geliyordu). Onu yazıp vuranın kelimenin düştüğü çatısına buz makinesi takılır, uçtuysa en yakın sağlam çatıya (süper
+    silahın roketleri patlatırsa makine gelmez).
     Şerit: "❄️ Buz makinesi takıldı: kelimeleri yavaşlatacak!" [O]
   - Makine çatının tepesinde buz mavisi bir kutudur (❄️, ağzı yukarıda, altındaki çizgi kalan buz). O çatının ve yanındaki bir
     çatının sütununu korur: yanındakilerden sağlam olanı; ikisi de sağlamsa hırpalanmış olanı, eşitse ortaya yakını. İki sütun
@@ -242,7 +246,8 @@ Her maddenin yanında nasıl denendiği yazar:
   - Bu iki sütuna düşen kelimeye kendiliğinden buzlu su püskürtür: makineden kelimenin altına genişleyen kısa bir su huzmesi,
     kelimenin çevresinde kar. Kelime buz mavisi olur, köşesinde ❄️, yarı hızla düşer. Su, kar ve şerit kelimelerin arkasında
     kalır; kelimeyi örtmez (velinin isteği). Çatısına en yakın kelime önce; her kelime bir kez ıslanır, iki püskürtme arası
-    0,6 sn. Roketi yolda olan kelimeye, süper silahın roketleri yoldayken ve oyun dururken püskürtmez. [O]
+    0,6 sn. Roketi yolda olan kelimeye, çatısı uçmuş sütuna düşen (zararsız) kelimeye, süper silahın roketleri yoldayken ve
+    oyun dururken püskürtmez. [O]
   - Makinede 8 buz var; bitince erir ("💧 Buz makinesinin buzu bitti."), yeni buzlu kelime 10–14 kelime sonra gelir. Çatısı
     uçarsa makine de gider ("💨 Çatı uçtu, buz makinesi de gitti."). [O]
   - Oyunda Ctrl'li kısayollar çalışmaz (Ctrl+R, Ctrl+P…); Ctrl+W ya da sayfayı yenileme tarayıcıda "çıkılsın mı?" sorar.
