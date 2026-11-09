@@ -27,12 +27,15 @@
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
-            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı'], together: ['birlikte bakılacaklar'] }
+            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı', 'kahramanı besleme', 'açlığı dondur'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
     if (role === 'student' && wordsPerDay(state.student) > 0) {
       pages.words = ['kelime kartları', 'güç', 'mağaza'];
       pages.shop = ['mağaza', 'kelime altını', 'yolculuk araçları', 'dünyanı süsle'];
     }
+    // Kahramanı besleme: açık olan öğrencide (7. sınıfa kadar açık gelir) kahramanın sayfası.
+    const feeding = role === 'student' && feedOn(state.student);
+    if (feeding) pages.hero = ['kahramanın', 'yemekler', 'tokluk', 'bronz nasıl kazanılır'];
     // Klavye dersleri: klavyeli cihazda (bu tarayıcı bölmesi) sekmesi olan öğrencide.
     const typingTab = role === 'student' && typingPerDay(state.student) > 0 && hasKeyboard();
     if (typingTab) pages.typing = ['on parmak klavye', 'orta sıra', 'kelimeler ve cümleler', 'başla: ders', 'kelime roketi'];
@@ -80,6 +83,49 @@
             `açılan ${state.tab}`);
         } else check('Konu çalışması', state.tab === 'konu' && !pageText().includes('bir şey ters gitti'), 'konuda soru yok, oturum atlandı');
       } else check('Konu çalışması', true, 'işlenen konu yok, atlandı');
+    }
+
+    // Kahramanı besleme (velinin isteği, 2026-11-09). Açıkken: ana sayfada selamın altında kahramanın kartı (çizim, söz,
+    // tokluk çubuğu, bronz, düğme; düğme kahramanın sayfasını açar); sayfada kahraman, altı yemekli raf, tokluk ve bronz;
+    // İngilizce sayfasındaki kahramanın altında tokluk ve "Besle". Kapalıyken kart görünmez, sayfa "kapalı" der. Yemeğe
+    // dokunulmaz: hiçbir şey yazılmaz.
+    if (role === 'student') {
+      go('home'); await settle();
+      for (let i = 0; i < 40 && feeding && document.querySelector('.feed-home')?.hidden; i++) await wait(150);
+      const card = document.querySelector('.feed-home');
+      if (feeding) {
+        const btn = card?.querySelector('button');
+        const drawn = !!card && !card.hidden && !!card.querySelector('.feed-face svg.hero') && !!card.querySelector('.feed-bar i')
+          && (card.querySelector('.feed-say')?.textContent.length || 0) > 10 && /🥉 \d+/.test(card.textContent);
+        const above = !!card && !!document.querySelector('#app section.task') && !!(card.compareDocumentPosition(document.querySelector('#app section.task')) & 4);
+        btn?.click(); await settle();
+        const foods = [...document.querySelectorAll('.feed-shelf .feed-food')];
+        const page = state.tab === 'hero' && foods.length === FEED_FOODS.length && foods.every((x) => /🥉 \d+/.test(x.textContent))
+          && !!document.querySelector('.feed-hero .hero-scene svg.hero') && !!document.querySelector('.feed-hero .feed-say.bubble')
+          && /Tokluk: /.test(document.getElementById('app').textContent);
+        check('Kahramanı besleme: ana sayfada kahramanın kartı (selamın altında), düğmesi kahramanın sayfasını açar: kahraman, yemek rafı, tokluk, bronz',
+          drawn && above && page, [!drawn && 'kart eksik', !above && 'kart tekrarların altında', !page && `sayfa eksik (açılan ${state.tab}, ${foods.length} yemek)`].filter(Boolean).join('; '));
+        const faces = ['mutlu', 'iyi', 'ac', 'cokac'].map((key, i) => heroSvg(state.student.avatar, 3, state.student.hero_look, { key, form: [1, 0.8, 0.5, 0.2][i] }));
+        check('Kahramanı besleme: tok, iyi, aç ve çok aç kahraman farklı çizilir; besleme dışında çizim değişmez',
+          new Set(faces).size === 4 && heroSvg(state.student.avatar, 3, state.student.hero_look) === heroSvg(state.student.avatar, 3, state.student.hero_look, undefined));
+        if (wordsPerDay(state.student) > 0) {
+          go('words'); await settle();
+          check('Kahramanı besleme: İngilizce sayfasında kahramanın altında tokluk ve "Besle"',
+            !!document.querySelector('.feed-strip .feed-bar') && [...document.querySelectorAll('.feed-strip button')].some((x) => x.textContent === 'Besle'));
+        }
+      } else {
+        go('hero'); await settle();
+        check('Kahramanı besleme kapalıyken ana sayfada kart yok, kahramanın sayfası "kapalı" der',
+          (!card || card.hidden) && pageText().includes('kahramanı besleme kapalı') && !document.querySelector('.feed-shelf'));
+      }
+    }
+    // Veli: Günlük planda "Kahramanı besleme" ve "Açlığı dondur" kutuları (kaydedilmez).
+    if (role === 'parent' && state.student) {
+      go('settings'); await settle();
+      for (let i = 0; i < 40 && !document.querySelector('#app input[aria-label="Kahramanı besleme açık"]'); i++) await wait(150);
+      const on = document.querySelector('#app input[aria-label="Kahramanı besleme açık"]'), pause = document.querySelector('#app input[aria-label="Açlığı dondur"]');
+      check('Kahramanı besleme: velinin Günlük planında açma kutusu ve "Açlığı dondur"; kapalıyken dondurma seçilemez',
+        !!on && !!pause && on.checked === feedOn(state.student) && pause.disabled === !on.checked);
     }
 
     // Klavye sekmesi yalnızca dersleri açık öğrencide (ilkokulda varsayılan açık, sonrasında veli açar).

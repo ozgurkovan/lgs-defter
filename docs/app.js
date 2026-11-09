@@ -398,7 +398,7 @@ const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', 'words', 'shop', 'typing', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together']
+  ? ['home', 'words', 'shop', 'typing', 'hero', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together']
   : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
@@ -459,6 +459,7 @@ function go(tab, how = 'push') {
     topics: viewTopics, konu: viewTopicPractice, // konu: öğrencinin seçtiği konu ve konu çalışması
     settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
     together: viewTogether, words: viewWords, shop: viewShop, typing: viewTyping, // klavye dersleri: typing.js
+    hero: viewHero, // kahramanı besleme: feed.js
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
   return true;
@@ -971,6 +972,8 @@ async function viewHome() {
       h('p', { class: 'label' }, new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })),
       h('h1', {}, playfulGreeting(name) || (name ? `${hello}, ${name}` : hello)),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null),
+    // Kahramanı besleme açıksa kahraman burada konuşur: acıkınca yardım ister, çalışmaya çağırır (feed.js). Kapalıysa görünmez.
+    feedHomeCard(),
     // Mesaj yoksa ara sıra (üç girişte bir kadar) bir fıkra, bilmece ya da şiir; gün yorucu geçmesin.
     !messages.length && !replies.length && Math.random() < 0.3 ? jokeCard() : null,
     messages.map((m) => {
@@ -1355,6 +1358,8 @@ function showSessionEnd() {
       h('p', { class: 'muted' }, stats.correct === stats.total ? (track === 'practice' ? 'Hepsi doğru. Bu konuyu iyi biliyorsun.' : 'Hepsi doğru. Bu konular bir süre rahat.') :
         'Yanlış yaptıkların yakında farklı sorularla tekrar gelecek.'),
       h('button', { class: 'primary block', onclick: () => go(returnTo || 'home') }, track === 'practice' ? 'Konuya dön' : 'Ana sayfa')),
+    // Besleme açıksa kahraman: doğru cevaplar bronz oldu, şimdi yedirebilir.
+    feedHomeCard(),
     // Oturum bitince çoğu zaman ödül gibi bir fıkra, bilmece ya da şiir.
     Math.random() < 0.6 ? jokeCard('Mola') : null,
     together.length ? h('section', { class: 'stack' },
@@ -3016,8 +3021,13 @@ const darken = (hex, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.sl
 // saçta saç bandı), 6–7 10 numaralı forma ve bileklik, 8–9 pelerinli kahraman, 10 altın madalya ve taç.
 // Velinin kuralı: kahraman her seviyede ve her görünüşte sevimli kalır (yumuşak hatlı yüz, gülümseme, pembe yanak);
 // benzetme yalnızca hazır seçeneklerden seçer: renkler, saç, yüz şekli, kaş, göz şekli, burun, gülüş, kulak, gözlük, çil.
-function heroSvg(gender, level, look) {
+// mood (kahramanı besleme, feed.js): { key: 'mutlu' | 'iyi' | 'ac' | 'cokac', form: pazıların dolgunluğu 0–1 }. Aç kahramanın
+// pazıları söner, kaşları kaygılı olur, karnı guruldar; çok açken kolları yana düşer, ağzı küçük bir "o" olur. Tokken gülüşü büyür, pazıları parlar.
+// Aç hali de sevimli kalır (iri gözler, pembe yanak; gözyaşı yok). mood verilmezse çizim eskisiyle birebir aynıdır.
+function heroSvg(gender, level, look, mood) {
   const L = Math.min(10, Math.max(0, level | 0));
+  const form = mood ? Math.min(1, Math.max(0, mood.form ?? 1)) : 1;
+  const tired = mood?.key === 'cokac', hungry = tired || mood?.key === 'ac', happy = mood?.key === 'mutlu';
   const lk = look && typeof look === 'object' ? look : {};
   const skin = HERO_LOOK.ten[lk.ten] || '#F5CBA7', shade = darken(skin, 0.88);
   const hair = HERO_LOOK.sac[lk.sac] || (gender === 'kiz' ? '#6B3E26' : '#4A2E1F');
@@ -3032,7 +3042,7 @@ function heroSvg(gender, level, look) {
     { shirt: '#E63946', shorts: '#1D3557', shoe: '#F4B400', cape: '#2F80ED', medal: true, crown: true },
   ][tier];
   const cx = 100, sy = 106;
-  const tw = 34 + L * 2.2, arm = 7 + L * 1.3, bic = 2 + L * 1.7, ex = 28 + L * 1.3, legW = 11 + L * 0.5;
+  const tw = 34 + L * 2.2, arm = (7 + L * 1.3) * (0.85 + 0.15 * form), bic = (2 + L * 1.7) * (0.25 + 0.75 * form), ex = 28 + L * 1.3, legW = 11 + L * 0.5;
   const s = [];
   if (o.cape) s.push(`<path d="M${cx - tw / 2 + 4} ${sy - 8} L${cx - tw / 2 - 16} 190 Q${cx} 200 ${cx + tw / 2 + 16} 190 L${cx + tw / 2 - 4} ${sy - 8} Z" fill="${o.cape}"/>`);
   s.push(`<ellipse cx="${cx}" cy="207" rx="${44 + L * 1.6}" ry="7" fill="rgba(0,0,0,.12)"/>`);
@@ -3046,16 +3056,21 @@ function heroSvg(gender, level, look) {
   if (o.star) s.push(`<text x="${cx}" y="127" text-anchor="middle" font-size="16" fill="#fff">★</text>`);
   if (o.number) s.push(`<text x="${cx}" y="131" text-anchor="middle" font-size="19" font-weight="800" font-family="Arial, sans-serif" fill="#fff">10</text>`);
   if (o.emblem) s.push(`<circle cx="${cx}" cy="122" r="11" fill="#FFD166"/><text x="${cx}" y="127.5" text-anchor="middle" font-size="15" font-weight="900" font-family="Arial, sans-serif" fill="#E63946">E</text>`);
-  // Kollar: hep pazı gösterir. Üst kol omuzdan dirseğe, ön kol yukarı, yumruk; pazı seviyeyle şişer.
+  // Kollar: hep pazı gösterir. Üst kol omuzdan dirseğe, ön kol yukarı, yumruk; pazı seviyeyle şişer. Çok açken (halsiz)
+  // kollar yana düşer, pazı görünmez; tokken pazıların yanında parıltı.
   for (const d of [-1, 1]) {
-    const shx = cx + d * (tw / 2 - 4), elx = cx + d * (tw / 2 + ex), ely = sy + 5, fy = ely - 30 - L * 0.7;
+    const shx = cx + d * (tw / 2 - 4), elx = cx + d * (tw / 2 + (tired ? ex * 0.5 : ex)), ely = tired ? sy + 24 : sy + 5;
+    const fy = tired ? ely + 22 : ely - 30 - L * 0.7, band = tired ? fy - arm * 0.55 - 7 : fy + arm * 0.55 + 1;
     s.push(`<line x1="${shx}" y1="${sy}" x2="${elx}" y2="${ely}" stroke="${skin}" stroke-width="${arm}" stroke-linecap="round"/>`);
     s.push(`<line x1="${elx}" y1="${ely}" x2="${elx}" y2="${fy}" stroke="${skin}" stroke-width="${arm * 0.9}" stroke-linecap="round"/>`);
-    s.push(`<ellipse cx="${(shx + elx) / 2 + d * 3}" cy="${sy - arm * 0.3}" rx="${5 + bic * 0.85}" ry="${1.5 + bic * 0.95}" fill="${skin}"/>`);
-    if (L >= 3) s.push(`<path d="M${(shx + elx) / 2 - d * (2 + bic * 0.3)} ${sy - bic * 0.5} q${d * (3 + bic * 0.3)} ${-bic * 0.45} ${d * (6 + bic * 0.6)} 0" stroke="${shade}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`);
+    if (!tired) s.push(`<ellipse cx="${(shx + elx) / 2 + d * 3}" cy="${sy - arm * 0.3}" rx="${5 + bic * 0.85}" ry="${1.5 + bic * 0.95}" fill="${skin}"/>`);
+    if (L >= 3 && !tired) s.push(`<path d="M${(shx + elx) / 2 - d * (2 + bic * 0.3)} ${sy - bic * 0.5} q${d * (3 + bic * 0.3)} ${-bic * 0.45} ${d * (6 + bic * 0.6)} 0" stroke="${shade}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`);
     s.push(`<line x1="${shx}" y1="${sy}" x2="${shx + d * 9}" y2="${sy + 1}" stroke="${o.shirt}" stroke-width="${arm + 6}" stroke-linecap="round"/>`);
-    if (o.bands) s.push(`<line x1="${elx}" y1="${fy + arm * 0.55 + 1}" x2="${elx}" y2="${fy + arm * 0.55 + 7}" stroke="#FFC531" stroke-width="${arm + 3}"/>`);
+    if (o.bands) s.push(`<line x1="${elx}" y1="${band}" x2="${elx}" y2="${band + 6}" stroke="#FFC531" stroke-width="${arm + 3}"/>`);
     s.push(`<circle cx="${elx}" cy="${fy}" r="${arm * 0.62 + 2.5}" fill="${skin}"/>`);
+    if (happy) s.push(`<text x="${elx + d * (arm * 0.62 + 11)}" y="${fy - 4}" text-anchor="middle" font-size="12">✨</text>`);
+    // Karın gurultusu: gövdenin iki yanında küçük dalgalar.
+    if (hungry && !tired) for (const y of [126, 133]) s.push(`<path d="M${cx + d * (tw / 2 + 5)} ${y} q${d * 2.5} -2.6 ${d * 5} 0 t${d * 5} 0" stroke="#7A8088" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".75"/>`);
   }
   // Saçın arka kısmı (başın arkasında kalan: örgüler, uzun saç, at kuyruğu, kâküllü kesim), boyun, kulaklar, baş
   const back = {
@@ -3101,7 +3116,11 @@ function heroSvg(gender, level, look) {
   }
   // Yüz: kaşlar, gözler (renkli gözde bebek; iri ya da badem), parıltı, yanaklar, çiller, burun, gülüş (güçlendikçe
   // genişler), gözlük
-  if (['ince', 'kalin', 'kavisli'].includes(lk.kas)) {
+  if (hungry) {
+    // Kaygılı kaşlar: iç uçları yukarıda ("yardım eder misin?").
+    const bw = lk.kas === 'kalin' ? 2.7 : lk.kas === 'ince' ? 1.5 : 2;
+    for (const d of [-1, 1]) s.push(`<path d="M${cx + d * 15.6} 53.6 L${cx + d * 6.4} 50.6" stroke="${darken(hair, 0.8)}" stroke-width="${bw}" fill="none" stroke-linecap="round"/>`);
+  } else if (['ince', 'kalin', 'kavisli'].includes(lk.kas)) {
     const bw = lk.kas === 'kalin' ? 2.7 : lk.kas === 'ince' ? 1.5 : 2, lift = lk.kas === 'kavisli' ? 3.2 : 1.5;
     for (const x of [89, 111]) s.push(`<path d="M${x - 4.6} 52.8 Q${x} ${52.8 - lift} ${x + 4.6} 52.8" stroke="${darken(hair, 0.8)}" stroke-width="${bw}" fill="none" stroke-linecap="round"/>`);
   }
@@ -3121,8 +3140,11 @@ function heroSvg(gender, level, look) {
   if (lk.burun === 'kucuk') s.push(`<path d="M98.2 66 q1.8 1.7 3.6 0" stroke="${nose}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`);
   else if (lk.burun === 'yuvarlak') s.push(`<ellipse cx="100" cy="66" rx="2.7" ry="2.1" fill="${darken(skin, 0.9)}"/><circle cx="99.1" cy="65.3" r=".7" fill="#fff" opacity=".6"/>`);
   else if (lk.burun === 'uzun') s.push(`<path d="M100.8 60.8 q-.6 4.4 -2.4 5.6 q1.6 1.2 3.6 .2" stroke="${nose}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`);
-  const sm = 7 + L * 0.35, dip = 77 + L * 0.3, lip = '#9A4A3C';
-  if (lk.agiz === 'disli') {
+  const sm = 7 + L * 0.35 + (happy ? 1.5 : 0), dip = 77 + L * 0.3 + (happy ? 1 : 0), lip = '#9A4A3C';
+  // Aç: düşünceli, dalgalı ağız; çok aç: küçük, yuvarlak "o". Tokken gülüş biraz büyür.
+  if (tired) s.push(`<ellipse cx="${cx}" cy="73.6" rx="3" ry="3.6" fill="${lip}"/>`);
+  else if (hungry) s.push(`<path d="M${cx - 6} 73.2 q3 -2.4 6 0 t6 0" stroke="${lip}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`);
+  else if (lk.agiz === 'disli') {
     // Ağzı açık gülüş: üstte dişler, altta dil.
     const w = sm + 1.5;
     s.push(`<path d="M${cx - w} 70 Q${cx} ${dip + 6} ${cx + w} 70 Z" fill="${lip}"/>`);
@@ -3170,11 +3192,12 @@ function rideTo(it) {
   const end = i + 1 < HERO_RIDES.length ? HERO_RIDES[i + 1][1] : 11;
   return HERO_PLACES.slice(HERO_RIDES[i][1], end).map((p) => p.to).join(' ve ');
 }
-// Kahraman ve aldığı eşyalar, bulunduğu yerin göğü ve zemininde (deniz altında kum, uzayda ay toprağı).
-function heroScene(student, level, owned) {
+// Kahraman ve aldığı eşyalar, bulunduğu yerin göğü ve zemininde (deniz altında kum, uzayda ay toprağı). mood: besleme
+// açıksa kahramanın hali (feed.js).
+function heroScene(student, level, owned, mood) {
   const pl = HERO_PLACES[Math.min(10, Math.max(0, level | 0))];
   const box = h('div', { class: 'hero-scene', style: `--s1: ${pl.sky[0]}; --s2: ${pl.sky[1]}; --g1: ${pl.floor}; --g2: ${darken(pl.floor, 0.9)}` });
-  box.innerHTML = heroSvg(student?.avatar, level, student?.hero_look);
+  box.innerHTML = heroSvg(student?.avatar, level, student?.hero_look, mood);
   for (const it of HERO_SHOP.filter((x) => x.pos && owned.has(x.id))) {
     box.append(h('span', { class: 'hero-item', title: it.name, style: `${it.pos}; font-size: ${it.size}px` }, it.emoji));
   }
@@ -3320,12 +3343,13 @@ function mixHash(s) {
 async function viewWords() {
   loading();
   const goal = wordsPerDay(state.student);
-  const [list, progress, answers, purchases, typed] = await Promise.all([
+  const [list, progress, answers, purchases, typed, feed] = await Promise.all([
     loadWords(),
     q(sb.from('word_progress').select('word, box, due_date, right_count, wrong_count, stability, difficulty, updated_at').eq('student_id', sid())),
     q(sb.from('word_answers').select('word, answered_at, correct, again, stability_before, elapsed_days').eq('student_id', sid())),
     q(sb.from('purchases').select('item, price').eq('student_id', sid())),
     q(sb.from('typing_results').select('lesson, stars, created_at').eq('student_id', sid())),
+    loadFeed(state.student, false).catch(() => null), // kahramanı besleme açıksa tokluk ve bronz (feed.js)
   ]);
   const start = dayStart();
   const answered = new Set(answers.filter((r) => r.answered_at >= start && !r.again).map((r) => r.word));
@@ -3354,11 +3378,12 @@ async function viewWords() {
       h('p', { class: 'label' }, 'İngilizce'), h('h1', {}, 'Kelime kartları'),
       h('p', { class: 'muted' }, 'İngilizce kelimeler, kolaydan zora. Bilemediğin kelime yakında yine gelir; bildikçe daha seyrek gelir.')),
     h('section', { class: 'card stack', style: 'gap: 10px' },
-      heroScene(state.student, level, owned),
+      heroScene(state.student, level, owned, feed ? feedMood(feed.sat) : undefined),
       h('div', { class: 'spread' },
         h('b', {}, `💪 Güç ${level}`),
         h('b', { class: 'num' }, `🪙 ${coins.balance}`),
         h('button', { class: 'small', onclick: () => go('shop') }, 'Mağaza')),
+      feedStrip(feed),
       tripBar(power, level, owned, coins.balance),
       rides.length ? h('div', { class: 'garage small muted' }, 'Araçların:', rides.map((it) => itemIcon(it, 24))) : null,
       prize ? h('p', { class: 'small muted garage' }, '🏆 Sıradaki büyük ödül:', itemIcon(prize, 22),
@@ -3549,6 +3574,7 @@ function endWords(run) {
       bonus ? h('p', { class: 'small muted' }, 'Günün kartlarını bitirdin: 5 altın da ödül.') : null,
       missed.length ? h('p', { class: 'muted' }, `Yakında yine gelecekler: ${missed.join(', ')}`) : null,
       h('button', { class: 'primary block', onclick: () => go('words') }, 'Tamam')),
+    feedHomeCard(),
     // Güç seviyesi arttıysa kutlama: yeni bir yere vardı, pazılar büyüdü, belki yeni kıyafet.
     up ? h('section', { class: 'card stack party-inline', style: 'text-align: center; gap: 8px' },
       h('div', { class: 'party-confetti', 'aria-hidden': 'true' }, Array.from({ length: 16 }, (_, i) =>
@@ -3885,10 +3911,12 @@ function planSection(p) {
     const typingRow = switchRow('Klavye dersleri (Klavye sekmesi)', typingPerDay(p) > 0, typingPerDay(p), 10, 2,
       'Aile isterse açar, her sınıfta. On parmak klavye: ekranda klavye ve eller, hangi parmağın hangi tuşa basacağı yanar. '
         + 'Bilgisayarda yapılır, telefonda sekme görünmez. Açıkken günde kaç ders? Kazandığı yıldızlar kelime kahramanını güçlendirir.', '1px');
+    // Kahramanı besleme (velinin isteği): çocuk başına açılır, hastalıkta ve tatilde açlık dondurulur (feed.js).
+    const feedRow = feedSetting(p);
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
-      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value() };
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value(), ...feedRow.value() };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;
@@ -3896,6 +3924,7 @@ function planSection(p) {
       subjects.forEach((s) => { inputs[s].value = by[s]; });
       wordsRow.show(upd.daily_words);
       typingRow.show(upd.daily_typing);
+      feedRow.show();
       update();
       toast('Kaydedildi. Yeni sayılar bugünden geçerli.');
     } }, 'Kaydet');
@@ -3905,7 +3934,7 @@ function planSection(p) {
       h('p', {}, `Bugün ${sum('n')} soru çözdü, ${fmtMinutes(sum('sec'))}. Son 7 günde ${fmtMinutes(sum('week'))}`
         + (days ? `, çalıştığı ${days} günde ortalama ${fmtMinutes(sum('week') / days)}.` : '.')),
       h('p', { class: 'small muted' }, 'Her dersten günde en fazla kaç soru gelsin? Önce hata tekrarları, sonra konu tekrarları gelir; kalan sayı en zayıf konulardan ek çalışmayla dolar. Süre, soruyu açtığı andan şıkkı seçtiği ana kadar ölçülür.'),
-      rowsEl, totalLine, wordsRow, typingRow, save);
+      rowsEl, totalLine, wordsRow, typingRow, feedRow, save);
   })().catch(() => fill(box, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yüklenemedi, sayfayı yenile.')));
   return box;
 }
@@ -4063,7 +4092,7 @@ function familySection() {
     // Kelime kahramanının görünüşü: İngilizce ya da Klavye açık her çocuk için (ikisi de kahramanı büyütür); açılınca yüklenir.
     const heroDetails = (kid) => {
       const st = state.students.find((x) => x.id === kid.id) || kid;
-      if (!(wordsPerDay(st) > 0 || typingPerDay(st) > 0)) return null;
+      if (!(wordsPerDay(st) > 0 || typingPerDay(st) > 0 || feedOn(st))) return null;
       let opened = false;
       return h('details', { class: 'hero-edit', ontoggle: (e) => {
         if (!e.currentTarget.open || opened) return;

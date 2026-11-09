@@ -438,7 +438,7 @@ async function typingHero() {
 
 async function viewTyping() {
   loading();
-  const hero = await typingHero();
+  const [hero, feed] = await Promise.all([typingHero(), loadFeed(state.student, false).catch(() => null)]); // feed: kahramanı besleme (feed.js)
   const { best } = hero.typing;
   const goal = typingPerDay(state.student);
   const next = typingNext(best);
@@ -458,12 +458,14 @@ async function viewTyping() {
         + 'Bir dersten üç yıldız alınca sonraki açılır.')),
     hasKeyboard() ? null : h('p', { class: 'card warn' }, 'Bu dersler bilgisayar klavyesiyle yapılır. Bilgisayardan aç.'),
     h('section', { class: 'card stack', style: 'gap: 10px' },
-      heroScene(state.student, hero.level, hero.owned),
+      heroScene(state.student, hero.level, hero.owned, feed ? feedMood(feed.sat) : undefined),
       h('div', { class: 'spread' },
         h('b', {}, `💪 Güç ${hero.level}`),
         h('b', { class: 'num' }, `🪙 ${hero.coins.balance}`),
         h('button', { class: 'small', onclick: () => go('shop') }, 'Mağaza')),
-      h('p', { class: 'small muted' }, `Klavye yıldızların: ${hero.typing.stars} ⭐. Her yıldız kahramanını güçlendirir; yeni yıldız 5 altın.`)),
+      feedStrip(feed),
+      h('p', { class: 'small muted' }, `Klavye yıldızların: ${hero.typing.stars} ⭐. Her yıldız kahramanını güçlendirir; yeni yıldız 5 altın.`
+        + (feed ? ` Günün her dersi ${feed.parts.lesson} bronz; Kelime roketi de bronz kazandırır (günde en çok ${feed.parts.gameCap}).` : ''))),
     h('section', { class: 'card stack', style: 'gap: 10px' },
       goal ? h('div', { class: 'spread' }, h('b', { class: 'num' }, `Bugün ${Math.min(hero.typing.today, goal)}/${goal} ders`),
         h('span', { class: 'small muted' }, `${TYPING_LESSONS.filter((l) => best[l.id] > 0).length}/${TYPING_LESSONS.length} ders bitti`)) : null,
@@ -706,6 +708,7 @@ async function endTyping(run) {
         h('button', { onclick: () => runTyping(run.index, hero) }, 'Tekrar dene'),
         nextOpen ? h('button', { class: 'primary', onclick: () => runTyping(run.index + 1, hero) }, `Sonraki ders: ${TYPING_LESSONS[run.index + 1].title}`) : null,
         h('button', { class: nextOpen ? 'ghost' : 'primary', onclick: () => go('typing') }, 'Derslere dön'))),
+    feedHomeCard(), // besleme açıksa kahraman: dersin bronzuyla yedirebilir (feed.js)
     up ? h('section', { class: 'card stack party-inline', style: 'text-align: center; gap: 8px' },
       h('div', { class: 'party-confetti', 'aria-hidden': 'true' }, Array.from({ length: 16 }, (_, i) =>
         h('span', { style: `left: ${(i * 41) % 100}%; animation-delay: ${(i % 6) * 0.15}s` }, ['🎉', '✨', '⭐', '🎊'][i % 4]))),
@@ -717,7 +720,7 @@ async function endTyping(run) {
 
 const GAME_COLORS = ['#F2738C', '#5AB0F0', '#F5A524', '#7ACB6A', '#A383F0']; // çatıların renkleri
 const fingerDot = (f) => h('span', { class: 'dot', style: `background: ${FINGER_COLOR[f]}` });
-// En iyi puan bu tarayıcıda, çocuğa göre tutulur (oyun hiçbir şey kaydetmez).
+// En iyi puan bu tarayıcıda, çocuğa göre tutulur (oyunun sonucu yalnızca bronz sayımı için kaydedilir: gameOver).
 const gameBestKey = () => `defter.typingGameBest.${sid()}`;
 function gameBest() {
   try { return +localStorage.getItem(gameBestKey()) || 0; } catch (e) { return 0; }
@@ -730,7 +733,7 @@ function runTypingGame(hero) {
   const game = {
     track: 'game', hero, words: gameWords(hero.typing.best), level: 1, hits: 0, score: 0, typed: 0, errors: 0,
     list: [], roofs: Array(GAME_ROOFS).fill(GAME_ROOF_HP), target: null, spawnIn: 1, last: 0, paused: false, over: false,
-    power: 0, superIn: GAME_SUPER_GAP - 1, ctrlAt: -Infinity, volley: null, ice: null, iceIn: GAME_ICE_FIRST, iceAt: -1,
+    power: 0, superIn: GAME_SUPER_GAP - 1, ctrlAt: -Infinity, volley: null, ice: null, iceIn: GAME_ICE_FIRST, iceAt: -1, play: 0,
     kb: keyboardView(), leaveText: 'Oyundan çıkılsın mı?',
   };
   game.spawn = (kind) => gameSpawn(game, kind);
@@ -880,6 +883,7 @@ const gamePlace = (w) => { w.el.style.transform = `translate(${w.x}px, ${w.y}px)
 
 function gameStep(game, dt) {
   if (game.paused || game.over) return;
+  game.play += dt; // oynanan süre (sn), duraklamalar hariç
   // Süper silahın roketleri yoldayken yeni kelime düşmez.
   if (!game.volley && (game.spawnIn -= dt) <= 0) {
     if (game.list.length < gameMax(game.level)) gameSpawn(game);
@@ -1203,6 +1207,12 @@ function gameOver(game) {
   state.session = null;
   const best = gameBest(), record = game.score > best;
   if (record) try { localStorage.setItem(gameBestKey(), String(game.score)); } catch (e) { /* önemli değil */ }
+  // Oyunun sonucu kaydedilir (ders adı 'oyun', yıldızsız): yazdığı harfler kahramanı besleyen bronza sayılır (feed.js,
+  // günlük sınırla). Dersleri, yıldızları ve günün ders sayısını etkilemez (typingStats bilmediği dersi atlar).
+  if (game.typed > 0) {
+    sb.from('typing_results').insert({ student_id: sid(), lesson: 'oyun', chars: Math.min(20000, game.typed), errors: Math.min(20000, game.errors),
+      seconds: Math.min(86400, Math.round(game.play || 0)), stars: 0 }).then(() => {}, () => {});
+  }
   const acc = Math.floor((100 * game.typed) / Math.max(1, game.typed + game.errors));
   game.kb.show({});
   game.view.field.append(h('div', { class: 'tg-over' },
@@ -1223,8 +1233,9 @@ function gameOver(game) {
 function typingBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
   (async () => {
-    const rows = await q(sb.from('typing_results').select('lesson, chars, errors, seconds, stars, misses, created_at').eq('student_id', sid())
-      .order('created_at', { ascending: false }).limit(500));
+    // Kelime roketinin sonuçları (ders adı 'oyun') ders değildir; burada sayılmaz.
+    const rows = (await q(sb.from('typing_results').select('lesson, chars, errors, seconds, stars, misses, created_at').eq('student_id', sid())
+      .order('created_at', { ascending: false }).limit(500))).filter((r) => r.lesson !== 'oyun');
     if (!rows.length) return;
     const stats = typingStats(rows, typingPerDay(state.student));
     const last = rows[0], lesson = TYPING_LESSONS.find((l) => l.id === last.lesson);

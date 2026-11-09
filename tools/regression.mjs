@@ -2,7 +2,8 @@
 //  1. Uygulama dosyası hatasız okunuyor mu, sürüm numaraları tutuyor mu; şifresiz giriş bağlantısı yalnızca
 //     test hesaplarına mı üretiliyor (bu deneme Supabase'e gitmez).
 //  2. Takvim ve günlük plan hesapları (tools/test-schedule.mjs), klavye dersleri (tools/test-typing.mjs), konu
-//     çalışmasının soru seçimi (tools/test-practice.mjs), kelime listesi ve günün kartları (tools/test-words.mjs).
+//     çalışmasının soru seçimi (tools/test-practice.mjs), kelime listesi ve günün kartları (tools/test-words.mjs),
+//     kahramanı besleme (tools/test-feed.mjs).
 //  3. Veritabanı yetkileri: supabase/test-*.sql. Her test kullanıcıların yerine geçip dener ve sonucu
 //     "SONUC {...}" hatasıyla döndürür; hata yüzünden her şey geri alınır, iz kalmaz. Sonuç dosyadaki
 //     "-- beklenen:" satırıyla karşılaştırılır (">0" gibi değerler sayı aralığıdır).
@@ -24,12 +25,12 @@ const node = (args) => {
 };
 
 // 1
-const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']);
-report(!checked.trim(), 'app.js ve typing.js sözdizimi', checked.trim().split('\n')[0]);
+const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']) + node(['--check', 'docs/feed.js']);
+report(!checked.trim(), 'app.js, typing.js ve feed.js sözdizimi', checked.trim().split('\n')[0]);
 const html = readFileSync('docs/index.html', 'utf8');
 const v = JSON.parse(readFileSync('docs/version.json', 'utf8')).v;
-const inHtml = [...html.matchAll(/(?:app\.js|style\.css|typing\.js|typing\.css)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
-report(inHtml.length > 0 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
+const inHtml = [...html.matchAll(/(?:app\.js|style\.css|typing\.js|typing\.css|feed\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
+report(inHtml.length === 5 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
 // Başka bir adres reddedilmeli. Deneme kapalı bir porta gider: koruma bozulsa bile Supabase'e ulaşmaz, hesap açılmaz.
 // Giriş bağlantısı üreten her araç adresi test-accounts.mjs'ten almalı.
 const refused = await testAccountEmail('velitest@hotmail.com', 'http://127.0.0.1:9', {}).then(() => 'kabul edildi', (e) => e.message);
@@ -57,6 +58,10 @@ report(practiceOut.length > 0 && !practiceBad.length, 'Konu çalışması', prac
 const wordsOut = node(['tools/test-words.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const wordsBad = wordsOut.filter((l) => !l.startsWith('OK'));
 report(wordsOut.length > 0 && !wordsBad.length, 'Kelime listesi', wordsBad.length ? wordsBad.join(' | ') : `${wordsOut.length} kontrol`);
+// Kahramanı besleme: bronz, tokluk, kahramanın sözü ve çizimi (tools/test-feed.mjs).
+const feedOut = node(['tools/test-feed.mjs']).trim().split(/\r?\n/).filter(Boolean);
+const feedBad = feedOut.filter((l) => !l.startsWith('OK'));
+report(feedOut.length > 0 && !feedBad.length, 'Kahramanı besleme', feedBad.length ? feedBad.join(' | ') : `${feedOut.length} kontrol`);
 
 // 3
 const fits = (want, got) => {

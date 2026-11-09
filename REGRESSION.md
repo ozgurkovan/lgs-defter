@@ -45,6 +45,7 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Bugün (ana sayfa): sade**
 - Tarih ve selam. Selam bazen şakacı olur ("…ciğim, napıyon?"). 8. sınıfta LGS'ye kalan gün. [A]
+- Kahramanı besleme açıksa selamın altında kahramanın kartı (aşağıda "Kahramanı besleme"); kapalıysa görünmez. [A]
 - Velinin okunmamış mesajları ("Okudum ❤" ile kapanır) ve bildirdiği sorulara gelen cevaplar ("Okudum"). [E]
 - Mesaj yoksa girişlerin yaklaşık %30'unda bir kart: şaka, bilmece, hafif bulmaca, fıkra ya da şiir. [A]
 - **Hata tekrarı** kartı:
@@ -165,6 +166,40 @@ Her maddenin yanında nasıl denendiği yazar:
 - Oturum sonunda kazandığı altın görünür. Yeni yere varınca konfetili kutlama ve yeni kahraman görünür.
 - Raporda güç, bulunduğu yer, altın, aracı beklediği ve aldıkları görünür.
 
+**Kahramanı besleme** (velinin isteği, 2026-11-09; `docs/feed.js`) [O], ekran [A], yedirme [E]
+- Çocuk çalışmazsa kahraman acıkır. Tokluk 0–100: günde 50 düşer (tam tok kahraman iki günde acıkır); besleme başlarken
+  tam toktur. Tok ve mutlu (70 ve üstü), iyi (40), acıktı (15), çok aç. [O]
+- Kahramanın hali çizimde görünür: tokken gülüşü büyür, pazılarının yanında parıltı; acıkınca pazıları söner, kaşları
+  kaygılı olur, karnı guruldar; çok açken kolları yana düşer. Her halde sevimli kalır (pembe yanak, gözyaşı yok).
+  Seviye, araçlar ve alınan eşyalar hiç kaybolmaz. Besleme kapalıyken çizim eskisiyle birebir aynıdır. [O]
+- Bronz altından ayrı paradır; yalnızca yemeğe gider. Kazanma [O]:
+  - her doğru cevap 1 bronz (hata tekrarı, konu tekrarı, ek çalışma, konu çalışması, kitap, deneme);
+  - günlük planın yarısını çözdüğü gün ve tamamını çözdüğü gün ikramiye (planın onda biri kadar, doğru sayısından
+    bağımsız: zorlanan çocuğun kahramanı aç kalmasın);
+  - ilk denemede doğru her 4 kelime kartı 1 bronz;
+  - günün klavye dersleri (yıldızlı, günlük ders sayısına kadar) ve Kelime roketi (40 harf 1 bronz, günlük sınırla: oyun
+    soru çözmenin yerini almasın). Oyunun sonucu bunun için `typing_results`'a "oyun" adıyla yazılır; dersleri,
+    yıldızları, günün ders sayısını ve rapordaki klavye kutusunu etkilemez.
+  - Bronz ve tokluk beslemenin başladığı günden sayılır (2026-11-09; veli sonradan açtıysa açtığı andan).
+- Yemekler: elma, süt, kahvaltı, yemek, hamburger, pasta. Fiyat çocuğun günlük planına göredir (günde 105 soru çözenle
+  35 soru çözen aynı emekle doyurur). Planını %60 doğruyla bitiren çocuk kahramanını bir gün doyurur; planın dörtte biri
+  yetmez. [O]
+- **Kahramanın sayfası** ("Kahramana git" ya da "Besle"): ortada kahraman ve sözü, yanda yemek rafı, altında tokluk
+  çubuğu, bronz ve bugün yedikleri; "Bronz nasıl kazanılır?" kutusu. [A]
+  - Rafta bir yemeğe dokununca bronzu yetiyorsa alınır, yemek kahramanın ağzına uçar, kahraman teşekkür eder, tokluk
+    artar, bronz düşer. Bronz yetmiyorsa "… bronz daha gerek"; karnı toksa (95 ve üstü) yemez. [E]
+  - Sayfa arka plandayken de yedirme tamamlanır (uçuş bitmesini beklemez). [E]
+- **Kahramanın kartı**: küçük kahraman, sözü, tokluk çubuğu, bronz, düğme. Ana sayfada selamın altında; soru oturumu,
+  kelime kartları ve klavye dersi bitince de görünür. Acıkmış ve bronzu yetiyorsa düğme "Kahramanı besle" (öne çıkar),
+  değilse "Kahramana git". [A]
+  - Kahraman yardım ister, suçlamaz: tokken teşekkür eder; bronzu yetiyorsa "Bana … alır mısın?"; yetmiyorsa en ucuz
+    yemeğe kaç doğru cevap kaldığını söyler ("2 doğru cevapla elma alabiliriz"). [O]
+- İngilizce ve Klavye sayfalarındaki kahraman da aynı haldedir; altında tokluk çubuğu, bronz ve "Besle". [A]
+- Veli (Ayarlar → Günlük plan, Klavye satırının altında): "Kahramanı besleme" çocuk başına açılır ya da kapanır.
+  7. sınıfa kadar açık gelir, 8. sınıftan sonra kapalı (büyük çocuğa çocukça gelebilir). "Açlığı dondur" (hastalık,
+  tatil): tokluk düşmez; açılınca kaldığı yerden devam eder. Altında kahramanın şimdiki hali, bronzu, bugün yedikleri.
+  Kapatıp yeniden açınca bronz sıfırdan başlar. Kapalıyken çocukta kart, raf ve bronz görünmez; kahraman eskisi gibidir. [A], kaydetme [E]
+
 **Klavye** (on parmak klavye, bilgisayarda) [A], ders [E]
 - Alt menüde "Klavye" sekmesi, İngilizce'nin solunda. Yalnızca klavyeli cihazda (fare ya da dokunmatik yüzey varsa) görünür,
   telefonda görünmez. Aile isterse açar (Ayarlar → Günlük plan, açma düğmesi), her sınıfta (8. sınıf da); açılmadıysa
@@ -252,7 +287,8 @@ Her maddenin yanında nasıl denendiği yazar:
     uçarsa makine de gider ("💨 Çatı uçtu, buz makinesi de gitti."). [O]
   - Oyunda Ctrl'li kısayollar çalışmaz (Ctrl+R, Ctrl+P…); Ctrl+W ya da sayfayı yenileme tarayıcıda "çıkılsın mı?" sorar.
   - Bitişte puan, vurulan kelime, seviye, doğruluk, en iyi puan (bu tarayıcıda; "Yeni rekor!"), "Tekrar oyna".
-  - Pencere arka plana geçince oyun durur, bir harfe basınca sürer. Geri tuşu önce sorar. Oyun hiçbir şey kaydetmez.
+  - Pencere arka plana geçince oyun durur, bir harfe basınca sürer. Geri tuşu önce sorar. Oyunun sonucu yalnızca bronz sayımı için kaydedilir
+    (kahramanı besleme).
 - Klavye kahramanı da büyütür. Kelime sayfası, mağaza ve rapor bunu sayar; güç arttıysa kutlama olur. Kahraman Klavye
   sayfasında da görünür. [O]
   - Her dersin en iyi yıldızı 1 güç verir; aynı dersi tekrarlamak şişirmez.
@@ -365,7 +401,7 @@ Her maddenin yanında nasıl denendiği yazar:
   - çocuk ekleme ve silme (silmede adını yazarak onay);
   - veli ekleme;
   - öğretmen bağlama (ders seçerek);
-  - 🦸 Kelime kahramanı (İngilizce ya da Klavye açık her çocuk). Kız ya da erkek, ten, yüz şekli, saç rengi, saç modeli
+  - 🦸 Kelime kahramanı (İngilizce, Klavye ya da kahramanı besleme açık her çocuk). Kız ya da erkek, ten, yüz şekli, saç rengi, saç modeli
     (kısa, kısa perçemli, yana taralı, kıvırcık, uzun, örgülü, at kuyruğu, kâküllü), kaş, göz rengi ve şekli, burun, gülüş,
     kulak, gözlük, çil seçilir; önizleme hemen değişir; Kaydet, Sıfırla.
   - Vesikalık fotoğraf yüklenir; saatlik iş bir saat içinde kahramanı ona benzetir, yine çizgi karakter kalır. Fotoğrafı
@@ -401,6 +437,10 @@ Her maddenin yanında nasıl denendiği yazar:
   - kahramanın kız ya da erkek oluşunu ve görünüşünü veli seçer, çocuk değiştiremez;
   - alışverişi veli ve İngilizce öğretmeni görür;
   - vesikalık fotoğrafı yalnızca çocuğun velileri yükler ve görür; çocuk, kardeş ve öğretmen göremez.
+- Kahramanı besleme (`test-hero-feed.sql`):
+  - çocuk kahramanına kendisi yedirir, kardeşi adına yediremez; besleme ayarını ve açlığı dondurmayı veli seçer, çocuk
+    değiştiremez;
+  - yemekleri ve bronz sayımını çocuk ve velisi görür; öğretmen ve kardeş göremez.
 - Okuduğu kitap:
   - çocuk kendi kitabını ekler ve sayfalarını gönderir, kardeşi adına ekleyemez;
   - sınav tarihini sonradan yalnızca veli değiştirir;
