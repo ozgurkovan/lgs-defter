@@ -492,6 +492,18 @@
         check('Rapor: tablodaki doğru ya da yanlış sayısına dokununca o sorular açılır, yeniden dokununca kapanır', shown && !dayBox().querySelector('.picked-rows'),
           !shown ? (panel?.textContent || 'panel yok').slice(0, 80) : '');
       } else check('Rapor: tablodaki sayılar', true, 'son günlerde soru çözülmemiş, atlandı');
+      // Zayıf konular (2026-11-09): "Yanlış soruları göster" o konunun yanlış sorularını kartın altında açar (soru metni,
+      // şıklar ya da deneme fotoğrafı); yeniden dokununca kapanır. Salt okunur.
+      const weakBtn = [...document.querySelectorAll('#app button')].find((x) => /^Yanlış soruları göster \(\d+\)$/.test(x.textContent));
+      if (weakBtn) {
+        weakBtn.scrollIntoView({ block: 'center' }); weakBtn.click();
+        const slot = weakBtn.nextElementSibling;
+        for (let i = 0; i < 40 && /Yükleniyor/.test(slot?.textContent || 'Yükleniyor'); i++) await wait(150);
+        const shown = !!slot && !slot.hidden && (slot.querySelectorAll('.opt, img, .stem, .exam-img').length >= 1 || /bulunamadı|havuzda değil/.test(slot.textContent));
+        weakBtn.click(); await wait(100);
+        check('Rapor: zayıf konuda "Yanlış soruları göster" soruları açar, yeniden dokununca kapanır', shown && slot.hidden,
+          shown ? `${slot.querySelectorAll('.opt').length} şık` : (slot?.textContent || 'panel yok').slice(0, 80));
+      } else check('Rapor: zayıf konuda "Yanlış soruları göster"', true, 'zayıf konu yok, atlandı');
       // Günün yanlışları derse göre gruplu (2026-11-09): her dersin başlığı bir kez çıkar, başlıktaki sayı altındaki yanlış
       // sayısına eşittir, dersler öğrencinin ders sırasıyla gelir.
       const heads = [...(dayBox()?.querySelectorAll('h4.wrong-group') || [])];
@@ -506,8 +518,8 @@
     }
 
     // Velinin "Benzer sorularla dene"si (2026-11-09): Sorular sayfasında kaçırdığı sorunun altında düğme; basınca panel açılır,
-    // benzer soru (şıklarıyla) ya da "benzer soru kalmadı" notu gelir. Şıklara dokunulmaz: hiçbir şey yazılmaz. Öğretmende
-    // ve öğrencide düğme yok (cevabı çocuğun adına yalnızca veli kaydedebilir).
+    // benzer soru (şıklarıyla) ya da "benzer soru kalmadı" notu gelir. Şıklara dokunulmaz: hiçbir şey yazılmaz. Veli ve
+    // öğretmende var (öğretmen kendi dersinde), öğrencide yok.
     if (role !== 'student') {
       go('questions'); await settle();
       const tabs = [...document.querySelectorAll('#app .chip')];
@@ -517,16 +529,15 @@
         btn = [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Benzer sorularla dene');
         if (btn) break;
       }
-      if (role === 'teacher') check('Öğretmende "Benzer sorularla dene" yok', !btn);
-      else if (btn) {
+      if (btn) {
         btn.click();
         for (let i = 0; i < 40 && /aranıyor/.test(document.querySelector('#app .check-panel')?.textContent || 'aranıyor'); i++) await wait(150);
         const panel = document.querySelector('#app .check-panel');
         const asked = !!panel && panel.querySelectorAll('button.choice').length >= 2 && /Benzer soru 1 \/ \d/.test(panel.textContent);
         const none = !!panel && /benzer soru kalmadı/.test(panel.textContent);
-        check('Veli: "Benzer sorularla dene" kaçırdığı sorunun altında benzer soruyu açar', btn.hidden && (asked || none),
+        check('Veli ya da öğretmen: "Benzer sorularla dene" kaçırdığı sorunun altında benzer soruyu açar', btn.hidden && (asked || none),
           asked ? panel.textContent.match(/Benzer soru 1 \/ \d/)[0] : none ? 'benzer soru kalmadı' : (panel?.textContent || 'panel yok').slice(0, 80));
-      } else check('Veli: "Benzer sorularla dene"', true, 'kaçırdığı soru yok, atlandı');
+      } else check('Veli ya da öğretmen: "Benzer sorularla dene"', true, 'kaçırdığı soru yok, atlandı');
     }
 
     // Ülke ve müfredat ayrımı (2026-11-09): seçili öğrencinin müfredatı Türkiye; konuların hepsi onun müfredatından gelir

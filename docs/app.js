@@ -1884,7 +1884,7 @@ async function viewTogether() {
   // Veli ve öğretmen işaretler (öğretmen sadece kendi derslerini görür ve işaretler); öğrenci işaretlemez.
   const canMark = state.profile.role !== 'student';
   const name = state.student?.display_name || 'Öğrenci';
-  const trackName = { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', practice: 'Konu çalışması', check: 'Veli denemesi' };
+  const trackName = { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', practice: 'Konu çalışması', check: 'Veli/öğretmen denemesi' };
   render(
     h('header', { class: 'stack', style: 'gap: 6px' },
       h('h1', {}, 'Birlikte bakılacaklar'),
@@ -4361,9 +4361,10 @@ function checkPanel(src, onDone) {
   })().catch(() => fill(box, h('p', { class: 'small error' }, 'Benzer sorular yüklenemedi, tekrar dene.')));
   return box;
 }
-// "Benzer sorularla dene" düğmesi: yalnızca veli (cevapları çocuğun adına o kaydedebilir) ve konusu bilinen soruda.
+// "Benzer sorularla dene" düğmesi: veli ve öğretmen (öğretmen kendi dersinde; cevapları çocuğun adına yazma izni
+// supabase/teacher-check.sql), konusu bilinen soruda. Öğrencide yok.
 function checkButton(src, onDone) {
-  if (state.profile?.role !== 'parent' || !src.topicId) return null;
+  if (!['parent', 'teacher'].includes(state.profile?.role) || !src.topicId) return null;
   const slot = h('div', {});
   const btn = h('button', { class: 'block', onclick: () => { btn.hidden = true; slot.append(checkPanel(src, onDone)); } }, 'Benzer sorularla dene');
   return [btn, slot];
@@ -4431,7 +4432,7 @@ async function viewQuestions() {
           h('b', {}, k), h('span', {}, qn.choices[k]),
           k === r.answer ? h('span', { class: 'muted' }, ' ← seçimi') : null))),
       h('p', { class: 'small muted' }, [
-        { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', practice: 'Konu çalışması', deneme: 'Deneme', check: 'Veli denemesi' }[r.track] || '',
+        { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', practice: 'Konu çalışması', deneme: 'Deneme', check: 'Veli/öğretmen denemesi' }[r.track] || '',
         new Date(r.answered_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
         r.confidence ? `emin %${r.confidence}` : null,
         `süre ${fmtDuration(r.duration_sec)} / ${fmtDuration(max)}${r.duration_sec > max ? ' (aştı)' : ''}`,
@@ -4601,6 +4602,56 @@ async function viewReport() {
     .sort((a, b) => a[1].ok / a[1].n - b[1].ok / b[1].n)
     .slice(0, 10);
   const youtube = youtubeSearch;
+  // Zayıf konunun yanlış soruları (velinin isteği, 2026-11-09: öğretmeniyle üstünden geçebilsinler): "Yanlış soruları
+  // göster" açılınca son 30 günün tekrarlarındaki yanlışları ve denemelerdeki yanlış ya da boşları soruyla birlikte listeler.
+  // Soru metinleri açılınca yüklenir. Veli her sorunun altından benzer sorularla deneyebilir (checkButton).
+  const topicWrongs = (id, t) => {
+    const slot = h('div', { class: 'topic-wrongs stack', style: 'gap: 10px', hidden: true });
+    let loaded = false;
+    const btn = h('button', { class: 'block', 'aria-expanded': 'false', onclick: async () => {
+      slot.hidden = !slot.hidden;
+      btn.setAttribute('aria-expanded', String(!slot.hidden));
+      if (slot.hidden || loaded) return;
+      loaded = true;
+      fill(slot, h('p', { class: 'small muted' }, 'Yükleniyor…'));
+      try {
+        const wrongRevs = reviews30.filter((r) => r.questions?.topic_id === id && !r.correct).sort((a, b) => (a.answered_at < b.answered_at ? 1 : -1));
+        const [qs, exs] = await Promise.all([
+          wrongRevs.length ? q(sb.from('questions').select('id, stem, choices, answer, solution, image_path, styles, variant_of').in('id', [...new Set(wrongRevs.map((r) => r.question_id))])) : [],
+          t.examMiss ? q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, exams(name, exam_date), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
+            .eq('student_id', s).eq('topic_id', id).neq('outcome', 'dogru').order('created_at', { ascending: false })) : [],
+        ]);
+        const byId = Object.fromEntries(qs.map((x) => [x.id, x]));
+        const trackName = { mistake: 'hata tekrarı', topic: 'konu tekrarı', extra: 'ek çalışma', practice: 'konu çalışması', deneme: 'deneme', check: 'veli/öğretmen denemesi' };
+        const opts = (qn, chosen) => h('div', { class: 'stack', style: 'gap: 4px' }, ['A', 'B', 'C', 'D'].filter((k) => qn.choices?.[k] !== undefined).map((k) =>
+          h('div', { class: 'opt small' + (k === qn.answer ? ' right' : k === chosen ? ' wrong' : '') }, h('b', {}, k), h('span', {}, qn.choices[k]),
+            k === chosen ? h('span', { class: 'muted' }, ' ← seçimi') : null)));
+        const revCards = wrongRevs.map((r) => {
+          const qn = byId[r.question_id];
+          return h('div', { class: 'stack', style: 'gap: 6px; padding-top: 10px; border-top: 1px solid var(--rule)' },
+            h('p', { class: 'small muted' }, [fmtDate(localDate(new Date(r.answered_at))), trackName[r.track],
+              r.needs_help ? 'boş geçti' : null, CONFIDENCE_LEVELS.find(([c]) => c === r.confidence)?.[1]].filter(Boolean).join(' · ')),
+            qn ? [qn.image_path ? lazyImg('questions', qn.image_path) : null, qn.stem ? h('p', { class: 'stem small' }, qn.stem) : null, opts(qn, r.answer),
+              qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, qn.solution)) : null,
+              checkButton({ questionId: qn.id, topicId: id, styles: qn.styles, variantOf: qn.variant_of })]
+              : h('p', { class: 'small muted' }, 'Soru artık havuzda değil.'));
+        });
+        const examCards = exs.map((e) => h('div', { class: 'stack', style: 'gap: 6px; padding-top: 10px; border-top: 1px solid var(--rule)' },
+          h('p', { class: 'small muted' }, `${e.exams?.name || 'Deneme'} · ${e.q_no}. soru · ${fmtDate(e.exams?.exam_date)} · ${e.outcome === 'bos' ? 'boş' : 'yanlış'}`),
+          examQuestionContent(e),
+          h('p', { class: 'small' }, e.outcome === 'bos' ? `Boş bıraktı. Doğru cevap ${e.correct_answer || '?'}.` : `Cevabı ${e.student_answer || '?'} · doğrusu ${e.correct_answer || '?'}`),
+          e.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, e.solution)) : null,
+          checkButton({ examQuestionId: e.id, questionId: e.question_id || null, topicId: id, styles: e.styles })));
+        fill(slot, revCards.length || examCards.length
+          ? [h('p', { class: 'small muted' }, `${revCards.length + examCards.length} soru. Öğretmeniyle ya da birlikte üstünden geçin.`), ...revCards, ...examCards]
+          : h('p', { class: 'small muted' }, 'Son 30 günde bu konuda yanlış soru bulunamadı.'));
+      } catch (e) {
+        loaded = false;
+        fill(slot, h('p', { class: 'small error' }, 'Sorular yüklenemedi, tekrar dene.'));
+      }
+    } }, `Yanlış soruları göster (${t.n - t.ok})`);
+    return [btn, slot];
+  };
   const weakCards = h('section', { class: 'stack' },
     h('h2', {}, 'Zayıf konular'),
     h('p', { class: 'small muted' }, 'Son 30 günün tekrarları ve denemeler. Başarısı %75’in altında olan ya da emin olduğu hâlde yanlış yaptığı konular.'),
@@ -4614,6 +4665,7 @@ async function viewReport() {
         (t.lucky ? ` · ${t.lucky} kez tahminle doğru` : '')),
       t.misconceptions.length ? h('div', { class: 'note teacher small' }, h('b', {}, 'Görülen yanılgı: '), t.misconceptions[t.misconceptions.length - 1]) : null,
       topicName[id].kazanim ? h('p', { class: 'small muted' }, 'Kapsam: ' + topicName[id].kazanim) : null,
+      t.n - t.ok > 0 ? topicWrongs(id, t) : null,
       h('a', { class: 'btn', href: youtube(topicName[id].name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı')))
       : h('div', { class: 'card flat' }, h('p', { class: 'muted small' },
           Object.keys(topicStats).length ? 'Şu an zayıf görünen konu yok.' : `${studentName || 'Öğrenci'} soru çözdükçe burada konu konu başarı görünecek.`)));
@@ -4688,7 +4740,7 @@ function dayReport(reviews, items, topicName) {
   const byTime = (a, b) => (a.answered_at < b.answered_at ? -1 : 1);
   const itemById = Object.fromEntries(items.map((i) => [i.id, i]));
   const solid = (r) => r.correct && !(r.confidence && r.confidence <= 50);
-  const trackName = { mistake: 'hata tekrarı', topic: 'konu tekrarı', extra: 'ek çalışma', practice: 'konu çalışması', deneme: 'deneme', check: 'veli denemesi' };
+  const trackName = { mistake: 'hata tekrarı', topic: 'konu tekrarı', extra: 'ek çalışma', practice: 'konu çalışması', deneme: 'deneme', check: 'veli/öğretmen denemesi' };
   let day = today;
 
   // "Anlamadım" ya da "birlikte bakalım" dediyse tek doğru yetmez: çözümü yeni okumuş olabilir.

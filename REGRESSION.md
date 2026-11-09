@@ -388,13 +388,14 @@ Her maddenin yanında nasıl denendiği yazar:
   - okundu bilgisi, geri alma.
 - Birlikte bakılacaklar ("Birlikte baktık" ile listeden çıkar).
 - **Benzer sorularla dene** (velinin isteği, 2026-11-09): çocuk yanlış yaptığı soruyu "anladım" deyince veli birkaç benzer
-  soruyla dener. Sorular sekmesinde kaçırdığı her sorunun ve Birlikte bakılacaklar'daki her sorunun altında düğme (yalnızca
-  veli; öğretmende ve öğrencide yok). [A]
+  soruyla dener. Sorular sekmesinde kaçırdığı her sorunun, Birlikte bakılacaklar'daki her sorunun ve raporda zayıf konunun
+  yanlış sorularının altında düğme. Veli ve öğretmen (öğretmen kendi dersinde; velinin isteği, 2026-11-09: öğrenci öğretmen
+  eşliğinde çözebilsin, `teacher-check.sql`); öğrencide yok. [A]
   - En fazla üç soru gelir, hepsi çocuğun görmediği: önce o sorudan yazılmış benzerler ("Bu sorudan yazıldı"), sonra aynı
     kaynağın kardeş soruları, sonra aynı tarzda, sonra konunun öbür soruları. Kitap soruları gelmez. [O]
   - Çocuk velinin ekranında şıkkı seçer; doğru ya da yanlış ve çözüm hemen görünür, "Sonraki benzer soru". Sonunda "3 benzer
     sorudan 2 tanesini doğru yaptı". [E]
-  - Cevaplar çocuğun adına "Veli denemesi" olarak kaydedilir: soru görülmüş sayılır, günlük plana ve ikramiye sayımına
+  - Cevaplar çocuğun adına "Veli/öğretmen denemesi" olarak kaydedilir: soru görülmüş sayılır, günlük plana ve ikramiye sayımına
     girmez (doğrusu bronz kazandırır). Yanlış yapılan benzer soru yarın hata tekrarına girer. [E]
   - Birlikte bakılacaklar'da hepsini doğru yaparsa soru kendiliğinden "birlikte bakıldı" olur. [E]
   - Görmediği benzer soru yoksa "benzer soru kalmadı" notu çıkar. [A]
@@ -419,6 +420,10 @@ Her maddenin yanında nasıl denendiği yazar:
   - veli sınav tarihini buradan değiştirir;
   - hiç kitap yoksa görünmez. [E]
 - Denemeler tablosu, özel derste çalışılacaklar (eksik konu notu, YouTube), zayıf konular.
+  - Zayıf konu kartında "Yanlış soruları göster (N)": son 30 günün tekrarlarında yanlış yaptığı ve denemelerde yanlış ya da
+    boş bıraktığı sorular kartın altında, soru metni, şıklar (seçimi ve doğrusu işaretli), deneme fotoğrafı ve çözümle
+    açılır; velide her sorunun altında "Benzer sorularla dene". Yeniden dokununca kapanır (velinin isteği, 2026-11-09:
+    öğretmeniyle üstünden geçebilsinler). [A]
 - Yanlışların nereden geldiği, derslere göre, soru tipine göre, kavram yanılgıları.
 - Son 14 gün, önümüzdeki 7 gün, yüklemeler ve saatlik görevin en son çalıştığı saat.
 
@@ -480,6 +485,9 @@ Her maddenin yanında nasıl denendiği yazar:
   değiştirdiği kayda yazılır (öğrenci, veli, öğretmen ya da takvim; girişsiz değişiklik takvim sayılır). Aynı durum yeniden
   yazılınca kayıt eklenmez. Kaydı çocuk, veli ve kardeş okuyamaz; ileride konuların gerçekte hangi hafta işlendiğini
   çıkarmak için birikir. Uygulamada görünen bir şey değişmez.
+- Öğretmenin benzer soru denemesi (`test-teacher-check.sql`): öğretmen kendi dersinde öğrencisi adına yalnızca "veli/öğretmen
+  denemesi" cevabı ve ondan doğan hata maddesi yazar; başka tarzda cevap, başka dersin sorusu, başka öğrenci yazamaz; cevabı
+  değiştiremez.
 - Kahramanı besleme (`test-hero-feed.sql`):
   - çocuk kahramanına kendisi yedirir, kardeşi adına yediremez; besleme ayarını ve açlığı dondurmayı veli seçer, çocuk
     değiştiremez;
