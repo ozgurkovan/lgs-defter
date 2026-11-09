@@ -387,6 +387,17 @@ Her maddenin yanında nasıl denendiği yazar:
   - bütün çocuklara gönderme;
   - okundu bilgisi, geri alma.
 - Birlikte bakılacaklar ("Birlikte baktık" ile listeden çıkar).
+- **Benzer sorularla dene** (velinin isteği, 2026-11-09): çocuk yanlış yaptığı soruyu "anladım" deyince veli birkaç benzer
+  soruyla dener. Sorular sekmesinde kaçırdığı her sorunun ve Birlikte bakılacaklar'daki her sorunun altında düğme (yalnızca
+  veli; öğretmende ve öğrencide yok). [A]
+  - En fazla üç soru gelir, hepsi çocuğun görmediği: önce o sorudan yazılmış benzerler ("Bu sorudan yazıldı"), sonra aynı
+    kaynağın kardeş soruları, sonra aynı tarzda, sonra konunun öbür soruları. Kitap soruları gelmez. [O]
+  - Çocuk velinin ekranında şıkkı seçer; doğru ya da yanlış ve çözüm hemen görünür, "Sonraki benzer soru". Sonunda "3 benzer
+    sorudan 2 tanesini doğru yaptı". [E]
+  - Cevaplar çocuğun adına "Veli denemesi" olarak kaydedilir: soru görülmüş sayılır, günlük plana ve ikramiye sayımına
+    girmez (doğrusu bronz kazandırır). Yanlış yapılan benzer soru yarın hata tekrarına girer. [E]
+  - Birlikte bakılacaklar'da hepsini doğru yaparsa soru kendiliğinden "birlikte bakıldı" olur. [E]
+  - Görmediği benzer soru yoksa "benzer soru kalmadı" notu çıkar. [A]
 - Gün gün çalışma: konu konu doğru ve yanlış, süre, "anladı mı?".
 - Bildirdiği sorular (kendi açıklamasıyla) ve tamamladığı şiirler.
 - Kelime kartları kutusu:

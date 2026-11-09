@@ -493,6 +493,10 @@ td.wrap { white-space: normal; min-width: 160px; }
 @keyframes feed-heart { from { opacity: 1; transform: translate(-50%, 0) scale(0.6); } to { opacity: 0; transform: translate(-50%, -46px) scale(1.4); } }
 @media (prefers-reduced-motion: reduce) { .hero-scene.yum svg.hero, .feed-heart { animation: none; } .feed-heart { opacity: 0; } .feed-bar i { transition: none; } }
 
+/* Velinin benzer soru denemesi: yanlış sorunun kartının altında açılan panel. */
+.check-panel { gap: 10px; margin-top: 4px; padding-top: 12px; border-top: 1px dashed var(--rule); }
+.check-panel .choice:disabled { opacity: 1; cursor: default; }
+
 /* Emin misin penceresi (askDialog): her düğmede ne olacağı yazar. Fotoğraf gönderme sayfalarında Gönder çubuğu hep ekranda,
    alt menünün üstünde durur (aşağı kaydırmadan görünsün). */
 .ask { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: rgba(12, 18, 40, 0.6); }

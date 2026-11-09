@@ -52,7 +52,8 @@ drop trigger if exists guard_hero_feed_setting on public.profiles;
 create trigger guard_hero_feed_setting before update on public.profiles
   for each row execute function public.guard_hero_feed_setting();
 
--- Bronzun hesabı için gün gün sayılar (since'ten beri): plana sayılan cevap (kitap ve konu çalışması dışı), doğru cevap,
+-- Bronzun hesabı için gün gün sayılar (since'ten beri): plana sayılan cevap (kitap, konu çalışması ve velinin benzer
+-- soru denemesi dışı), doğru cevap,
 -- ilk denemede doğru kelime kartı, yıldızlı klavye dersi, oyunda yazılan harf; bir de harcanan bronz. Satırlar çok
 -- olduğu için (günde yüz soru) sayım burada yapılır. Yalnızca çocuğun kendisi ve velisi çağırabilir; başkasına null.
 -- Günler Türkiye saatiyle.
@@ -64,7 +65,7 @@ returns jsonb language sql stable security definer set search_path = public as $
       select jsonb_agg(jsonb_build_object('day', d, 'answered', coalesce(r.answered, 0), 'correct', coalesce(r.correct, 0),
         'words', coalesce(w.words, 0), 'lessons', coalesce(t.lessons, 0), 'game_chars', coalesce(t.game_chars, 0)) order by d)
       from (select (answered_at at time zone 'Europe/Istanbul')::date as d,
-              count(*) filter (where track not in ('book', 'practice')) as answered, count(*) filter (where correct) as correct
+              count(*) filter (where track not in ('book', 'practice', 'check')) as answered, count(*) filter (where correct) as correct
             from reviews where student_id = sid and not voided and answered_at >= since group by 1) r
       full join (select (answered_at at time zone 'Europe/Istanbul')::date as d, count(*) filter (where correct and not again) as words
             from word_answers where student_id = sid and answered_at >= since group by 1) w using (d)

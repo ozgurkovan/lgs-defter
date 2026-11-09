@@ -470,6 +470,30 @@
     const d = navDepth(); go(a); await settle();
     check('Aynı sayfayı yeniden açmak geçmişe kayıt eklemez', navDepth() === d, `derinlik ${d} → ${navDepth()}`);
 
+    // Velinin "Benzer sorularla dene"si (2026-11-09): Sorular sayfasında kaçırdığı sorunun altında düğme; basınca panel açılır,
+    // benzer soru (şıklarıyla) ya da "benzer soru kalmadı" notu gelir. Şıklara dokunulmaz: hiçbir şey yazılmaz. Öğretmende
+    // ve öğrencide düğme yok (cevabı çocuğun adına yalnızca veli kaydedebilir).
+    if (role !== 'student') {
+      go('questions'); await settle();
+      const tabs = [...document.querySelectorAll('#app .chip')];
+      let btn = null;
+      for (const name of ['Denemeler', 'Tekrarlar']) {
+        tabs.find((x) => x.textContent === name)?.click(); await wait(150);
+        btn = [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Benzer sorularla dene');
+        if (btn) break;
+      }
+      if (role === 'teacher') check('Öğretmende "Benzer sorularla dene" yok', !btn);
+      else if (btn) {
+        btn.click();
+        for (let i = 0; i < 40 && /aranıyor/.test(document.querySelector('#app .check-panel')?.textContent || 'aranıyor'); i++) await wait(150);
+        const panel = document.querySelector('#app .check-panel');
+        const asked = !!panel && panel.querySelectorAll('button.choice').length >= 2 && /Benzer soru 1 \/ \d/.test(panel.textContent);
+        const none = !!panel && /benzer soru kalmadı/.test(panel.textContent);
+        check('Veli: "Benzer sorularla dene" kaçırdığı sorunun altında benzer soruyu açar', btn.hidden && (asked || none),
+          asked ? panel.textContent.match(/Benzer soru 1 \/ \d/)[0] : none ? 'benzer soru kalmadı' : (panel?.textContent || 'panel yok').slice(0, 80));
+      } else check('Veli: "Benzer sorularla dene"', true, 'kaçırdığı soru yok, atlandı');
+    }
+
     // Ülke ve müfredat ayrımı (2026-11-09): seçili öğrencinin müfredatı Türkiye; konuların hepsi onun müfredatından gelir
     // (başka ülkenin aynı sınıftaki konuları karışmaz). Salt okunur.
     if (state.student) {
