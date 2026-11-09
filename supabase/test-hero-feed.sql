@@ -7,13 +7,16 @@ declare
   kid uuid := (select id from public.profiles where display_name = 'IrfTest' and role = 'student');
   sibling uuid := (select id from public.profiles where role = 'student' and id <> kid order by created_at limit 1);
   parent uuid := (select parent_id from public.family_links where student_id = kid and relation = 'parent' limit 1);
-  teacher uuid := (select parent_id from public.family_links where student_id = kid and relation = 'teacher' limit 1);
+  teacher uuid := (select id from public.profiles where display_name = 'Test Öğretmen' and role = 'teacher');
   since timestamptz := now() - interval '1 minute';
   rid uuid;
   r jsonb := '{}';
   n int;
   s jsonb;
 begin
+  -- Test öğretmeni bu testte IrfTest'e matematik ve fen için bağlanır (geri alınır); gerçek bağları ne olursa olsun test aynı çalışır.
+  delete from public.family_links where parent_id = teacher and student_id = kid;
+  insert into public.family_links (parent_id, student_id, relation, subjects) values (teacher, kid, 'teacher', array['matematik', 'fen']);
   -- Çocuk yedirir; kardeşi adına yediremez, besleme ayarını değiştiremez, kendi sayımını görür
   perform set_config('request.jwt.claims', json_build_object('sub', kid, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
