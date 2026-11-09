@@ -470,6 +470,16 @@
     const d = navDepth(); go(a); await settle();
     check('Aynı sayfayı yeniden açmak geçmişe kayıt eklemez', navDepth() === d, `derinlik ${d} → ${navDepth()}`);
 
+    // Ülke ve müfredat ayrımı (2026-11-09): seçili öğrencinin müfredatı Türkiye; konuların hepsi onun müfredatından gelir
+    // (başka ülkenin aynı sınıftaki konuları karışmaz). Salt okunur.
+    if (state.student) {
+      const cur = studentCurriculum(state.student);
+      const rows = await q(sb.from('topics').select('id, curriculum, grade').eq('curriculum', cur).in('grade', studentGrades(state.student)));
+      const other = await q(sb.from('topics').select('id').neq('curriculum', cur).in('grade', studentGrades(state.student)));
+      check('Müfredat: öğrencinin konuları kendi müfredatından', cur === 'tr' && rows.length > 0 && rows.every((r) => r.curriculum === cur),
+        `müfredat ${cur}, ${rows.length} konu` + (other.length ? `; aynı sınıfta başka müfredattan ${other.length} konu var (gösterilmiyor)` : ''));
+    }
+
     // Supabase bir istekte en çok 1000 satır verir; q() kalan sayfaları da okur (2026-11-09). Soru havuzu 1000'den büyük:
     // okunan satır sayısı veritabanının saydığıyla aynı olmalı, hiçbir satır iki kez gelmemeli. Salt okunur.
     {

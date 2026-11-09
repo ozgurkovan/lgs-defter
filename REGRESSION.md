@@ -40,6 +40,11 @@ Her maddenin yanında nasıl denendiği yazar:
 - E-posta ve şifreyle giriş. Hata mesajları ayrı: internet yok, sunucuya ulaşılamıyor, çok deneme, şifre yanlış. "Şifremi unuttum" bağlantısı. [E]
 - Yeni sürüm yayınlanınca uygulama kendini yeniler (Ctrl+F5 gerekmez). Soru çözerken, denemedeyken ya da gönderilmemiş fotoğraf varken beklenir. [E]
 - Geri: üst çubuktaki "← Geri" ve tarayıcının geri tuşu bir önceki sayfaya döner; ilk sayfada tarayıcı tuşu siteden çıkar. [A]
+- Ülke ve müfredat ayrımı (velinin isteği, 2026-11-09; `supabase/country-curriculum.sql`): konular sınıfın yanında müfredata
+  göre de seçilir (`topics.curriculum`, `profiles.curriculum`; bugün hepsi `tr`). Başka müfredatın aynı sınıftaki konusu
+  öğrenciye görünmez ve yıllık plana göre açılmaz. LGS'ye özgü dersler, günlük plan ağırlıkları, sayaç ve denemeler
+  yalnızca Türkiye müfredatındaki 8. sınıfta. Müfredatı veli ayarlar, çocuk değiştiremez. Görünen bir şey değişmedi;
+  müfredat seçme ekranı henüz yok. [O] (`test-country-curriculum.sql`, `tools/test-schedule.mjs`), [A]
 - Büyük okumalar eksiksiz gelir. Supabase bir istekte en çok 1000 satır verir; uygulamanın ortak okuma yardımcısı (`q`) sonuç
   tam 1000 satırsa sorguyu birincil anahtara göre sıralayıp bütün sayfaları okur (2026-11-09: 1000 cevabı geçen öğrencide
   çözdüğü sorular görülmemiş sayılacak, altın ve güç yanlış hesaplanacaktı). Yazma sorguları ve kendi sınırı olanlar

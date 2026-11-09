@@ -14,9 +14,11 @@ const code = [
   pick('/* Sorular sınavdaki gibi', '// ---------------------------------------------------------------- öğrenci: bugün'),
   pick('/* Tekrar zamanı: FSRS', 'const wordsPerDay'),
   pick('/* Kelime kahramanı', '// Mağaza:'),
-  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins, heroBest, heroPower, heroCap };',
+  'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins, heroBest, heroPower, heroCap,'
+    + ' studentCurriculum, isLgsStudent, studentSubjects };',
 ].join('\n');
-const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins, heroBest, heroPower, heroCap } = new Function(code)();
+const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins, heroBest, heroPower, heroCap,
+  studentCurriculum, isLgsStudent, studentSubjects } = new Function(code)();
 
 // Soru süreleri LGS oturum sürelerine eşit olmalı: sözel 50 soru / 75 dk, sayısal 40 soru / 80 dk.
 const counts = { turkce: 20, inkilap: 10, din: 10, ingilizce: 10, matematik: 20, fen: 20 };
@@ -180,5 +182,14 @@ const coins = heroCoins(ans, [{ item: 'top', price: 2 }], 3);
 check('kahraman: altın', coins.earned === 3 + 5 && coins.spent === 2 && coins.balance === 6, JSON.stringify(coins));
 const withTyping = heroCoins(ans, [{ item: 'top', price: 2 }], 3, 15);
 check('kahraman: klavye altını eklenir', withTyping.earned === 3 + 5 + 15 && withTyping.balance === 21, JSON.stringify(withTyping));
+
+// Ülke ve müfredat ayrımı (2026-11-09): müfredat yazılmamışsa Türkiye; LGS'ye özgü dersler ve plan yalnızca Türkiye
+// müfredatındaki 8. sınıfta. Başka müfredattaki 8. sınıf LGS öğrencisi sayılmaz, planı LGS ağırlığıyla bölünmez.
+check('müfredat: yazılmamışsa Türkiye', studentCurriculum({}) === 'tr' && studentCurriculum(null) === 'tr' && studentCurriculum({ curriculum: 'us-pa' }) === 'us-pa');
+check('LGS yalnızca Türkiye müfredatındaki 8. sınıfta', isLgsStudent({ grade: 8 }) && isLgsStudent({ grade: 8, curriculum: 'tr' }) && isLgsStudent({})
+  && !isLgsStudent({ grade: 8, curriculum: 'us-pa' }) && !isLgsStudent({ grade: 4 }) && !isLgsStudent({ grade: 7, curriculum: 'us-pa' }));
+const usPlan = dailyPlan({ grade: 8, curriculum: 'us-pa', daily_questions: 30 });
+check('başka müfredatta LGS dersleri ve LGS planı kullanılmaz', !studentSubjects({ grade: 8, curriculum: 'us-pa' }).includes('inkilap')
+  && studentSubjects({ grade: 8 }).includes('inkilap') && planTotal(usPlan) === 30 && !('inkilap' in usPlan), JSON.stringify(usPlan));
 
 process.exit(fails ? 1 : 0);

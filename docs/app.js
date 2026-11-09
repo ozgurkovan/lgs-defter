@@ -41,7 +41,11 @@ const GRADE_SUBJECTS = {
   4: ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din'],
 };
 const PRIMARY_ORDER = ['turkce', 'matematik', 'hayat', 'fen', 'sosyal', 'ingilizce', 'din'];
-const isLgsStudent = (p) => !p?.grade || p.grade >= 8;
+// Müfredat (velinin isteği, 2026-11-09): ülke koduyla başlayan kimlik; 'tr' Türkiye (MEB), ileride 'us-pa' gibi. Konular
+// sınıfın yanında müfredata göre de seçilir (başka ülkenin aynı sınıftaki konuları karışmasın). LGS'ye özgü her şey
+// (dersler, sayaç, denemeler, seyrek konu ayarı) yalnızca Türkiye müfredatındaki 8. sınıf içindir.
+const studentCurriculum = (p) => p?.curriculum || 'tr';
+const isLgsStudent = (p) => studentCurriculum(p) === 'tr' && (!p?.grade || p.grade >= 8);
 const studentGrades = (p) => [...new Set([p?.grade || 8, ...(p?.extra_grades || [])])];
 function studentSubjects(p) {
   if (isLgsStudent(p)) return LGS_SUBJECTS;
@@ -2667,7 +2671,8 @@ async function viewMyTopics() {
   loading();
   const [topics, statuses, items] = await Promise.all([
     // "Kitap okuma" konusu okuduğu kitabın sorularınındır; Konular'da görünmez.
-    q(sb.from('topics').select('id, subject, grade, name, sort, planned_start, lgs_avg').in('grade', studentGrades(state.student)).not('id', 'like', '%.kitap-okuma')),
+    q(sb.from('topics').select('id, subject, grade, name, sort, planned_start, lgs_avg').eq('curriculum', studentCurriculum(state.student))
+      .in('grade', studentGrades(state.student)).not('id', 'like', '%.kitap-okuma')),
     q(sb.from('topic_status').select('topic_id, status').eq('student_id', sid())),
     q(sb.from('items').select('topic_id, track, step, state').eq('student_id', sid())),
   ]);
@@ -2772,7 +2777,7 @@ async function viewTopics() {
   loading();
   const [topics, statuses, items] = await Promise.all([
     // "Kitap okuma" konusu okuduğu kitabın sorularınındır; Konular'da işaretlenmez.
-    q(sb.from('topics').select('*').in('grade', studentGrades(state.student)).not('id', 'like', '%.kitap-okuma')),
+    q(sb.from('topics').select('*').eq('curriculum', studentCurriculum(state.student)).in('grade', studentGrades(state.student)).not('id', 'like', '%.kitap-okuma')),
     q(sb.from('topic_status').select('*').eq('student_id', sid())),
     q(sb.from('items').select('topic_id, track, step, state, due_date, note').eq('student_id', sid())),
   ]);
@@ -3893,7 +3898,7 @@ function viewSettings() {
           // "Tekrar etme" seçilince seyrek konuların açık tekrarları kapanır; geri açılınca yeniden başlar.
           const nowOff = upd.rare_factor === 0;
           if (upd.rare_factor !== undefined && nowOff !== wasOff) {
-            const rareIds = (await q(sb.from('topics').select('id').eq('grade', 8).lt('lgs_avg', 0.5))).map((t) => t.id);
+            const rareIds = (await q(sb.from('topics').select('id').eq('curriculum', 'tr').eq('grade', 8).lt('lgs_avg', 0.5))).map((t) => t.id);
             if (nowOff) {
               await q(sb.from('items').update({ state: 'paused', note: 'LGS\'de nadir çıkıyor; konu tekrarı kapalı (Konular\'dan açılabilir).' })
                 .eq('student_id', p.id).eq('track', 'topic').eq('state', 'active').in('topic_id', rareIds));
@@ -4383,7 +4388,7 @@ async function viewReport() {
     q(sb.from('exams').select('*').eq('student_id', s).order('exam_date')),
     q(sb.from('exam_results').select('*').eq('student_id', s)),
     q(sb.from('exam_questions').select('exam_id, subject, topic_id, styles, outcome, marked_guess, coding_error, diagnosis_cause, student_reason, misconception').eq('student_id', s)),
-    q(sb.from('topics').select('*').in('grade', studentGrades(state.student))),
+    q(sb.from('topics').select('*').eq('curriculum', studentCurriculum(state.student)).in('grade', studentGrades(state.student))),
     q(sb.from('topic_status').select('*').eq('student_id', s)),
     q(sb.from('items').select('*').eq('student_id', s)),
     q(sb.from('reviews').select('id, item_id, question_id, track, answer, correct, understood, needs_help, together_at, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, topic_id)')
