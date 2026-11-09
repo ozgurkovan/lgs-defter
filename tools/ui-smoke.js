@@ -470,6 +470,30 @@
     const d = navDepth(); go(a); await settle();
     check('Aynı sayfayı yeniden açmak geçmişe kayıt eklemez', navDepth() === d, `derinlik ${d} → ${navDepth()}`);
 
+    // Rapor, Gün gün çalışma (2026-11-09): tablodaki doğru ya da yanlış sayısına dokununca o konunun soruları tablonun altında
+    // açılır, soru metni yüklenir; yeniden dokununca kapanır. Salt okunur. Çalıştığı bir gün yoksa atlanır.
+    if (role !== 'student') {
+      go('report'); await settle();
+      const dayBox = () => [...document.querySelectorAll('#app h2')].find((x) => x.textContent === 'Gün gün çalışma')?.parentElement;
+      for (let i = 0; i < 40 && !dayBox(); i++) await wait(150);
+      // Sayı olan en yakın güne git (en çok 10 gün geri).
+      for (let i = 0; i < 10 && dayBox() && !dayBox().querySelector('.num-link'); i++) {
+        const prev = [...dayBox().querySelectorAll('button')].find((x) => x.textContent === '‹ Önceki');
+        if (!prev || prev.disabled) break;
+        prev.click(); await wait(150);
+      }
+      const num = dayBox()?.querySelector('.num-link');
+      if (num) {
+        num.click(); await wait(200);
+        for (let i = 0; i < 40 && /Yükleniyor/.test(dayBox().querySelector('.picked-rows')?.textContent || 'Yükleniyor'); i++) await wait(150);
+        const panel = dayBox().querySelector('.picked-rows');
+        const shown = !!panel && panel.querySelectorAll('details[open]').length >= 1 && panel.querySelectorAll('.opt, img, .stem').length >= 1;
+        dayBox().querySelector('.num-link[aria-expanded="true"]')?.click(); await wait(200);
+        check('Rapor: tablodaki doğru ya da yanlış sayısına dokununca o sorular açılır, yeniden dokununca kapanır', shown && !dayBox().querySelector('.picked-rows'),
+          !shown ? (panel?.textContent || 'panel yok').slice(0, 80) : '');
+      } else check('Rapor: tablodaki sayılar', true, 'son günlerde soru çözülmemiş, atlandı');
+    }
+
     // Velinin "Benzer sorularla dene"si (2026-11-09): Sorular sayfasında kaçırdığı sorunun altında düğme; basınca panel açılır,
     // benzer soru (şıklarıyla) ya da "benzer soru kalmadı" notu gelir. Şıklara dokunulmaz: hiçbir şey yazılmaz. Öğretmende
     // ve öğrencide düğme yok (cevabı çocuğun adına yalnızca veli kaydedebilir).

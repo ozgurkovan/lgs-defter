@@ -4703,12 +4703,12 @@ function dayReport(reviews, items, topicName) {
     return ok ? ['Kısmen oturdu', 'amber', detail] : ['Hâlâ zorlanıyor', 'red', detail];
   };
 
-  // Soru metni sadece açılınca yüklenir.
-  const questionDetails = (r) => {
+  // Soru metni sadece açılınca yüklenir; open verilirse açık ve yüklenmiş gelir (tablodaki sayıya dokununca).
+  const questionDetails = (r, open = false) => {
     const body = h('div', { class: 'stack', style: 'gap: 4px; margin-top: 6px' }, h('p', { class: 'small muted' }, 'Yükleniyor…'));
     const d = h('details', {}, h('summary', { class: 'small' }, 'Soruyu göster'), body);
-    d.addEventListener('toggle', async () => {
-      if (!d.open || d.dataset.loaded) return;
+    const load = async () => {
+      if (d.dataset.loaded) return;
       d.dataset.loaded = '1';
       try {
         const qn = await q(sb.from('questions').select('stem, choices, answer, solution, image_path').eq('id', r.question_id).single());
@@ -4723,8 +4723,33 @@ function dayReport(reviews, items, topicName) {
         delete d.dataset.loaded;
         fill(body, h('p', { class: 'small muted' }, 'Soru yüklenemedi.'));
       }
-    });
+    };
+    d.addEventListener('toggle', () => { if (d.open) load(); });
+    if (open) { d.open = true; load(); }
     return d;
+  };
+  // Tablodaki doğru ya da yanlış sayısına dokununca o konunun o günkü soruları tablonun altında açılır (velinin isteği,
+  // 2026-11-09: sayılara basınca soru gelmiyordu). picked: { day, id: konu, kind: 'wrong' | 'right' }; aynı sayıya yeniden
+  // dokunmak ya da "Kapat" kapatır.
+  let picked = null;
+  const isPicked = (id, kind) => !!picked && picked.day === day && picked.id === id && picked.kind === kind;
+  const countBtn = (id, kind, text) => h('button', { class: 'num-link', 'aria-expanded': String(isPicked(id, kind)),
+    'aria-label': `${topicName[id]?.name || 'Konu'}: ${kind === 'wrong' ? 'yanlış ve boş' : 'doğru'} soruları göster`,
+    onclick: () => { picked = isPicked(id, kind) ? null : { day, id, kind }; draw(); document.querySelector('#app .picked-rows')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } }, text);
+  const pickedPanel = (rows) => {
+    if (!picked || picked.day !== day) return null;
+    const list = rows.filter((r) => (r.questions?.topic_id || '?') === picked.id && (picked.kind === 'wrong' ? !r.correct : r.correct));
+    return h('div', { class: 'card flat stack picked-rows', style: 'gap: 8px' },
+      h('div', { class: 'spread' },
+        h('b', {}, `${topicName[picked.id]?.name || 'Konu'} · ${picked.kind === 'wrong' ? 'yanlış ve boş' : 'doğru'} sorular (${list.length})`),
+        h('button', { class: 'ghost small', onclick: () => { picked = null; draw(); } }, 'Kapat')),
+      list.map((r) => h('div', { class: 'stack', style: 'gap: 4px; padding-top: 8px; border-top: 1px solid var(--rule)' },
+        h('p', { class: 'small muted' }, [
+          new Date(r.answered_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), trackName[r.track],
+          r.needs_help ? 'boş geçti' : null, CONFIDENCE_LEVELS.find(([c]) => c === r.confidence)?.[1],
+          fmtDuration(r.duration_sec || 0) + (r.hint_used ? ', ipucuyla' : ''),
+        ].filter(Boolean).join(' · ')),
+        questionDetails(r, true))));
   };
 
   const draw = () => {
@@ -4773,9 +4798,12 @@ function dayReport(reviews, items, topicName) {
         h('thead', {}, h('tr', {}, h('th', {}, 'Konu'), h('th', {}, 'Soru'), h('th', {}, 'Doğru'), h('th', {}, 'Yanlış'), h('th', {}, 'Süre'))),
         h('tbody', {}, topicRows.map(([id, t]) => h('tr', {},
           h('td', {}, h('div', {}, topicName[id]?.name || '—'), h('div', { class: 'small muted' }, SUBJECTS[t.subject]?.name || '')),
-          h('td', {}, t.n), h('td', {}, t.ok),
-          h('td', { style: t.n - t.ok ? 'color: var(--red); font-weight: 600' : null }, t.n - t.ok - (t.blank || 0) + (t.blank ? ` +${t.blank} boş` : '')),
+          h('td', {}, t.n), h('td', {}, t.ok ? countBtn(id, 'right', t.ok) : 0),
+          h('td', { style: t.n - t.ok ? 'color: var(--red); font-weight: 600' : null },
+            t.n - t.ok ? countBtn(id, 'wrong', t.n - t.ok - (t.blank || 0) + (t.blank ? ` +${t.blank} boş` : '')) : 0),
           h('td', { class: 'num' }, fmtMinutes(t.sec))))))),
+      h('p', { class: 'small muted' }, 'Doğru ya da yanlış sayısına dokununca o sorular açılır.'),
+      pickedPanel(rows),
       wrongs.length ? [
         h('h3', { style: 'margin-top: 8px' }, 'Yanlışlarını anladı mı?'),
         h('p', { class: 'small muted' }, [

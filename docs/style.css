@@ -493,6 +493,10 @@ td.wrap { white-space: normal; min-width: 160px; }
 @keyframes feed-heart { from { opacity: 1; transform: translate(-50%, 0) scale(0.6); } to { opacity: 0; transform: translate(-50%, -46px) scale(1.4); } }
 @media (prefers-reduced-motion: reduce) { .hero-scene.yum svg.hero, .feed-heart { animation: none; } .feed-heart { opacity: 0; } .feed-bar i { transition: none; } }
 
+/* Rapor tablosunda dokunulabilir sayı (o konunun doğru ya da yanlış soruları açılır). */
+.num-link { min-height: 36px; min-width: 40px; padding: 4px 10px; border-radius: 10px; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.num-link[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); text-decoration: none; }
+
 /* Velinin benzer soru denemesi: yanlış sorunun kartının altında açılan panel. */
 .check-panel { gap: 10px; margin-top: 4px; padding-top: 12px; border-top: 1px dashed var(--rule); }
 .check-panel .choice:disabled { opacity: 1; cursor: default; }

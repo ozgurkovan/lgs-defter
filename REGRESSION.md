@@ -399,6 +399,9 @@ Her maddenin yanında nasıl denendiği yazar:
   - Birlikte bakılacaklar'da hepsini doğru yaparsa soru kendiliğinden "birlikte bakıldı" olur. [E]
   - Görmediği benzer soru yoksa "benzer soru kalmadı" notu çıkar. [A]
 - Gün gün çalışma: konu konu doğru ve yanlış, süre, "anladı mı?".
+  - Tablodaki doğru ya da yanlış sayısına dokununca o konunun o günkü soruları tablonun hemen altında açılır: saat, tür,
+    emin olma, süre ve sorunun kendisi (şıklar, seçimi, doğru cevap, çözüm). Aynı sayıya yeniden dokunmak ya da "Kapat"
+    kapatır (velinin isteği, 2026-11-09: sayılara basınca soru gelmiyordu). [A]
 - Bildirdiği sorular (kendi açıklamasıyla) ve tamamladığı şiirler.
 - Kelime kartları kutusu:
   - bugün, son 7 günün doğru oranı;
