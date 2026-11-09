@@ -470,6 +470,37 @@
     const d = navDepth(); go(a); await settle();
     check('Aynı sayfayı yeniden açmak geçmişe kayıt eklemez', navDepth() === d, `derinlik ${d} → ${navDepth()}`);
 
+    // Fotoğraf gönderme sayfası (velinin isteği, 2026-11-09): Gönder çubuğu hep ekranda (yapışkan); gönderilmemiş fotoğraf
+    // varken başka sayfaya geçmek ya da geri tuşu pencereyle sorar: "Sayfada kal" fotoğrafları korur, "Fotoğrafları sil ve
+    // çık" çıkar. "Fotoğrafları gönder"e basılmaz: hiçbir şey yazılmaz.
+    if (role !== 'teacher') {
+      const page = role === 'student' ? 'ask' : 'upload', other = role === 'student' ? 'home' : 'report';
+      go(other); await settle();
+      go(page); await settle();
+      const input = document.querySelector('#app .card input[type=file]');
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array([255, 216, 255])], 'zz-smoke.jpg', { type: 'image/jpeg' }));
+      if (input) { input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+      await wait(100);
+      const bar = document.querySelector('#app .send-bar');
+      const sticky = !!bar && getComputedStyle(bar).position === 'sticky' && /^Gönder \(1 fotoğraf\)$/.test(bar.querySelector('button')?.textContent || '');
+      const btn = (t) => [...document.querySelectorAll('.ask button')].find((x) => x.textContent.trim() === t);
+      go(other); await wait(200);
+      const asked = !!document.querySelector('.ask') && state.tab === page && !!btn('Sayfada kal') && !!btn('Fotoğrafları sil ve çık')
+        && (role !== 'student' || !!btn('Fotoğrafları gönder'));
+      btn('Sayfada kal')?.click(); await wait(150);
+      const kept = !document.querySelector('.ask') && state.tab === page && document.querySelectorAll('#app .thumb').length === 1;
+      history.back(); await wait(400);
+      const askedBack = !!document.querySelector('.ask') && state.tab === page && history.state?.tab === page;
+      btn('Sayfada kal')?.click(); await wait(150);
+      go(other); await wait(200);
+      btn('Fotoğrafları sil ve çık')?.click(); await settle();
+      check('Fotoğraf gönderme: Gönder çubuğu hep ekranda; gönderilmemiş fotoğrafla çıkarken pencere sorar, "Sayfada kal" fotoğrafı korur, "sil ve çık" çıkar',
+        sticky && asked && kept && askedBack && state.tab === other && !document.querySelector('.ask'),
+        [!sticky && 'Gönder çubuğu yapışkan değil ya da sayı yok', !asked && 'çıkarken sormadı', !kept && 'fotoğraf korunmadı', !askedBack && 'geri tuşunda sormadı',
+          state.tab !== other && `çıkmadı (açık ${state.tab})`].filter(Boolean).join('; '));
+    }
+
     if (role === 'student') {
       go('home'); await settle();
       // Soru çözerken geri tuşu: önce sorar (burada evet), ana sayfaya döner. Soru cevaplanmadığı için hiçbir şey yazılmaz.
@@ -477,6 +508,27 @@
       if (s?.entries?.length) {
         runSession('topic', s); await settle();
         const inSession = !!state.session && history.state?.overlay === 'session' && !document.querySelector('nav.tabs');
+        // "Bu konuyu okulda henüz işlemedik" ve "Soruda sorun var" önce sorar (velinin isteği, 2026-11-09). Burada vazgeçilir:
+        // konu bekletilmez, bildirim gönderilmez, hiçbir şey yazılmaz.
+        const byText = (t) => [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === t);
+        const inAsk = (t) => [...document.querySelectorAll('.ask button')].find((x) => x.textContent.trim() === t);
+        const index0 = state.session.index, total0 = state.session.entries.length;
+        const taught = byText('Bu konuyu okulda henüz işlemedik');
+        let askTaught = !taught; // hata tekrarında bu düğme yok
+        if (taught) {
+          taught.click(); await wait(150);
+          askTaught = !!inAsk('Evet, henüz işlemedik');
+          inAsk('Vazgeç, soruyu çözeceğim')?.click(); await wait(150);
+          askTaught = askTaught && !document.querySelector('.ask') && !taught.disabled;
+        }
+        byText('Soruda sorun var')?.click(); await wait(100);
+        byText('Çok zor')?.click(); await wait(50);
+        [...document.querySelectorAll('#app .card button.primary')].find((x) => x.textContent.trim() === 'Gönder')?.click(); await wait(150);
+        const askReport = !!inAsk('Evet, bildir');
+        inAsk('Vazgeç')?.click(); await wait(150); // bildirim kutusunun kendi "Vazgeç"i değil, penceredeki
+        check('Oturumda "henüz işlemedik" ve "Soruda sorun var" önce sorar; vazgeçince soru yerinde kalır',
+          askTaught && askReport && !document.querySelector('.ask') && !!byText('Soruda sorun var') && state.session?.index === index0
+          && state.session.entries.length === total0, [!askTaught && 'işlemedik sormadı', !askReport && 'bildirim sormadı'].filter(Boolean).join('; '));
         history.back(); await settle();
         check('Soru çözerken geri tuşu ana sayfaya döner', inSession && !state.session && state.tab === 'home' && !history.state?.overlay);
       } else check('Soru çözerken geri tuşu', true, 'bugün soru yok, atlandı');

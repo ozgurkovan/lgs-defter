@@ -76,8 +76,10 @@ Her maddenin yanında nasıl denendiği yazar:
 - Sayaç (derse göre süre), emin olma ölçeği, ipucu.
 - "Bunu birlikte bakalım": boş geçer, birlikte bakılacaklara düşer.
 - Yanlıştan sonra "Çözümü anladın mı? Anladım / Anlamadım". Hata tekrarında "Benzer soru" etiketi.
-- "Okulda işlenmedi" düğmesi: konu bekletilir.
-- "Soruda sorun var": cevap yanlış, soru hatalı ya da anlaşılmıyor seçilirse açıklama yazmak zorunlu.
+- "Bu konuyu okulda henüz işlemedik" düğmesi önce sorar (velinin isteği, 2026-11-09): pencerede konunun adı, öne çıkan
+  "Vazgeç, soruyu çözeceğim" ve "Evet, henüz işlemedik". Evet denirse konu bekletilir; vazgeçilirse soru yerinde kalır. [A]
+- "Soruda sorun var": cevap yanlış, soru hatalı ya da anlaşılmıyor seçilirse açıklama yazmak zorunlu. "Gönder" önce sorar:
+  ne bildirdiğini ve sonucunu söyler ("Soru kontrol edilecek ve sana sayılmayacak"); "Evet, bildir" ya da "Vazgeç". [A]
 - Konu tekrarında ya da ek çalışmada yanlış yapılan soru hata tekrarına girer.
 - "Ara ver" düğmesi. Oturum sonunda sonuç, birlikte bakılacaklar ve çoğu zaman bir mola kartı. [A]
 
@@ -341,7 +343,15 @@ Her maddenin yanında nasıl denendiği yazar:
   - Çözümler "Gönderdiğin sorular" altında görünür.
 - **Kâğıt deneme**: kitapçık sayfaları, varsa optik form, "süre yetti mi?". Cevap anahtarı istenmez.
 - Son yüklemelerin durumu.
-- Gönderilmemiş fotoğraf varken sayfadan çıkılırsa sorulur. Panodan yapıştırma çalışır.
+- Gönder çubuğu hep ekranda, alt menünün üstünde durur; aşağı kaydırmak gerekmez. Düğmede fotoğraf sayısı yazar
+  ("Gönder (3 fotoğraf)"), altında neyin eksik olduğu (velinin isteği, 2026-11-09: çocuklar aşağıdaki düğmeyi görmeyip
+  başka düğmelere basıyor, fotoğraflar siliniyordu). Soru gönder, kâğıt deneme, okuduğum kitap ve velinin kitap sayfası
+  sayfalarında aynı. [A]
+- Gönderilmemiş fotoğraf varken sayfadan çıkılırsa (alt menü, geri tuşu, "← Geri", çocuk değiştirme, çıkış) pencere
+  sorar; tarayıcının "Tamam / İptal" kutusu değil, her düğmesinde ne olacağı yazar: "Fotoğrafları gönder" (gönderilebiliyorsa,
+  öne çıkar), "Sayfada kal", "Fotoğrafları sil ve çık". Gönderilemiyorsa neyin eksik olduğunu söyler; yükleme sürerken
+  beklemesini söyler. Esc ve pencerenin dışı "Sayfada kal" sayılır. [A]
+- Panodan yapıştırma çalışır.
 
 **Konular** (öğrenci, Yükle'nin sağında; velinin isteği, 2026-11-01) [A]
 - Salt okunur: öğrenci konuları görür, işaretleyemez. Konuları veli işaretler (velinin Konular sekmesi), yıllık plandaki

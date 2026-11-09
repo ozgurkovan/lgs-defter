@@ -259,11 +259,15 @@ function studentSwitcher() {
     return h('span', { class: 'small muted' }, me.role !== 'student' && state.student
       ? `${me.display_name || ''} · ${state.student.display_name}` : me.display_name || '');
   }
-  return h('select', { id: 'student-switch', class: 'switch', 'aria-label': 'Hangi çocuk', onchange: (e) => {
-    if (!confirmLeave()) { e.target.value = sid(); return; }
-    state.student = state.students.find((s) => s.id === e.target.value);
+  const pick = (id) => {
+    state.student = state.students.find((s) => s.id === id);
     try { localStorage.setItem('defter.student', state.student.id); } catch (err) { /* önemli değil */ }
     go(state.tab);
+  };
+  return h('select', { id: 'student-switch', class: 'switch', 'aria-label': 'Hangi çocuk', onchange: (e) => {
+    const id = e.target.value;
+    if (!confirmLeave(() => pick(id))) { e.target.value = sid(); return; }
+    pick(id);
   } }, state.students.map((s) => h('option', { value: s.id, selected: s.id === sid() }, `${s.display_name} · ${s.grade}. sınıf`)));
 }
 
@@ -346,11 +350,49 @@ function renderTabs() {
 
 /* Gönderilmemiş fotoğraf varken sayfadan çıkmadan önce sorar (yanlışlıkla başka düğmeye basınca
    çekilen fotoğraflar kaybolmasın). leaveGuard o anki sayfanın "kaybolacak bir şey var mı?" kontrolüdür. */
-let leaveGuard = null;
-function confirmLeave() {
-  if (leaveGuard?.() && !confirm('Çektiğin fotoğraflar henüz gönderilmedi. Çıkarsan kaybolacak. Çıkmak istediğinden emin misin?')) return false;
-  leaveGuard = null;
-  return true;
+let leaveGuard = null, leaveAsking = false;
+/* Emin misin penceresi (velinin isteği, 2026-11-09): tarayıcının "Tamam / İptal" kutusu yerine, her düğmesinde ne olacağı
+   yazan bir pencere; çocuklar "Tamam"a okumadan basıyor, çektikleri fotoğraflar siliniyordu. actions: [{ label, value,
+   cls }]. Esc ve pencerenin dışına dokunmak cancel değerini döndürür. */
+function askDialog({ title, text, actions, cancel = null }) {
+  return new Promise((resolve) => {
+    const close = (v) => { box.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(cancel); } };
+    const box = h('div', { class: 'ask', role: 'alertdialog', 'aria-modal': 'true', 'aria-label': title, onclick: (e) => { if (e.target === box) close(cancel); } },
+      h('section', { class: 'card stack ask-card' },
+        h('h2', {}, title),
+        text ? h('p', {}, text) : null,
+        actions.map((a) => h('button', { class: a.cls || 'block', onclick: () => close(a.value) }, a.label))));
+    document.addEventListener('keydown', onKey, true);
+    document.body.append(box);
+    box.querySelector('button')?.focus();
+  });
+}
+/* Gönderilmemiş fotoğraf varsa sayfadan çıkılmaz, pencere sorar: "Fotoğrafları gönder" (gönderilebiliyorsa, öne çıkar),
+   "Sayfada kal", "Fotoğrafları sil ve çık". retry: silip çıkmayı seçerse yapılacak iş (istenen sayfaya gitmek). Çıkış
+   hemen olmaz; false döner. leaveGuard'ın isteğe bağlı parçaları: count (kaç fotoğraf), ready (gönderilebilir mi), why
+   (neden gönderilemiyor), busy (yükleniyor mu), send (gönder). */
+function confirmLeave(retry) {
+  if (!leaveGuard?.()) { leaveGuard = null; return true; }
+  if (leaveAsking) return false;
+  leaveAsking = true;
+  const g = leaveGuard, n = g.count?.() || 0, busy = !!g.busy?.(), ready = !busy && !!g.ready?.();
+  askDialog({
+    title: busy ? 'Fotoğraflar yükleniyor' : `${n ? n + ' fotoğraf' : 'Fotoğrafların'} henüz gönderilmedi`,
+    text: busy ? 'Yükleme bitmeden çıkarsan gönderim yarım kalır. Bitmesini bekle.'
+      : `Başka sayfaya geçersen çektiğin fotoğraflar silinir. ${ready ? 'Önce gönderelim mi?' : g.why?.() || ''}`.trim(),
+    actions: [
+      ready ? { label: 'Fotoğrafları gönder', value: 'send', cls: 'primary block' } : null,
+      { label: 'Sayfada kal', value: 'stay', cls: ready ? 'block' : 'primary block' },
+      { label: 'Fotoğrafları sil ve çık', value: 'leave', cls: 'ghost small danger' },
+    ].filter(Boolean),
+    cancel: 'stay',
+  }).then((v) => {
+    leaveAsking = false;
+    if (v === 'send') g.send?.();
+    else if (v === 'leave') { if (leaveGuard === g) leaveGuard = null; retry?.(); }
+  });
+  return false;
 }
 window.addEventListener('beforeunload', (e) => {
   if (leaveGuard?.()) { e.preventDefault(); e.returnValue = ''; }
@@ -433,7 +475,9 @@ window.addEventListener('popstate', (e) => {
 // how: 'push' yeni sayfa; 'replace' bu kaydın yerine (ilk açılış, kendiliğinden yönlendirme); 'history' geri/ileri
 // tuşundan geldi, geçmişe dokunulmaz. Sayfa değiştiyse true döner.
 function go(tab, how = 'push') {
-  if (!confirmLeave()) return false;
+  // Gönderilmemiş fotoğraf varsa pencere sorar; "sil ve çık" denirse yeniden denenir (geri tuşuyla gelindiyse geri gidilir,
+  // çünkü popstate sayfanın kaydını geri koymuştur).
+  if (!confirmLeave(() => (how === 'history' ? history.back() : go(tab, how)))) return false;
   // Oturum ya da deneme kaydının üstündeyken: önce o kayıt geri alınır, sayfa popstate'te açılır (geri tuşunda
   // aynı sayfa iki kez durmasın).
   if (how === 'push' && history.state?.overlay) { pendingTab = tab; history.back(); return true; }
@@ -596,7 +640,7 @@ function viewNewPassword() {
 }
 
 async function signOut() {
-  if (!confirmLeave()) return;
+  if (!confirmLeave(signOut)) return;
   // Sunucu oturumu bulamazsa kütüphane yerel kaydı silmiyor; ortak telefonda hesap açık kalmasın diye
   // önce normal çıkış, sonra yerel çıkış, en son kayıt anahtarı elle silinir.
   try { await sb.auth.signOut(); } catch (e) { /* aşağıda yerelden temizlenir */ }
@@ -1070,7 +1114,16 @@ function showQuestion() {
     }, 'data-k': k }, h('b', {}, k), h('span', {}, question.choices[k])));
 
   // Okulda henüz işlenmemiş konu: soru sayılmaz, konu işlenene kadar bekletilir.
+  // Önce sorar (velinin isteği, 2026-11-09): tek dokunuş bütün konuyu bekletiyordu; "Vazgeç" öne çıkar.
   const notTaughtBtn = h('button', { class: 'ghost small muted', onclick: async () => {
+    const sure = await askDialog({
+      title: 'Bu konuyu okulda işlemediniz mi?',
+      text: `${item.topics?.name ? `"${item.topics.name}" konusunu` : 'Bu konuyu'} okulda henüz işlemediyseniz "Evet" de: konu işlenene kadar bu konudan soru gelmez. `
+        + 'İşlediniz ama soru zor geldiyse vazgeç ve çözmeyi dene.',
+      actions: [{ label: 'Vazgeç, soruyu çözeceğim', value: false, cls: 'primary block' }, { label: 'Evet, henüz işlemedik', value: true, cls: 'block' }],
+      cancel: false,
+    });
+    if (!sure) return;
     clearInterval(timerId);
     notTaughtBtn.disabled = true;
     try {
@@ -1247,8 +1300,17 @@ function showQuestion() {
     h('div', { class: 'row' }, reportSend, h('button', { class: 'ghost', onclick: () => { report.hidden = true; } }, 'Vazgeç')));
 
   async function sendReport() {
-    reportSend.disabled = true;
     const dispute = DISPUTE_KINDS.has(reportKind);
+    // Önce sorar (velinin isteği, 2026-11-09): ne bildirdiğini ve sonucunu söyler.
+    const sure = await askDialog({
+      title: 'Bu soruyu bildiriyorsun',
+      text: `"${FEEDBACK_KINDS.find(([k]) => k === reportKind)?.[1] || 'Sorun var'}" diye bildireceksin. `
+        + (dispute ? 'Soru kontrol edilecek ve sana sayılmayacak. ' : 'Notun kontrol edilecek. ') + 'Emin misin?',
+      actions: [{ label: 'Evet, bildir', value: true, cls: 'block' }, { label: 'Vazgeç', value: false, cls: 'block' }],
+      cancel: false,
+    });
+    if (!sure) return;
+    reportSend.disabled = true;
     const skipped = !answered;
     const list = ss.results.get(item.id) || [];
     try {
@@ -1976,8 +2038,11 @@ async function viewUpload(kind) {
   bookTitle.addEventListener('input', () => refresh());
   state.readBook = null;
   const photos = [];
-  let timeNote = null, sent = false;
-  leaveGuard = () => photos.length > 0 && !sent;
+  let timeNote = null, sent = false, sending = false;
+  // Sayfadan çıkarken sorulur; pencere "Fotoğrafları gönder" de sunar (confirmLeave).
+  leaveGuard = Object.assign(() => photos.length > 0 && !sent, {
+    count: () => photos.length, ready: () => !sendBtn.disabled, why: () => missingNote.textContent, busy: () => sending, send: () => sendBtn.click(),
+  });
 
   const examSel = h('select', { id: 'exam' },
     h('option', { value: '' }, exams.length ? 'Deneme seç' : 'Henüz deneme yok'),
@@ -2006,8 +2071,15 @@ async function viewUpload(kind) {
   const sendBtn = h('button', { class: 'primary block', disabled: true, onclick: send }, 'Gönder');
   // Gönder neden kapalı ya da neye dikkat edilmeli: düğmenin hemen altında söylenir.
   const missingNote = h('p', { class: 'small muted' });
+  // Gönder düğmesi hep ekranda (velinin isteği, 2026-11-09): aşağı kaydırmadan görünür, alt menünün üstünde durur. Çocuklar
+  // aşağıdaki düğmeyi görmeyip başka düğmelerle (alt menüdeki "Yükle" gibi) gönderileceğini sanıyor, fotoğraflar siliniyordu.
+  const sendBar = h('div', { class: 'send-bar' }, sendBtn, missingNote, status);
 
   function refresh() {
+    refreshState();
+    sendBtn.textContent = photos.length ? `Gönder (${photos.length} fotoğraf)` : 'Gönder';
+  }
+  function refreshState() {
     if (kind === 'okuma') {
       const bookOk = bookSel.value && (bookSel.value !== '__new' || bookTitle.value.trim());
       const missing = [!bookOk && 'kitabın adını yaz', !photos.length && 'sayfaların fotoğraflarını ekle'].filter(Boolean);
@@ -2033,6 +2105,7 @@ async function viewUpload(kind) {
 
   async function send() {
     sendBtn.disabled = true;
+    sending = true;
     status.hidden = false;
     try {
       let examId = null;
@@ -2091,6 +2164,7 @@ async function viewUpload(kind) {
       console.error(e);
       status.innerHTML = '';
       status.append(h('span', { class: 'error' }, 'Yükleme yarım kaldı: ' + (e.message || e) + '. İnternetini kontrol edip tekrar gönder.'));
+      sending = false;
       sendBtn.disabled = false;
     }
   }
@@ -2108,7 +2182,7 @@ async function viewUpload(kind) {
       photoPicker('Yapamadığım sorular', 'Çözümünü takıldığın yerden anlatırım; benzerleri hata tekrarında gelir.', 'yapamadim', photos, refresh),
       photoPicker('Beğendiğim sorular', 'Bu tarzda yeni sorular yazarım.', 'begendim', photos, refresh),
       h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
-      sendBtn, missingNote, status);
+      sendBar);
     refresh();
     return;
   }
@@ -2121,7 +2195,7 @@ async function viewUpload(kind) {
       photoPicker('Kitabın sayfaları', 'Sırayla çek, ilk okuduğun sayfadan başla. Yazılar net okunsun, sayfa numarası görünsün. Bölüm bölüm de gönderebilirsin.',
         'okuma', photos, refresh),
       h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
-      sendBtn, missingNote, status);
+      sendBar);
     refresh();
     return;
   }
@@ -2132,7 +2206,7 @@ async function viewUpload(kind) {
         h('p', { class: 'muted' }, 'Soru bankasından sayfa fotoğrafları. Cevap anahtarı ayrı sayfadaysa onu da çek.')),
       photoPicker('Sayfalar', 'Her sayfa düz ve net olsun, gölge düşmesin.', 'kitap_sayfa', photos, refresh),
       h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
-      sendBtn, missingNote, status);
+      sendBar);
     refresh();
     return;
   }
@@ -2146,7 +2220,7 @@ async function viewUpload(kind) {
     photoPicker('1. Kitapçık sayfaları', 'Tüm sayfalar, sırayla. Karalamaların görünsün; T ve yuvarlak işaretlerin de.', 'kitapcik', photos, refresh),
     photoPicker('2. Optik form (varsa)', null, 'optik', photos, refresh),
     h('section', { class: 'card' }, h('h3', {}, 'Süre yetti mi?'), h('div', { class: 'chips' }, timeChips)),
-    sendBtn, missingNote, status,
+    sendBar,
     state.profile.role === 'parent' ? h('div', { class: 'card flat' },
       h('p', { class: 'small muted' }, 'Soru bankasından sayfa eklemek ister misiniz? Bu sayfalar bütün çocukların ortak soru havuzuna gider.'),
       h('button', { class: 'block', onclick: () => go('book') }, 'Kitap sayfası ekle')) : null);
