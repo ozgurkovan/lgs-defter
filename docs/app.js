@@ -281,11 +281,32 @@ function failBox(err) {
     h('p', { class: 'small muted' }, (err && err.message) || String(err)),
     h('button', { onclick: () => go(state.tab) }, 'Tekrar dene'));
 }
+/* Sorgu sayfaları: sorgunun sonucu (bütün satırlar)
+   Supabase bir istekte en çok SB_PAGE satır verir (projenin ayarı). Bir öğrencinin bütün cevapları gibi büyüyen okumalar bu
+   sınırı geçince eksik geliyordu: çözdüğü sorular görülmemiş sayılır, altın ve güç yanlış hesaplanırdı (2026-11-09). Sonuç
+   tam SB_PAGE satırsa sorgu birincil anahtara göre sıralanır (sayfalar çakışmasın, satır atlanmasın) ve baştan, sayfa sayfa
+   okunur. Yalnızca okuma sorgularında (GET) ve kendi sınırı (limit) olmayanlarda; yazma ve rpc çağrıları yinelenmez. */
+const SB_PAGE = 1000;
+// Birincil anahtarı "id" olmayan tablolar.
+const SB_KEYS = { exam_results: ['exam_id', 'subject'], family_links: ['parent_id', 'student_id'], topic_status: ['student_id', 'topic_id'],
+  word_progress: ['student_id', 'word'] };
+const sbCapped = (b, data) => Array.isArray(data) && data.length === SB_PAGE && b?.method === 'GET' && typeof b.range === 'function'
+  && typeof b.order === 'function' && !!b.url?.searchParams && !b.url.searchParams.has('limit');
 async function q(promise) {
   const { data, error } = await promise;
   if (error) throw error;
-  return data;
+  if (!sbCapped(promise, data)) return data;
+  for (const key of SB_KEYS[promise.url.pathname.split('/').pop()] || ['id']) promise.order(key);
+  const rows = [];
+  for (let from = 0; ; from += SB_PAGE) {
+    const page = await promise.range(from, from + SB_PAGE - 1);
+    // Sayfalar okunamazsa eldeki ilk SB_PAGE satırla devam edilir (sayfa hiç açılmamaktan iyidir).
+    if (page.error || !Array.isArray(page.data)) { console.warn('Sayfalı okuma yarım kaldı', page.error); return data; }
+    rows.push(...page.data);
+    if (page.data.length < SB_PAGE) return rows;
+  }
 }
+/* Sorgu sayfaları: son */
 
 const urlCache = new Map();
 async function signedUrl(bucket, path) {

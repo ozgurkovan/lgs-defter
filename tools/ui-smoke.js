@@ -470,6 +470,15 @@
     const d = navDepth(); go(a); await settle();
     check('Aynı sayfayı yeniden açmak geçmişe kayıt eklemez', navDepth() === d, `derinlik ${d} → ${navDepth()}`);
 
+    // Supabase bir istekte en çok 1000 satır verir; q() kalan sayfaları da okur (2026-11-09). Soru havuzu 1000'den büyük:
+    // okunan satır sayısı veritabanının saydığıyla aynı olmalı, hiçbir satır iki kez gelmemeli. Salt okunur.
+    {
+      const { count } = await sb.from('questions').select('id', { count: 'exact', head: true });
+      const rows = await q(sb.from('questions').select('id'));
+      check('1000 satırdan büyük okuma eksiksiz gelir', count > 0 && rows.length === count && new Set(rows.map((r) => r.id)).size === count,
+        `veritabanı ${count}, okunan ${rows.length}` + (count <= SB_PAGE ? '; havuz 1000 satırdan küçük, sayfalama denenmedi' : ''));
+    }
+
     // Fotoğraf gönderme sayfası (velinin isteği, 2026-11-09): Gönder çubuğu hep ekranda (yapışkan); gönderilmemiş fotoğraf
     // varken başka sayfaya geçmek ya da geri tuşu pencereyle sorar: "Sayfada kal" fotoğrafları korur, "Fotoğrafları sil ve
     // çık" çıkar. "Fotoğrafları gönder"e basılmaz: hiçbir şey yazılmaz.

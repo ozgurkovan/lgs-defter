@@ -3,7 +3,7 @@
 //     test hesaplarına mı üretiliyor (bu deneme Supabase'e gitmez).
 //  2. Takvim ve günlük plan hesapları (tools/test-schedule.mjs), klavye dersleri (tools/test-typing.mjs), konu
 //     çalışmasının soru seçimi (tools/test-practice.mjs), kelime listesi ve günün kartları (tools/test-words.mjs),
-//     kahramanı besleme (tools/test-feed.mjs).
+//     kahramanı besleme (tools/test-feed.mjs), 1000 satır sınırını geçen okumalar (tools/test-paging.mjs).
 //  3. Veritabanı yetkileri: supabase/test-*.sql. Her test kullanıcıların yerine geçip dener ve sonucu
 //     "SONUC {...}" hatasıyla döndürür; hata yüzünden her şey geri alınır, iz kalmaz. Sonuç dosyadaki
 //     "-- beklenen:" satırıyla karşılaştırılır (">0" gibi değerler sayı aralığıdır).
@@ -58,6 +58,10 @@ report(practiceOut.length > 0 && !practiceBad.length, 'Konu çalışması', prac
 const wordsOut = node(['tools/test-words.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const wordsBad = wordsOut.filter((l) => !l.startsWith('OK'));
 report(wordsOut.length > 0 && !wordsBad.length, 'Kelime listesi', wordsBad.length ? wordsBad.join(' | ') : `${wordsOut.length} kontrol`);
+// Sayfalı okuma: 1000 satır sınırını geçen sorgular eksiksiz okunur (tools/test-paging.mjs).
+const pagingOut = node(['tools/test-paging.mjs']).trim().split(/\r?\n/).filter(Boolean);
+const pagingBad = pagingOut.filter((l) => !l.startsWith('OK'));
+report(pagingOut.length > 0 && !pagingBad.length, 'Sayfalı okuma', pagingBad.length ? pagingBad.join(' | ') : `${pagingOut.length} kontrol`);
 // Kahramanı besleme: bronz, tokluk, kahramanın sözü ve çizimi (tools/test-feed.mjs).
 const feedOut = node(['tools/test-feed.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const feedBad = feedOut.filter((l) => !l.startsWith('OK'));

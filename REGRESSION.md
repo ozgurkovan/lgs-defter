@@ -40,6 +40,10 @@ Her maddenin yanında nasıl denendiği yazar:
 - E-posta ve şifreyle giriş. Hata mesajları ayrı: internet yok, sunucuya ulaşılamıyor, çok deneme, şifre yanlış. "Şifremi unuttum" bağlantısı. [E]
 - Yeni sürüm yayınlanınca uygulama kendini yeniler (Ctrl+F5 gerekmez). Soru çözerken, denemedeyken ya da gönderilmemiş fotoğraf varken beklenir. [E]
 - Geri: üst çubuktaki "← Geri" ve tarayıcının geri tuşu bir önceki sayfaya döner; ilk sayfada tarayıcı tuşu siteden çıkar. [A]
+- Büyük okumalar eksiksiz gelir. Supabase bir istekte en çok 1000 satır verir; uygulamanın ortak okuma yardımcısı (`q`) sonuç
+  tam 1000 satırsa sorguyu birincil anahtara göre sıralayıp bütün sayfaları okur (2026-11-09: 1000 cevabı geçen öğrencide
+  çözdüğü sorular görülmemiş sayılacak, altın ve güç yanlış hesaplanacaktı). Yazma sorguları ve kendi sınırı olanlar
+  yinelenmez; sayfalar okunamazsa ilk 1000 satırla devam edilir. [O], canlı soru havuzunda [A]
 - Soru çözerken ve denemedeyken geri tuşu önce sorar. Denemede süre işlemeye devam eder ve deneme telefonda saklanır. [A]
 - Sayfa yenilenince aynı sayfada kalınır. Aynı sekmede çıkış yapıp başka biri girerse kendi ilk sayfasından başlar. [E]
 
