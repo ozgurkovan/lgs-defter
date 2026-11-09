@@ -188,19 +188,32 @@
         [!opened && 'açılmadı', !intro && 'tanıtım yok', !lit && 'satır yanmadı', !erase && '⌫ yok', !cleared && 'silinmedi'].filter(Boolean).join('; '));
 
       // Kelime roketi: yazılan kelimeyi çatıdan kalkan roket vurur, puan artar; çatıya değen kelime çatıyı hırpalar.
-      // Geri tuşu önce sorar, Klavye sayfasına döner. Oyun hiçbir şey kaydetmez.
+      // Geri tuşu önce sorar, Klavye sayfasına döner. Oyun bitince sonucu kaydedilir (bronz için); bu denetim oyunu bitirmez,
+      // bir şey kaydetmez.
       go('typing'); await settle();
       [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Oyna')?.click(); await wait(200);
       const g = state.session;
       let shot = false, bonk = false, reset = false, swap = false, fixed = false, armed = false, stacked = false, held = false, frozen = false,
         calm = false, boom = false, guard = false, iceOn = false, sprayed = false, melted = false, moved = false, lost = false,
-        clear = false, turned = false, fair = false, thrifty = false;
+        clear = false, turned = false, fair = false, thrifty = false, burst = false;
       if (g?.track === 'game') {
         g.paused = false;
         const w = g.spawn();
         for (const ch of w.text) key(ch, TQ_KEY[ch]);
         await wait(1200); // roketin uçuşu (arka plandaki sayfada zamanlayıcı yavaşlar)
         shot = g.hits === 1 && g.score > 0 && !g.list.includes(w);
+        // Patlama kelimenin yerinde kalır: simge kendi ortasında büyüyüp söner (velinin isteği, 2026-11-09: simge soldan sağa
+        // kayıyordu); halka yayılır, kıvılcımlar dört yana saçılır. Animasyon zamanı elle ileri sarılır (arka planda da çalışsın).
+        const lay = g.view.layer.getBoundingClientRect(), px = lay.width * 0.8, py = lay.height * 0.4;
+        gameBurst(g, px, py, '💥');
+        const puff = [...g.view.layer.querySelectorAll('.tg-puff')].pop(), sparks = [...g.view.layer.querySelectorAll('.tg-spark')];
+        const mid = (el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2 - lay.left, r.top + r.height / 2 - lay.top]; };
+        const seek = (el, k) => el.getAnimations().forEach((a) => { a.pause(); a.currentTime = k * a.effect.getComputedTiming().duration; });
+        const spots = puff ? [0.05, 0.4, 0.9].map((k) => { seek(puff, k); return mid(puff); }) : [];
+        if (sparks[0]) seek(sparks[0], 1);
+        const flew = sparks[0] ? Math.hypot(mid(sparks[0])[0] - px, mid(sparks[0])[1] - py) : 0;
+        burst = spots.length === 3 && spots.every(([x, y]) => Math.abs(x - px) < 3 && Math.abs(y - py) < 3)
+          && (reduceMotion() || (sparks.length >= 8 && !!g.view.layer.querySelector('.tg-ring') && flew > 20));
         const w2 = g.spawn(), roofs = g.roofs.reduce((a, b) => a + b, 0);
         w2.y = w2.ground;
         g.paused = false; // test sırasında tarayıcı bölmesi odağı kaybedince oyun durabilir
@@ -384,6 +397,8 @@
         }
       }
       history.back(); await settle();
+      check('Kelime roketi: patlama kelimenin yerinde kalır (simge kaymaz), halka yayılır, kıvılcımlar saçılır', burst,
+        burst ? '' : 'simge kaydı ya da halka ve kıvılcım yok');
       check('Kelime roketi: yazılan kelimeyi roket vurur, çatıya değen kelime çatıyı hırpalar, geri tuşu Klavye sayfasına döner',
         g?.track === 'game' && shot && bonk && !state.session && state.tab === 'typing' && !history.state?.overlay,
         [g?.track !== 'game' && 'açılmadı', !shot && 'vurmadı', !bonk && 'çatı hırpalanmadı', state.tab !== 'typing' && `açılan ${state.tab}`].filter(Boolean).join('; '));
@@ -403,13 +418,13 @@
       check('Kelime roketi: buz makinesi buzu bitince erir, sıradaki buzlu kelime başka eve düşer, çatısı uçan makine gider', melted && moved && lost,
         [!melted && 'buzu bitince erimedi', !moved && 'yeni buzlu kelime aynı eve düştü', !lost && 'çatı uçunca gitmedi'].filter(Boolean).join('; '));
       check('Kelime roketi: süper ya da buzlu kelimenin sütununa başka kelime düşmez; özel kelime öbürlerinin, yazılan kelime hepsinin üstünde',
-        clear, 'özel kelimenin sütununa kelime düştü ya da kelimeler yanlış sırada');
+        clear, clear ? '' : 'özel kelimenin sütununa kelime düştü ya da kelimeler yanlış sırada');
       check('Kelime roketi: buz makinesinin yanındaki çatı uçunca makine öbür yana döner, şerit oraya kayar; dönecek yer yoksa yerinde kalır, '
         + 'uçmuş çatıya düşen kelimeye buz harcamaz', turned && thrifty,
         [!turned && 'öbür yana dönmedi', !thrifty && 'uçmuş çatıya düşen kelimeye buz harcadı',
           g?.ice ? `sütunlar ${g.ice.cols.join()}, çatılar ${g.roofs.join()}` : 'makine yok'].filter(Boolean).join('; '));
       check('Kelime roketi: süper silahın roketlerinin vurduğu süper ya da buzlu kelime bir şey kazandırmaz; ateşlenince 10 kelime özel kelime gelmez',
-        fair, 'roketlerin vurduğu özel kelime silah ya da makine verdi, ya da sonraki özel kelime ertelenmedi');
+        fair, fair ? '' : 'roketlerin vurduğu özel kelime silah ya da makine verdi, ya da sonraki özel kelime ertelenmedi');
     }
 
     // Günlük plan: İngilizce ve Klavye'yi aile açar (açma düğmeleri).

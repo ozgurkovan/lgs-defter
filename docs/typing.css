@@ -100,10 +100,26 @@
    2026-11-03: arkadan gelen hızlı kelimeler özel kelimenin üstünü örtüyordu). Roketler ve patlamalar en üstte. */
 .tg-word.super, .tg-word.ice { z-index: 1; }
 .tg-word.target { z-index: 2; }
-.tg-rocket, .tg-puff { z-index: 3; }
+.tg-rocket, .tg-puff, .tg-ring, .tg-spark { z-index: 3; }
 .tg-rocket { font-size: 28px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
-.tg-puff { font-size: 36px; animation: tg-puff 0.5s ease-out forwards; }
-@keyframes tg-puff { from { opacity: 1; scale: 0.4; } to { opacity: 0; scale: 1.7; } }
+/* Patlama (velinin isteği, 2026-11-09): simge kendi ortasında büyüyüp söner. Yeri left/top'la verilir; transform'la verilince
+   büyüme konumu da büyütüyor, simge sağa kayıyordu. Çevresine halka yayılır, kıvılcımlar dört yana saçılır. */
+.tg-puff { font-size: 36px; line-height: 1; translate: -50% -50%; animation: tg-puff 0.5s ease-out forwards; }
+@keyframes tg-puff { 0% { opacity: 1; scale: 0.3; } 35% { opacity: 1; scale: 1.2; } 100% { opacity: 0; scale: 1.45; } }
+.tg-ring, .tg-spark { position: absolute; translate: -50% -50%; border-radius: 50%; pointer-events: none; }
+.tg-ring {
+  width: 56px; height: 56px; border: 3px solid rgba(255, 241, 196, 0.95);
+  box-shadow: 0 0 14px rgba(255, 183, 77, 0.85), inset 0 0 10px rgba(255, 183, 77, 0.6); animation: tg-ring 0.45s ease-out forwards;
+}
+.tg-ring.big { width: 96px; height: 96px; border-width: 4px; }
+.tg-ring.super { border-color: rgba(255, 224, 236, 0.95); box-shadow: 0 0 16px rgba(244, 143, 177, 0.9), inset 0 0 10px rgba(255, 213, 79, 0.7); }
+.tg-ring.ice { border-color: rgba(225, 245, 254, 0.95); box-shadow: 0 0 14px rgba(129, 212, 250, 0.9), inset 0 0 10px rgba(179, 229, 252, 0.7); }
+@keyframes tg-ring { from { opacity: 1; scale: 0.2; } to { opacity: 0; scale: 1.5; } }
+.tg-spark {
+  width: 7px; height: 7px; background: var(--c); box-shadow: 0 0 6px var(--c);
+  animation: tg-spark 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes tg-spark { to { translate: calc(var(--dx) - 50%) calc(var(--dy) - 50%); opacity: 0; scale: 0.4; } }
 /* Süper silahın roketleri büyük ve parlak; vurdukları kelime büyük bir 💥 ile patlar. */
 .tg-rocket.volley { font-size: 38px; filter: drop-shadow(0 0 6px #FFD54F) drop-shadow(0 0 14px rgba(255, 112, 67, 0.9)); }
 .tg-puff.big { font-size: 60px; }
@@ -209,4 +225,5 @@
   .tg-word.super, .tg-house.fix, .tg-pad.on::before, .tg-pad.go::before, .tg-field.boom, .tg-field.boom::after,
   .tg-word.ice, .tg-spray, .tg-ice.puff, .tg-ice.melt, .tg-frost::before { animation: none; }
   .tg-frost { transition: none; }
+  .tg-ring, .tg-spark { display: none; }
 }

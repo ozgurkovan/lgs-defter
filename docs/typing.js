@@ -1004,7 +1004,7 @@ function gameFire(game, t, volley = false) {
 function gameHit(game, t) {
   if (game.over || !game.list.includes(t)) return; // oyun bitti ya da çıkıldı
   gameRemove(game, t);
-  gamePuff(game, t.x, t.y - 14, t.super ? '🌟' : t.ice ? '❄️' : '💥');
+  gameBurst(game, t.x, t.y - 14, t.super ? '🌟' : t.ice ? '❄️' : '💥', t.super ? 'super' : t.ice ? 'ice' : '');
   game.hits++;
   game.score += t.text.length * game.level;
   if (t.super) gamePower(game, Math.min(GAME_POWER_MAX, game.power + 1));
@@ -1090,7 +1090,7 @@ function gameBlast(game, w) {
   if (game.over || !game.volley) return;
   if (game.list.includes(w)) {
     gameRemove(game, w);
-    gamePuff(game, w.x, w.y - 14, '💥', 'big');
+    gameBurst(game, w.x, w.y - 14, '💥', 'big');
     game.hits++;
     game.score += w.text.length * game.level;
     gameHud(game);
@@ -1108,11 +1108,32 @@ function gameBlast(game, w) {
   gameGuide(game);
 }
 
-// kind: '' ya da 'big' (süper silah), 'snow' (buzlu su; kelimenin arkasında kalır).
+// Kısa ömürlü simge (💥, 💨, 🔨, 💧, ❄️): (x, y) ortasında büyüyüp söner. Yeri left/top'la verilir; transform'la verilince
+// büyüme animasyonu konumu da büyütüyor, simge sağa aşağı kayıyordu (velinin isteği, 2026-11-09). kind: '' ya da 'big'
+// (süper silah), 'snow' (buzlu su; kelimenin arkasında kalır).
 function gamePuff(game, x, y, emoji, kind = '') {
-  const el = h('span', { class: `tg-puff ${kind}`.trim(), 'aria-hidden': 'true', style: `transform: translate(${x}px, ${y}px) translate(-50%, -50%)` }, emoji);
+  const el = h('span', { class: `tg-puff ${kind}`.trim(), 'aria-hidden': 'true', style: `left: ${x}px; top: ${y}px` }, emoji);
   game.view.layer.append(el);
   setTimeout(() => el.remove(), 550);
+}
+// Kelime patlaması (velinin isteği, 2026-11-09: daha hoş olsun): simge kelimenin yerinde büyüyüp söner, çevresine bir halka
+// yayılır, renkli kıvılcımlar dört bir yana saçılır. kind: '' kelime, 'super' ya da 'ice' (halkanın ve kıvılcımların rengi),
+// 'big' (süper silahın roketi: daha büyük, daha çok kıvılcım). Hareketi azalt açıksa yalnızca simge.
+const GAME_SPARKS = { '': ['#FFD54F', '#FF9E6B', '#FF7043', '#FFF59D'], super: ['#FFD54F', '#FF9E6B', '#F48FB1', '#81D4FA', '#A5D6A7'],
+  ice: ['#FFFFFF', '#E1F5FE', '#B3E5FC', '#81D4FA'] };
+function gameBurst(game, x, y, emoji, kind = '') {
+  const big = kind === 'big';
+  gamePuff(game, x, y, emoji, big ? 'big' : '');
+  if (reduceMotion()) return;
+  const colors = GAME_SPARKS[kind] || GAME_SPARKS[''], n = big ? 12 : 8, reach = big ? 80 : 52, at = `left: ${x}px; top: ${y}px`;
+  const parts = [h('span', { class: `tg-ring ${kind}`.trim(), 'aria-hidden': 'true', style: at })];
+  for (let i = 0; i < n; i++) {
+    const a = ((i + Math.random() * 0.7) / n) * 2 * Math.PI, d = reach * (0.6 + Math.random() * 0.5);
+    parts.push(h('span', { class: 'tg-spark', 'aria-hidden': 'true',
+      style: `${at}; --dx: ${(Math.cos(a) * d).toFixed(1)}px; --dy: ${(Math.sin(a) * d).toFixed(1)}px; --c: ${colors[i % colors.length]}` }));
+  }
+  game.view.layer.append(...parts);
+  setTimeout(() => parts.forEach((el) => el.remove()), 700);
 }
 
 // Buzlu kelime vuruldu: düştüğü çatıya (uçtuysa en yakın sağlam çatıya) buz makinesi takılır. Koruduğu iki sütun gökyüzünde

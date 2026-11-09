@@ -232,6 +232,10 @@ Her maddenin yanında nasıl denendiği yazar:
   - İlk harfe basınca çatıya en yakın o harfle başlayan kelime hedef olur; yazdıkça harfleri yeşillenir. Yönerge ve ekrandaki
     klavye sıradaki harfin tuşunu ve parmağını gösterir. Kelime bitince en yakın sağlam çatıdan roket kalkar, vurur (💥),
     puan = harf sayısı × seviye.
+  - Patlama (velinin isteği, 2026-11-09: simge soldan sağa kayıyordu, daha hoş olsun): 💥 (süper kelimede 🌟, buzluda ❄️)
+    kelimenin yerinde büyüyüp söner, kaymaz; çevresine bir halka yayılır, 8 renkli kıvılcım dört yana saçılır (süper kelimede
+    gökkuşağı, buzluda buz mavisi). Süper silahın roketlerinin patlamaları daha büyük, 12 kıvılcımlı. Öteki simgeler (çatıya
+    değince 💨, onarımda 🔨, makine eriyince 💧) de yerinde kalır. Hareketi azalt açıksa halka ve kıvılcım yok. [O]
   - Yanlış tuş hedefi bırakır, yazdıkları silinir ("O tuş değil, kelime baştan"); saha sallanır (velinin isteği: yanlıştan
     sonra kelimede takılı kalıyorlardı). Basılan harfle başlayan başka bir kelime varsa hemen o kelimeye geçer; başka
     kelimeye geçmek tek tuş, bu yanlış sayılmaz. ⌫ ya da Esc de hedefi bırakır.
