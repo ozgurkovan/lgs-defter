@@ -455,6 +455,10 @@ Her maddenin yanında nasıl denendiği yazar:
   - kahramanın kız ya da erkek oluşunu ve görünüşünü veli seçer, çocuk değiştiremez;
   - alışverişi veli ve İngilizce öğretmeni görür;
   - vesikalık fotoğrafı yalnızca çocuğun velileri yükler ve görür; çocuk, kardeş ve öğretmen göremez.
+- Konu durumunun geçmişi (`test-topic-status-log.sql`; velinin isteği, 2026-11-09): bir konunun durumu değişince kimin
+  değiştirdiği kayda yazılır (öğrenci, veli, öğretmen ya da takvim; girişsiz değişiklik takvim sayılır). Aynı durum yeniden
+  yazılınca kayıt eklenmez. Kaydı çocuk, veli ve kardeş okuyamaz; ileride konuların gerçekte hangi hafta işlendiğini
+  çıkarmak için birikir. Uygulamada görünen bir şey değişmez.
 - Kahramanı besleme (`test-hero-feed.sql`):
   - çocuk kahramanına kendisi yedirir, kardeşi adına yediremez; besleme ayarını ve açlığı dondurmayı veli seçer, çocuk
     değiştiremez;
