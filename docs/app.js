@@ -4784,7 +4784,12 @@ function dayReport(reviews, items, topicName) {
     const topicRows = Object.entries(byTopic).sort((a, b) =>
       (studentSubjects(state.student).indexOf(a[1].subject) - studentSubjects(state.student).indexOf(b[1].subject)) || ((topicName[a[0]]?.sort ?? 0) - (topicName[b[0]]?.sort ?? 0)));
 
-    const wrongs = rows.filter((r) => !r.correct).map((r) => ({ r, v: verdictFor(r) }));
+    // Yanlışlar derse göre gruplanır (velinin isteği, 2026-11-09): Türkçe yanlışları bir arada, sonra öbür dersler, dersin
+    // sırasıyla; ders içinde çözdüğü saate göre.
+    const subjRank = (r) => { const i = studentSubjects(state.student).indexOf(r.questions?.subject); return i < 0 ? 99 : i; };
+    const wrongs = rows.filter((r) => !r.correct).map((r) => ({ r, v: verdictFor(r) })).sort((a, b) => subjRank(a.r) - subjRank(b.r));
+    const wrongCount = {};
+    wrongs.forEach(({ r }) => { const s = r.questions?.subject || '?'; wrongCount[s] = (wrongCount[s] || 0) + 1; });
     const tally = {};
     wrongs.forEach(({ v }) => { tally[v[1]] = (tally[v[1]] || 0) + 1; });
 
@@ -4811,10 +4816,14 @@ function dayReport(reviews, items, topicName) {
           tally.amber ? `${tally.amber} tanesi henüz belli değil ya da kısmen oturdu` : null,
           tally.red ? `${tally.red} tanesinde hâlâ zorlanıyor` : null,
         ].filter(Boolean).join(', ') + '. Kendi "anladım / anlamadım" cevabı ve aynı konudan sonraki sorulara bakılır.'),
-        wrongs.map(({ r, v }) => {
+        wrongs.map(({ r, v }, i) => {
           const it = itemById[r.item_id];
           const conf = CONFIDENCE_LEVELS.find(([c]) => c === r.confidence)?.[1];
-          return h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0; border-top: 1px solid var(--rule)' },
+          const subj = r.questions?.subject || '?';
+          // Dersin ilk yanlışından önce ders başlığı: "Türkçe · 3 yanlış".
+          const head = i === 0 || (wrongs[i - 1].r.questions?.subject || '?') !== subj
+            ? h('h4', { class: 'wrong-group', style: 'margin: 14px 0 0' }, `${SUBJECTS[subj]?.name || 'Diğer'} · ${wrongCount[subj]} yanlış`) : null;
+          return [head, h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0; border-top: 1px solid var(--rule)' },
             h('div', { class: 'spread' },
               h('div', { class: 'row' }, subjTag(r.questions?.subject), h('span', { class: 'small' }, topicName[r.questions?.topic_id]?.name || '')),
               h('span', { class: 'tag ' + v[1] }, v[0])),
@@ -4827,7 +4836,7 @@ function dayReport(reviews, items, topicName) {
               + (r.confidence >= 75 ? ' Emin olduğu hâlde yanlış: kavram yanılgısı olabilir.' : '')
               + (r.together_at ? ` Birlikte baktınız (${fmtDate(localDate(new Date(r.together_at)))}).` : '')),
             it && it.state === 'active' && it.due_date > day ? h('p', { class: 'small muted' }, `Bu konu tekrar soruları ${fmtDate(it.due_date)} günü gelecek.`) : null,
-            questionDetails(r));
+            questionDetails(r))];
         })] : h('p', { class: 'small', style: 'color: var(--green)' }, 'Bu gün hiç yanlışı yok.'));
   };
   draw();

@@ -402,6 +402,8 @@ Her maddenin yanında nasıl denendiği yazar:
   - Tablodaki doğru ya da yanlış sayısına dokununca o konunun o günkü soruları tablonun hemen altında açılır: saat, tür,
     emin olma, süre ve sorunun kendisi (şıklar, seçimi, doğru cevap, çözüm). Aynı sayıya yeniden dokunmak ya da "Kapat"
     kapatır (velinin isteği, 2026-11-09: sayılara basınca soru gelmiyordu). [A]
+  - "Yanlışlarını anladı mı?" listesi derse göre grupludur: her dersin başlığı ("Türkçe · 3 yanlış") ve altında o dersin
+    yanlışları; dersler öğrencinin ders sırasıyla, ders içinde çözdüğü saate göre (velinin isteği, 2026-11-09). [A]
 - Bildirdiği sorular (kendi açıklamasıyla) ve tamamladığı şiirler.
 - Kelime kartları kutusu:
   - bugün, son 7 günün doğru oranı;

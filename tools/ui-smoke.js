@@ -492,6 +492,17 @@
         check('Rapor: tablodaki doğru ya da yanlış sayısına dokununca o sorular açılır, yeniden dokununca kapanır', shown && !dayBox().querySelector('.picked-rows'),
           !shown ? (panel?.textContent || 'panel yok').slice(0, 80) : '');
       } else check('Rapor: tablodaki sayılar', true, 'son günlerde soru çözülmemiş, atlandı');
+      // Günün yanlışları derse göre gruplu (2026-11-09): her dersin başlığı bir kez çıkar, başlıktaki sayı altındaki yanlış
+      // sayısına eşittir, dersler öğrencinin ders sırasıyla gelir.
+      const heads = [...(dayBox()?.querySelectorAll('h4.wrong-group') || [])];
+      if (heads.length) {
+        const names = heads.map((x) => x.textContent.split(' · ')[0]);
+        const order = studentSubjects(state.student).map((s) => SUBJECTS[s].name);
+        const counts = heads.map((x) => { let n = 0; for (let el = x.nextElementSibling; el && !el.matches('h4.wrong-group'); el = el.nextElementSibling) if (el.querySelector('.tag')) n++; return n; });
+        check('Rapor: günün yanlışları derse göre gruplu', new Set(names).size === names.length
+          && names.every((n, i) => i === 0 || order.indexOf(names[i - 1]) <= (order.indexOf(n) < 0 ? 99 : order.indexOf(n)))
+          && heads.every((x, i) => +x.textContent.match(/(\d+) yanlış/)?.[1] === counts[i]), heads.map((x) => x.textContent).join(', '));
+      } else check('Rapor: günün yanlışları derse göre gruplu', true, 'o gün yanlış yok, atlandı');
     }
 
     // Velinin "Benzer sorularla dene"si (2026-11-09): Sorular sayfasında kaçırdığı sorunun altında düğme; basınca panel açılır,
