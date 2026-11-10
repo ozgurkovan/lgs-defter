@@ -3930,7 +3930,12 @@ function viewSettings() {
           if (isLgsStudent(p)) upd.rare_factor = +rareSel.value;
         }
         try {
-          await q(sb.from('profiles').update(upd).eq('id', p.id));
+          // Sınıf değişince hemen geçerli olur (velinin isteği, 2026-11-10): eski sınıfın konu tekrarları durur, yeni sınıfın
+          // haftası gelmiş konuları açılır (supabase/set-student-grade.sql). Öbür alanlar ayrıca kaydedilir.
+          const gradeChanged = isParent && (upd.grade !== p.grade || String(upd.extra_grades) !== String(p.extra_grades || []));
+          if (gradeChanged) await q(sb.rpc('set_student_grade', { sid: p.id, g: upd.grade, extra: upd.extra_grades }));
+          const { grade: _g, extra_grades: _e, ...rest } = upd;
+          await q(sb.from('profiles').update(rest).eq('id', p.id));
           // "Tekrar etme" seçilince seyrek konuların açık tekrarları kapanır; geri açılınca yeniden başlar.
           const nowOff = upd.rare_factor === 0;
           if (upd.rare_factor !== undefined && nowOff !== wasOff) {

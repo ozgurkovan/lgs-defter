@@ -58,7 +58,7 @@ Her maddenin yanında nasıl denendiği yazar:
     yer tutucu uyuşmazlığını ve İngilizcede Türkçe harfi yakalar. [O]
   - Şakalar, bilmeceler, fabllar, şiirler (kamu malı), velinin tatlı söz önerileri ve şakacı selamlar ABD'de İngilizce
     içerikten gelir (`tools/i18n/content-en.json`). [A]
-  - Dersler yalnız Matematik ("Math"); konular Pennsylvania matematiği, 2., 4. ve 7. sınıf, Common Core standartlarına göre
+  - Dersler yalnız Matematik ("Math"); konular Pennsylvania matematiği, 2., 3., 4. ve 7. sınıf, Common Core standartlarına göre
     (`supabase/topics-us-pa-math.sql`, CC BY 4.0), 2026-27 okul yılına yayılmış haftalarla; haftası gelen konu kendiliğinden
     açılır. Türk öğrenciye ABD konusu, ABD öğrencisine Türk konusu hiç gelmez. [O] (`test-country-curriculum.sql`), [A]
   - ABD'de İngilizce kelime kartları (sekme, ayar satırı) ve LGS yok. Klavye dersleri ABD klavyesiyle ve İngilizce kelimelerle
@@ -506,6 +506,9 @@ Her maddenin yanında nasıl denendiği yazar:
 - İngilizce (kelime kartları) ve Klavye dersleri: aile isterse açar, her sınıfta; açma düğmesi ve açıkken günde kaç kart ya
   da ders. Kapalıyken çocuğun sekmesi görünmez. Ders sayılarından ayrı satırlarda; kelimede bugün kaç kart çözdüğü. [A]
 - Sınıf (1–8), bir üst sınıfın konuları, LGS tarihi (8. sınıf).
+  - Veli sınıfı değiştirince hemen geçerli olur (velinin isteği, 2026-11-10; `supabase/set-student-grade.sql`): eski
+    sınıfın konu tekrarları durur, yeni sınıfın haftası gelmiş konuları açılır, eski sınıfa dönülünce duranlar kaldığı yerden
+    devam eder. Yalnızca velisi değiştirebilir; çocuk ve öğretmen değiştiremez. [O] (`test-set-grade.sql`), [A]
 - Seyrek konu katsayısı: 1, 1,5, 2, 3 ya da 0 (tekrar etme).
 - Aile:
   - çocuk ekleme ve silme (silmede adını yazarak onay);

@@ -87,7 +87,18 @@ function tCore(text, depth = 0) {
   const key = m[2];
   if (!key) return s;
   let out = I18N.en[key];
-  // Sözlükte başında ", " ya da "· " ile duran parça (kodda öncekine eklenmiş): o biçimiyle aranır, baştaki işaret atılır.
+  if (out === undefined && looksTurkish(key)) {
+    for (const p of I18N.patterns) {
+      const r = p.re.exec(key);
+      if (!r || !i18nFits(p, r)) continue;
+      const groups = [];
+      p.order.forEach((idx, k) => { groups[idx] = r[k + 1]; });
+      out = i18nFill(p.en, groups);
+      break;
+    }
+  } else if (out !== undefined && out.includes('{')) out = out.replace(/\{\d+\|([^|}]*)\|[^}]*\}/g, '$1');
+  // Doğrudan ve kalıpla bulunamadıysa: sözlükte başında ", " ya da "· " ile duran parça (kodda öncekine eklenmiş); o
+  // biçimiyle aranır, baştaki işaret atılır.
   if (out === undefined && looksTurkish(key) && !/^[,·;.]/.test(key)) {
     for (const pre of [', ', '· ', '; ', '. ']) {
       const en = I18N.en[pre + key];
@@ -108,16 +119,6 @@ function tCore(text, depth = 0) {
       }
     }
   }
-  if (out === undefined && looksTurkish(key)) {
-    for (const p of I18N.patterns) {
-      const r = p.re.exec(key);
-      if (!r || !i18nFits(p, r)) continue;
-      const groups = [];
-      p.order.forEach((idx, k) => { groups[idx] = r[k + 1]; });
-      out = i18nFill(p.en, groups);
-      break;
-    }
-  } else if (out !== undefined && out.includes('{')) out = out.replace(/\{\d+\|([^|}]*)\|[^}]*\}/g, '$1');
   // Küçük harfle cümle içine giren ad ("elma", "bir şaka"): büyük harfli karşılığı varsa o, küçük harfle; tersi de
   // (cümle başında büyük harfle yazılmış "Ormana").
   if (out === undefined && /^[a-zçğıöşü]/.test(key)) {
