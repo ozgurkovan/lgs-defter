@@ -6,6 +6,9 @@ export const TEST_ACCOUNTS = {
   test4: 'c16864e7-684c-42fb-bb5e-f99c05b2a219', // öğrenci, 4. sınıf (ilkokul görünümü)
   testveli: 'eac9fc92-6e78-4e48-a81b-409aff6678c9', // veli, yalnızca IrfTest'e bağlı
   testogretmen: '0502e009-7d69-40a9-b7c6-ceedaad1012f', // öğretmen, IrfTest'te matematik ve fen
+  abdveli: '39be86d3-9683-41f6-8e2a-a6621594803f', // veli (ABD denemesi), ABD4 ve ABD7'ye bağlı
+  abd4: '543d12a4-a7c8-464a-92ce-1bd23d37eec5', // öğrenci, 4. sınıf, müfredat us-pa (Pennsylvania)
+  abd7: '6d0357bd-35f9-4a55-b8ab-ceb6dcd4e6d1', // öğrenci, 7. sınıf, müfredat us-pa (Pennsylvania)
 };
 
 // Test hesabının giriş e-postası. Listede olmayan bir ad Supabase'e hiç sorulmadan reddedilir.
