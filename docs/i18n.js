@@ -30,6 +30,8 @@ const looksTurkish = (s) => {
   if (I18N_TR_LETTERS.test(s)) return true;
   const words = s.split(/[^A-Za-zÇĞİÖŞÜçğıöşü'’]+/).filter(Boolean); // you've, Ali'nin tek sözcük
   if (words.length === 1) return I18N_TR_WORDS.has(words[0]) && !I18N_SKIP_WORDS.has(words[0]);
+  // Büyük harfle başlayan Türkçe sözcük ("Ders 6 · E and I") tek başına yeter; küçük harfli olanlar bir bağlaçla birlikte.
+  if (words.some((w) => /^[A-ZÇĞİÖŞÜ]/.test(w) && I18N_TR_WORDS.has(w) && !I18N_SKIP_WORDS.has(w))) return true;
   return words.filter((w) => I18N_TR_WORDS.has(w) && !I18N_SKIP_WORDS.has(w)).length >= 1 && words.some((w) => /^(ve|ile|bir|bu|da|de|ne|var|yok|ama|soru|konu|ders|dk|sn|gün|için)$/.test(w));
 };
 
