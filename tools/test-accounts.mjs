@@ -11,6 +11,7 @@ export const TEST_ACCOUNTS = {
   abdveli: '39be86d3-9683-41f6-8e2a-a6621594803f', // veli (ABD denemesi), ABD4 ve ABD7'ye bağlı
   abd4: '543d12a4-a7c8-464a-92ce-1bd23d37eec5', // öğrenci, 4. sınıf, müfredat us-pa (Pennsylvania)
   abd7: '6d0357bd-35f9-4a55-b8ab-ceb6dcd4e6d1', // öğrenci, 7. sınıf, müfredat us-pa (Pennsylvania)
+  abd2: '04015894-64ef-4d4a-b868-c18090967b82', // öğrenci, 2. sınıf, müfredat us-pa (Pennsylvania)
 };
 
 // Test hesabının giriş e-postası. Listede olmayan bir ad Supabase'e hiç sorulmadan reddedilir.
