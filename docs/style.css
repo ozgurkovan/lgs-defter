@@ -493,6 +493,14 @@ td.wrap { white-space: normal; min-width: 160px; }
 @keyframes feed-heart { from { opacity: 1; transform: translate(-50%, 0) scale(0.6); } to { opacity: 0; transform: translate(-50%, -46px) scale(1.4); } }
 @media (prefers-reduced-motion: reduce) { .hero-scene.yum svg.hero, .feed-heart { animation: none; } .feed-heart { opacity: 0; } .feed-bar i { transition: none; } }
 
+/* Rapor sekmeleri: başlık çubuğu yapışkan, altında seçili bölüm. */
+.report-tabs > .chips { position: sticky; top: 0; z-index: 5; padding: 8px 0; background: var(--paper); }
+.report-panel { gap: 16px; }
+
+/* Derslere göre yanlış çubuğu düğme olarak (sayıya dokununca sorular açılır). */
+.bar-btn { width: 100%; min-height: 36px; padding: 2px 0; border: 0; background: transparent; border-radius: 8px; text-align: left; color: inherit; }
+.bar-btn[aria-expanded="true"] { background: var(--accent-soft, rgba(0, 0, 0, 0.04)); }
+
 /* Rapor tablosunda dokunulabilir sayı (o konunun doğru ya da yanlış soruları açılır). */
 .num-link { min-height: 36px; min-width: 40px; padding: 4px 10px; border-radius: 10px; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .num-link[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); text-decoration: none; }

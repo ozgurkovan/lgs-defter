@@ -381,6 +381,11 @@ Her maddenin yanında nasıl denendiği yazar:
 ## Veli
 
 **Rapor** [A], içindekiler [E]
+- Üstte her zaman: özet kutuları, mesaj kutusu, birlikte bakılacaklar. Altı yedi sekmeye ayrılmıştır (velinin isteği,
+  2026-11-10; sayfa çok uzamıştı): Gün gün çalışma · Bildirdiği sorular (ve tamamladığı şiirler) · Denemeler (tablo,
+  derslere ve soru tipine göre, kavram yanılgıları) · Zayıf konular (özel derste çalışılacaklar, derse göre gruplu zayıf
+  konular ve "Yanlışlar nereden geliyor?") · Son 14 gün (ve önümüzdeki 7 gün) · Yüklemeler (ve saatlik görevin son çalışması) · Kelime, Klavye,
+  Kitap. Seçilen sekme bu tarayıcıda hatırlanır. Hiçbir bölüm kaldırılmadı, yalnızca sekmelere taşındı. [A]
 - Özet kutuları.
 - "… mesaj bırak":
   - tatlı söz ya da şaka önerisi, imza;
@@ -426,6 +431,9 @@ Her maddenin yanında nasıl denendiği yazar:
     açılır; velide her sorunun altında "Benzer sorularla dene". Yeniden dokununca kapanır (velinin isteği, 2026-11-09:
     öğretmeniyle üstünden geçebilsinler). [A]
 - Yanlışların nereden geldiği, derslere göre, soru tipine göre, kavram yanılgıları.
+  - "Derslere göre yanlış ve boş" çubuğunun sayısına dokununca o dersin denemelerdeki yanlış ve boş soruları konuya göre
+    gruplu, en yeniden eskiye açılır (deneme adı, soru no, tarih, soru, cevabı ve doğrusu, çözüm, "Benzer sorularla dene").
+    Yeniden dokununca kapanır (velinin isteği, 2026-11-10). [A]
 - Son 14 gün, önümüzdeki 7 gün, yüklemeler ve saatlik görevin en son çalıştığı saat.
 
 **Diğer sayfalar**

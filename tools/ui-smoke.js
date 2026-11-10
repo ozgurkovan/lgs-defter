@@ -470,6 +470,21 @@
     const d = navDepth(); go(a); await settle();
     check('Aynı sayfayı yeniden açmak geçmişe kayıt eklemez', navDepth() === d, `derinlik ${d} → ${navDepth()}`);
 
+    // Rapor sekmeleri (2026-11-10): yedi sekme; yalnızca seçili sekmenin bölümleri görünür, seçim hatırlanır. Salt okunur.
+    if (role !== 'student') {
+      go('report'); await settle();
+      const chips = () => [...document.querySelectorAll('#app .report-tabs .chips .chip')];
+      const visible = () => [...document.querySelectorAll('#app .report-panel')].filter((p) => !p.hidden).map((p) => p.dataset.tab);
+      const names = chips().map((c) => c.textContent);
+      chips().find((c) => c.dataset.tab === 'denemeler')?.click(); await wait(100);
+      const afterClick = visible().join() === 'denemeler' && pageText().includes('derslere göre yanlış') && ![...document.querySelectorAll('#app h2')].some((x) => x.textContent === 'Gün gün çalışma' && x.offsetParent);
+      go(role === 'parent' ? 'questions' : 'topics'); await settle(); go('report'); await settle();
+      const remembered = visible().join() === 'denemeler';
+      chips().find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
+      check('Rapor sekmeleri: yedi sekme, seçili olanın bölümleri görünür, seçim hatırlanır', names.length === 7 && afterClick && remembered && visible().join() === 'gun',
+        `${names.length} sekme: ${names.join(' | ')}; görünen ${visible().join()}`);
+    }
+
     // Mesaj kutusu (2026-11-10): yalnızca son mesaj görünür, okudu ya da okumadı etiketiyle. Salt okunur.
     if (role === 'parent') {
       go('report'); await settle();
@@ -483,6 +498,7 @@
     // açılır, soru metni yüklenir; yeniden dokununca kapanır. Salt okunur. Çalıştığı bir gün yoksa atlanır.
     if (role !== 'student') {
       go('report'); await settle();
+      [...document.querySelectorAll('#app .report-tabs .chip')].find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
       const dayBox = () => [...document.querySelectorAll('#app h2')].find((x) => x.textContent === 'Gün gün çalışma')?.parentElement;
       for (let i = 0; i < 40 && !dayBox(); i++) await wait(150);
       // Sayı olan en yakın güne git (en çok 10 gün geri).
@@ -501,8 +517,22 @@
         check('Rapor: tablodaki doğru ya da yanlış sayısına dokununca o sorular açılır, yeniden dokununca kapanır', shown && !dayBox().querySelector('.picked-rows'),
           !shown ? (panel?.textContent || 'panel yok').slice(0, 80) : '');
       } else check('Rapor: tablodaki sayılar', true, 'son günlerde soru çözülmemiş, atlandı');
+      // Derslere göre yanlış ve boş (2026-11-10): çubuğun sayısına dokununca o dersin soruları konuya göre, en yeniden eskiye açılır.
+      [...document.querySelectorAll('#app .report-tabs .chip')].find((c) => c.dataset.tab === 'denemeler')?.click(); await wait(100);
+      const subjBtn = document.querySelector('#app .bar-btn');
+      if (subjBtn) {
+        subjBtn.click();
+        const slot = subjBtn.nextElementSibling;
+        for (let i = 0; i < 40 && /Yükleniyor/.test(slot?.textContent || 'Yükleniyor'); i++) await wait(150);
+        const dates = [...slot.querySelectorAll('p.small.muted')].map((p) => p.textContent.match(/(\d{1,2}) (\S+)/)).filter(Boolean).length;
+        const ok = !slot.hidden && (slot.querySelectorAll('h4.wrong-group').length >= 1 || /bulunamadı/.test(slot.textContent));
+        subjBtn.click(); await wait(100);
+        check('Rapor: derse göre yanlış sayısına dokununca sorular konuya göre açılır, yeniden dokununca kapanır', ok && slot.hidden,
+          `${slot.querySelectorAll('h4.wrong-group').length} konu, ${dates} soru`);
+      } else check('Rapor: derse göre yanlış sayısı', true, 'deneme yanlışı yok, atlandı');
       // Zayıf konular (2026-11-09): "Yanlış soruları göster" o konunun yanlış sorularını kartın altında açar (soru metni,
       // şıklar ya da deneme fotoğrafı); yeniden dokununca kapanır. Salt okunur.
+      [...document.querySelectorAll('#app .report-tabs .chip')].find((c) => c.dataset.tab === 'zayif')?.click(); await wait(100);
       const weakBtn = [...document.querySelectorAll('#app button')].find((x) => /^Yanlış soruları göster \(\d+\)$/.test(x.textContent));
       if (weakBtn) {
         weakBtn.scrollIntoView({ block: 'center' }); weakBtn.click();
@@ -510,7 +540,10 @@
         for (let i = 0; i < 40 && /Yükleniyor/.test(slot?.textContent || 'Yükleniyor'); i++) await wait(150);
         const shown = !!slot && !slot.hidden && (slot.querySelectorAll('.opt, img, .stem, .exam-img').length >= 1 || /bulunamadı|havuzda değil/.test(slot.textContent));
         weakBtn.click(); await wait(100);
-        check('Rapor: zayıf konuda "Yanlış soruları göster" soruları açar, yeniden dokununca kapanır', shown && slot.hidden,
+        const groups = [...document.querySelectorAll('#app h3.weak-group')].map((x) => x.textContent.split(' · ')[0]);
+        const order = studentSubjects(state.student).map((s) => SUBJECTS[s].name);
+        const grouped = new Set(groups).size === groups.length && groups.every((g, i) => i === 0 || order.indexOf(groups[i - 1]) <= order.indexOf(g));
+        check('Rapor: zayıf konular derse göre gruplu; "Yanlış soruları göster" soruları açar, yeniden dokununca kapanır', shown && slot.hidden && grouped && pageText().includes('yanlışlar nereden geliyor'),
           shown ? `${slot.querySelectorAll('.opt').length} şık` : (slot?.textContent || 'panel yok').slice(0, 80));
       } else check('Rapor: zayıf konuda "Yanlış soruları göster"', true, 'zayıf konu yok, atlandı');
       // Günün yanlışları derse göre gruplu (2026-11-09): her dersin başlığı bir kez çıkar, başlıktaki sayı altındaki yanlış

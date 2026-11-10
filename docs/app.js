@@ -4542,9 +4542,48 @@ async function viewReport() {
   const bySubject = countBy(missed, (m) => m.subject);
   const maxSubj = Math.max(1, ...Object.values(bySubject));
   const byTopic = Object.entries(countBy(missed.filter((m) => m.topic_id), (m) => m.topic_id)).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const subjects = h('section', { class: 'card' },
+  // Dersin yanlış ve boş soruları (velinin isteği, 2026-11-10): çubuktaki sayıya dokununca denemelerde o derste yanlış ya da
+  // boş bıraktığı sorular konuya göre gruplu açılır; en son cevaplanan konu ve soru en üstte. Sorular açılınca yüklenir.
+  const subjectWrongs = (subj) => {
+    const slot = h('div', { class: 'subject-wrongs stack', style: 'gap: 10px', hidden: true });
+    let loaded = false;
+    const row = h('button', { class: 'bar bar-btn', 'aria-expanded': 'false', 'aria-label': `${SUBJECTS[subj].name}: yanlış ve boş soruları göster`, onclick: async () => {
+      slot.hidden = !slot.hidden;
+      row.setAttribute('aria-expanded', String(!slot.hidden));
+      if (slot.hidden || loaded) return;
+      loaded = true;
+      fill(slot, h('p', { class: 'small muted' }, 'Yükleniyor…'));
+      try {
+        const rows = await q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, topic_id, created_at, exams(name, exam_date), topics(name), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
+          .eq('student_id', s).eq('subject', subj).neq('outcome', 'dogru').order('created_at', { ascending: false }));
+        const groups = [];
+        for (const e of rows) {
+          const key = e.topic_id || '?';
+          let g = groups.find((x) => x.key === key);
+          if (!g) { g = { key, name: e.topics?.name || topicName[key]?.name || 'Konusu belirsiz', rows: [] }; groups.push(g); }
+          g.rows.push(e);
+        }
+        fill(slot, rows.length ? groups.map((g) => h('div', { class: 'stack', style: 'gap: 8px' },
+          h('h4', { class: 'wrong-group', style: 'margin: 10px 0 0' }, `${g.name} · ${g.rows.length} soru`),
+          g.rows.map((e) => h('div', { class: 'stack', style: 'gap: 6px; padding-top: 8px; border-top: 1px solid var(--rule)' },
+            h('p', { class: 'small muted' }, `${e.exams?.name || 'Deneme'} · ${e.q_no}. soru · ${fmtDate(e.exams?.exam_date)} · ${e.outcome === 'bos' ? 'boş' : 'yanlış'}`),
+            examQuestionContent(e),
+            h('p', { class: 'small' }, e.outcome === 'bos' ? `Boş bıraktı. Doğru cevap ${e.correct_answer || '?'}.` : `Cevabı ${e.student_answer || '?'} · doğrusu ${e.correct_answer || '?'}`),
+            e.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, e.solution)) : null,
+            checkButton({ examQuestionId: e.id, questionId: e.question_id || null, topicId: e.topic_id, styles: e.styles })))))
+          : h('p', { class: 'small muted' }, 'Bu derste yanlış ya da boş soru bulunamadı.'));
+      } catch (e) {
+        loaded = false;
+        fill(slot, h('p', { class: 'small error' }, 'Sorular yüklenemedi, tekrar dene.'));
+      }
+    } }, h('span', {}, SUBJECTS[subj].name), h('span', { class: 'track' }, h('i', { style: `width: ${(bySubject[subj] / maxSubj) * 100}%; --subj: var(--c-${subj})` })),
+      h('b', { class: 'num num-link', style: 'text-align: right' }, bySubject[subj]));
+    return [row, slot];
+  };
+  const subjects = h('section', { class: 'card stack', style: 'gap: 10px' },
     h('h2', {}, 'Derslere göre yanlış ve boş'),
-    studentSubjects(state.student).filter((s) => bySubject[s]).map((s) => bar(SUBJECTS[s].name, bySubject[s], maxSubj, `var(--c-${s})`)),
+    h('p', { class: 'small muted' }, 'Sayıya dokununca o dersin soruları konuya göre açılır, en yeniden eskiye.'),
+    studentSubjects(state.student).filter((s) => bySubject[s]).map((s) => subjectWrongs(s)),
     byTopic.length ? [h('h3', { style: 'margin-top: 8px' }, 'En çok tekrar eden konular'),
       byTopic.map(([t, n]) => h('div', { class: 'spread small' }, h('span', {}, topicName[t]?.name || t), h('b', { class: 'num' }, n)))] : null,
     !missed.length ? h('p', { class: 'muted' }, 'Henüz veri yok.') : null);
@@ -4600,7 +4639,9 @@ async function viewReport() {
   const weak = Object.entries(topicStats)
     .filter(([id, t]) => topicName[id] && !gapIds.has(id) && t.n >= 3 && (t.ok / t.n < 0.75 || t.sureWrong > 0))
     .sort((a, b) => a[1].ok / a[1].n - b[1].ok / b[1].n)
-    .slice(0, 10);
+    .slice(0, 10)
+    // Derse göre gruplu (velinin isteği, 2026-11-10): ders öğrencinin ders sırasıyla, ders içinde en zayıftan başlayarak.
+    .sort((a, b) => studentSubjects(state.student).indexOf(topicName[a[0]].subject) - studentSubjects(state.student).indexOf(topicName[b[0]].subject));
   const youtube = youtubeSearch;
   // Zayıf konunun yanlış soruları (velinin isteği, 2026-11-09: öğretmeniyle üstünden geçebilsinler): "Yanlış soruları
   // göster" açılınca son 30 günün tekrarlarındaki yanlışları ve denemelerdeki yanlış ya da boşları soruyla birlikte listeler.
@@ -4655,7 +4696,11 @@ async function viewReport() {
   const weakCards = h('section', { class: 'stack' },
     h('h2', {}, 'Zayıf konular'),
     h('p', { class: 'small muted' }, 'Son 30 günün tekrarları ve denemeler. Başarısı %75’in altında olan ya da emin olduğu hâlde yanlış yaptığı konular.'),
-    weak.length ? weak.map(([id, t]) => h('div', { class: 'card' },
+    weak.length ? weak.map(([id, t], i) => [
+      // Dersin ilk kartından önce ders başlığı.
+      i === 0 || topicName[weak[i - 1][0]].subject !== topicName[id].subject
+        ? h('h3', { class: 'weak-group', style: 'margin: 8px 0 0' }, `${SUBJECTS[topicName[id].subject]?.name || topicName[id].subject} · ${weak.filter(([k]) => topicName[k].subject === topicName[id].subject).length} konu`) : null,
+      h('div', { class: 'card' },
       h('div', { class: 'spread' },
         h('div', { class: 'row' }, subjTag(topicName[id].subject), h('b', {}, topicName[id].name)),
         h('span', { class: 'tag ' + (t.ok / t.n < 0.5 ? 'red' : 'amber') }, `%${Math.round((t.ok / t.n) * 100)}`)),
@@ -4666,7 +4711,7 @@ async function viewReport() {
       t.misconceptions.length ? h('div', { class: 'note teacher small' }, h('b', {}, 'Görülen yanılgı: '), t.misconceptions[t.misconceptions.length - 1]) : null,
       topicName[id].kazanim ? h('p', { class: 'small muted' }, 'Kapsam: ' + topicName[id].kazanim) : null,
       t.n - t.ok > 0 ? topicWrongs(id, t) : null,
-      h('a', { class: 'btn', href: youtube(topicName[id].name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı')))
+      h('a', { class: 'btn', href: youtube(topicName[id].name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı'))])
       : h('div', { class: 'card flat' }, h('p', { class: 'muted small' },
           Object.keys(topicStats).length ? 'Şu an zayıf görünen konu yok.' : `${studentName || 'Öğrenci'} soru çözdükçe burada konu konu başarı görünecek.`)));
 
@@ -4724,10 +4769,32 @@ async function viewReport() {
       h('p', { class: 'label' }, isTeacherView() ? 'Öğretmen görünümü' : 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
-    tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows), dayReport(reviews30, items, topicName),
-    reportedBox(), poemBox(), wordBox(), typingBox(), booksBox(),
-    h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable),
-    gapCards, weakCards, causes, subjects, styles, misconceptions, perf, load, job);
+    tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows),
+    // Rapor bölümleri sekmelerde (velinin isteği, 2026-11-10): sayfa çok uzamıştı. Seçilen sekme bu tarayıcıda hatırlanır.
+    reportTabs([
+      ['gun', 'Gün gün çalışma', () => [dayReport(reviews30, items, topicName)]],
+      ['bildirdikleri', 'Bildirdiği sorular', () => [reportedBox(), poemBox()]],
+      ['denemeler', 'Denemeler', () => [h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable), subjects, styles, misconceptions]],
+      ['zayif', 'Zayıf konular', () => [gapCards, weakCards, causes]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
+      ['son14', 'Son 14 gün', () => [perf, load]],
+      ['yuklemeler', 'Yüklemeler', () => [job]],
+      ['diger', 'Kelime · Klavye · Kitap', () => [wordBox(), typingBox(), booksBox()]],
+    ]));
+}
+// Rapor sekmeleri: [kimlik, başlık, bölümleri üreten işlev]. Bölümler ilk açılışta üretilir (hepsi bir kez), yalnızca seçili
+// sekmeninki görünür. Seçim localStorage'da (defter.reportTab) durur.
+function reportTabs(tabs) {
+  let current = 'gun';
+  try { current = localStorage.getItem('defter.reportTab') || 'gun'; } catch (e) { /* önemli değil */ }
+  if (!tabs.some(([id]) => id === current)) current = tabs[0][0];
+  const panels = Object.fromEntries(tabs.map(([id, , make]) => [id, h('div', { class: 'stack report-panel', 'data-tab': id, hidden: id !== current }, make())]));
+  const chips = tabs.map(([id, label]) => h('button', { class: 'chip', 'aria-pressed': String(id === current), 'data-tab': id, onclick: () => {
+    current = id;
+    try { localStorage.setItem('defter.reportTab', id); } catch (e) { /* önemli değil */ }
+    chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.tab === id)));
+    Object.entries(panels).forEach(([k, p]) => { p.hidden = k !== id; });
+  } }, label));
+  return h('div', { class: 'stack report-tabs' }, h('div', { class: 'chips', role: 'tablist', 'aria-label': 'Rapor bölümleri' }, chips), ...Object.values(panels));
 }
 
 /* Gün gün çalışma (son 30 gün): seçili günde konu konu kaç soru, kaçı doğru, kaçı yanlış, ne kadar sürdü.
