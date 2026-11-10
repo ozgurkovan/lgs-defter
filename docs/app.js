@@ -4402,7 +4402,14 @@ function studyCard(data, src, onDone) {
       // Çözüm kapalı durur (velinin isteği, 2026-11-10): önce birlikte konuşsunlar, gerekirse açsınlar.
       data.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, data.solution))
         : h('p', { class: 'small muted' }, 'Bu sorunun yazılı çözümü yok; birlikte çözün.'),
-      canSimilar ? h('div', { class: 'stack', style: 'gap: 6px' },
+      // Doğru yaptıysa "anladı mı?" sorulmaz (velinin sorusu, 2026-11-10): benzer soru doğrudan teklif edilir.
+      canSimilar && correct ? h('div', { class: 'stack', style: 'gap: 6px' },
+        h('p', { class: 'small' }, h('b', {}, 'Bu sefer doğru.'), ' Benzer bir soruyla pekiştirelim mi?'),
+        h('div', { class: 'row' },
+          h('button', { class: 'primary', onclick: () => fill(ask, checkPanel(src, onDone)) }, 'Benzer soru gelsin'),
+          h('button', { class: 'ghost', onclick: () => fill(ask, h('p', { class: 'small muted' }, 'Tamam, bu soru bitti.')) }, 'Yeter')),
+        ask)
+      : canSimilar ? h('div', { class: 'stack', style: 'gap: 6px' },
         h('p', { class: 'small' }, h('b', {}, 'Anladı mı?'), ' Çözümü birlikte inceleyin, sonra sorun.'),
         h('div', { class: 'row' },
           h('button', { class: 'primary', onclick: () => fill(ask, h('p', { class: 'small muted' }, 'Anladı: benzer bir soruyla deneyelim.'), checkPanel(src, onDone)) }, 'Anladım, benzer soru gelsin'),
@@ -4952,14 +4959,10 @@ function dayReport(reviews, items, topicName) {
       if (d.dataset.loaded) return;
       d.dataset.loaded = '1';
       try {
-        const qn = await q(sb.from('questions').select('stem, choices, answer, solution, image_path').eq('id', r.question_id).single());
-        fill(body,
-          qn.image_path ? lazyImg('questions', qn.image_path) : null,
-          qn.stem ? h('p', { class: 'stem small' }, qn.stem) : null,
-          ['A', 'B', 'C', 'D'].filter((k) => qn.choices?.[k] !== undefined).map((k) =>
-            h('div', { class: 'opt small' + (k === qn.answer ? ' right' : k === r.answer ? ' wrong' : '') },
-              h('b', {}, k), h('span', {}, qn.choices[k]), k === r.answer ? h('span', { class: 'muted' }, ' ← seçimi') : null)),
-          qn.solution ? h('div', { class: 'note small' }, qn.solution) : null);
+        // Soru birlikte çöz kartı olarak açılır (velinin isteği, 2026-11-10: cevap açık geliyordu): cevap ve çözüm gizli,
+        // çocuk yeniden çözer; "Cevabı göster" eski görünümü verir.
+        const qn = await q(sb.from('questions').select('id, topic_id, stem, choices, answer, solution, image_path, styles, variant_of').eq('id', r.question_id).single());
+        fill(body, studyCard(...reviewStudy(r, qn)));
       } catch (e) {
         delete d.dataset.loaded;
         fill(body, h('p', { class: 'small muted' }, 'Soru yüklenemedi.'));
@@ -5077,11 +5080,7 @@ function dayReport(reviews, items, topicName) {
               + (r.confidence >= 75 ? ' Emin olduğu hâlde yanlış: kavram yanılgısı olabilir.' : '')
               + (r.together_at ? ` Birlikte baktınız (${fmtDate(localDate(new Date(r.together_at)))}).` : '')),
             it && it.state === 'active' && it.due_date > day ? h('p', { class: 'small muted' }, `Bu konu tekrar soruları ${fmtDate(it.due_date)} günü gelecek.`) : null,
-            questionDetails(r),
-            ['parent', 'teacher'].includes(state.profile?.role) ? togetherButton(async () => {
-              const qn = await q(sb.from('questions').select('id, topic_id, stem, choices, answer, solution, image_path, styles, variant_of').eq('id', r.question_id).single());
-              return reviewStudy(r, qn);
-            }) : null)];
+            questionDetails(r))];
         })] : h('p', { class: 'small', style: 'color: var(--green)' }, 'Bu gün hiç yanlışı yok.'));
   };
   draw();

@@ -550,9 +550,10 @@
         num.click(); await wait(200);
         for (let i = 0; i < 40 && /Yükleniyor/.test(dayBox().querySelector('.picked-rows')?.textContent || 'Yükleniyor'); i++) await wait(150);
         const panel = dayBox().querySelector('.picked-rows');
-        const shown = !!panel && panel.querySelectorAll('details[open]').length >= 1 && panel.querySelectorAll('.opt, img, .stem').length >= 1;
+        const shown = !!panel && panel.querySelectorAll('details[open]').length >= 1 && panel.querySelectorAll('.study-card .choice, img, .stem').length >= 1
+          && !panel.querySelector('.opt, .choice.right, .choice.wrong');
         dayBox().querySelector('.num-link[aria-expanded="true"]')?.click(); await wait(200);
-        check('Rapor: tablodaki doğru ya da yanlış sayısına dokununca o sorular açılır, yeniden dokununca kapanır', shown && !dayBox().querySelector('.picked-rows'),
+        check('Rapor: tablodaki doğru ya da yanlış sayısına dokununca o sorular cevabı gizli (birlikte çöz kartı) açılır, yeniden dokununca kapanır', shown && !dayBox().querySelector('.picked-rows'),
           !shown ? (panel?.textContent || 'panel yok').slice(0, 80) : '');
       } else check('Rapor: tablodaki sayılar', true, 'son günlerde soru çözülmemiş, atlandı');
       // Derslere göre yanlış ve boş (2026-11-10): çubuğun sayısına dokununca o dersin soruları konuya göre, en yeniden eskiye açılır.

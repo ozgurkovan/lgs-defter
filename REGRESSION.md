@@ -404,10 +404,12 @@ Her maddenin yanında nasıl denendiği yazar:
     isteği, 2026-11-10; önceden son beş mesaj). [A]
 - Birlikte bakılacaklar ("Birlikte baktık" ile listeden çıkar).
 - **Birlikte çöz** (velinin isteği, 2026-11-10): yanlış sorunun açıldığı her yerde (deneme kutusu, derse göre yanlışlar,
-  zayıf konunun soruları, Birlikte bakılacaklar; Sorular ve Gün gün listelerinde "Birlikte çöz" düğmesiyle) cevap ve çözüm
+  zayıf konunun soruları, Birlikte bakılacaklar, Gün gün; Sorular listesinde "Birlikte çöz" düğmesiyle) cevap ve çözüm
   önce gizlidir: şıklar düğmedir, çocuk soruyu velinin ya da öğretmeninin yanında yeniden çözer. Sonra doğru/yanlış, doğru
   cevap, ilk seferdeki seçimi (ya da boş bıraktığı) ve çözüm (kapalı, dokununca açılır) gelir; "Cevabı göster" çözmeden açar. Ardından "Anladı mı?":
   "Anladım" benzer soruyu aynı kartta sorar, "Anlamadım" konuya birlikte bakmayı önerir (benzer soru düğmesi yine durur).
+  Doğru yaparsa "anladı mı?" sorulmaz: "Bu sefer doğru. Benzer bir soruyla pekiştirelim mi?" ve "Benzer soru gelsin" /
+  "Yeter" (velinin sorusu, 2026-11-10).
   Yeniden çözüm havuzdaki soruysa 'check' tarzıyla kaydedilir (doğruysa bronz), hata tekrarına yeniden girmez. Kâğıt
   denemenin fotoğrafında yalnız A–D harfleri. Öğrencide yok. [A]
 - **Benzer sorularla dene** (velinin isteği, 2026-11-09; artık Birlikte çöz kartının içinde "Anladım" deyince açılır): çocuk yanlış yaptığı soruyu "anladım" deyince veli birkaç benzer
@@ -424,8 +426,10 @@ Her maddenin yanında nasıl denendiği yazar:
   - Görmediği benzer soru yoksa "benzer soru kalmadı" notu çıkar. [A]
 - Gün gün çalışma: konu konu doğru ve yanlış, süre, "anladı mı?".
   - Tablodaki doğru ya da yanlış sayısına dokununca o konunun o günkü soruları tablonun hemen altında açılır: saat, tür,
-    emin olma, süre ve sorunun kendisi (şıklar, seçimi, doğru cevap, çözüm). Aynı sayıya yeniden dokunmak ya da "Kapat"
-    kapatır (velinin isteği, 2026-11-09: sayılara basınca soru gelmiyordu). [A]
+    emin olma, süre ve sorunun kendisi birlikte çöz kartı olarak (cevap ve çözüm gizli; "Cevabı göster" seçimi, doğru
+    cevabı ve çözümü açar; velinin isteği, 2026-11-10: soru cevabıyla açık geliyordu). Aynı sayıya yeniden dokunmak ya da
+    "Kapat" kapatır (velinin isteği, 2026-11-09: sayılara basınca soru gelmiyordu). "Yanlışlarını anladı mı?" listesindeki
+    "Soruyu göster" de aynı kartı açar. [A]
   - "Yanlışlarını anladı mı?" listesi derse göre grupludur: her dersin başlığı ("Türkçe · 3 yanlış") ve altında o dersin
     yanlışları; dersler öğrencinin ders sırasıyla, ders içinde çözdüğü saate göre (velinin isteği, 2026-11-09). [A]
 - Bildirdiği sorular (kendi açıklamasıyla) ve tamamladığı şiirler.
