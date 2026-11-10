@@ -3,17 +3,32 @@
    bilgisayarda Türkçe ses varsa sesli de söylenir. "asas asas" gibi satırlar yazar; doğru yazdıkça alttaki satırda
    ışık yanar, yanlışta sağ serçe parmakla ⌫ geri silmesi gösterilir. Ders bitince puan, doğruluğa göre yıldız;
    yıldızlar kelime kahramanını güçlendirir ve altın kazandırır. Dersler orta sıradan başlar; üst sıra, alt sıra, sonra
-   kelimeler ve cümleler. app.js'ten sonra yüklenir, onun yardımcılarını kullanır (h, render, sb, state…). */
+   kelimeler ve cümleler. ABD öğrencisinde (LANG 'en') ABD klavyesi, İngilizce dersler ve İngilizce ses. app.js'ten sonra
+   yüklenir, onun yardımcılarını kullanır (h, render, sb, state…). */
 
 /* Klavye dersleri: saf kısım (tools/test-typing.mjs ayrıca dener) */
+
+// Dil (velinin isteği, 2026-11-10: ABD öğrencilerine Türkçe hiçbir şey gösterilmez): i18n.js'teki LANG, 'tr' ya da 'en'.
+// Profil yüklenince değişebileceği için yüklenirken değil, her çizimde okunur. 'en'de ABD klavyesi (US QWERTY), İngilizce
+// dersler (ayrı ders kimlikleriyle; Türkçe derslerin ilerlemesine karışmaz) ve İngilizce ses. trEn: dile göre yazı.
+const tLang = () => (typeof LANG === 'string' ? LANG : 'tr');
+const trEn = (tr, en) => (tLang() === 'en' ? en : tr);
 
 // Türkçe Q klavyede harfin tuşu (KeyboardEvent.code). ı I tuşunda, i İ tuşunda; Ş, İ, Ğ, Ü, Ö, Ç ve nokta kendi
 // yerlerinde.
 const TQ_KEY = { ' ': 'Space', '.': 'Slash', ',': 'Backslash', 'ı': 'KeyI', 'i': 'Quote', 'ş': 'Semicolon', 'ğ': 'BracketLeft', 'ü': 'BracketRight', 'ö': 'Comma', 'ç': 'Period' };
 for (const c of 'abcdefghjklmnopqrstuvwxyz') TQ_KEY[c] = 'Key' + c.toUpperCase();
+// ABD klavyesinde (US QWERTY) harfin tuşu: harfler aynı yerde (i I tuşunda), noktalama ABD yerlerinde.
+const US_KEY = { ' ': 'Space', '.': 'Period', ',': 'Comma', ';': 'Semicolon', "'": 'Quote', '/': 'Slash', '[': 'BracketLeft',
+  ']': 'BracketRight', '\\': 'Backslash', '`': 'Backquote', '-': 'Minus', '=': 'Equal' };
+for (const c of 'abcdefghijklmnopqrstuvwxyz') US_KEY[c] = 'Key' + c.toUpperCase();
+const keyMap = (lang = tLang()) => (lang === 'en' ? US_KEY : TQ_KEY);
 // Hangi parmak: 0–3 sol serçe, yüzük, orta, işaret; 4–7 sağ işaret, orta, yüzük, serçe; 8 başparmaklar.
 const FINGER_NAMES = ['sol serçe parmağın', 'sol yüzük parmağın', 'sol orta parmağın', 'sol işaret parmağın',
   'sağ işaret parmağın', 'sağ orta parmağın', 'sağ yüzük parmağın', 'sağ serçe parmağın', 'başparmağın'];
+const FINGER_NAMES_EN = ['left pinky', 'left ring finger', 'left middle finger', 'left index finger',
+  'right index finger', 'right middle finger', 'right ring finger', 'right pinky', 'thumb'];
+const fingerName = (f) => trEn(FINGER_NAMES[f], FINGER_NAMES_EN[f]);
 const FINGER_OF = {};
 for (const [f, codes] of [
   [0, 'Backquote Digit1 Tab KeyQ CapsLock KeyA ShiftLeft IntlBackslash KeyZ ControlLeft'],
@@ -26,6 +41,10 @@ for (const [f, codes] of [
   [7, 'Digit0 Minus Equal Backspace KeyP BracketLeft BracketRight Enter Semicolon Quote Backslash Slash ShiftRight ContextMenu ControlRight'],
   [8, 'Space'],
 ]) for (const c of codes.split(' ')) FINGER_OF[c] = f;
+// Basılan tuş bu harf mi: önce tuşun yeri (kod; dile göre Türkçe Q ya da ABD klavyesi), bilinmeyen tuşta yazdığı harf.
+// ABD klavyesinde I tuşu i'dir (Türkçe Q'da ı).
+const typedIs = (e, ch, map = keyMap()) => (e.code && FINGER_OF[e.code] != null && map[ch] ? e.code === map[ch]
+  : (map === US_KEY ? (e.key || '').toLowerCase() : (e.key || '').toLocaleLowerCase('tr')) === ch);
 
 // Dersler. keys: o derste öğrenilen harfler; drills: tuş alıştırmaları; words: yalnızca o ana kadar öğrenilen
 // harflerle kelimeler; lines: hazır cümleler. Satırlar her seferinde yeniden dizilir, tekrar eden ders aynı gelmez.
@@ -76,6 +95,56 @@ const TYPING_LESSONS = [
     words: ['cat', 'dog', 'bird', 'fish', 'red', 'blue', 'green', 'yellow', 'apple', 'book', 'pen', 'hello', 'yes', 'no', 'one', 'two', 'three',
       'mother', 'father', 'sun', 'moon', 'star', 'water', 'milk', 'box', 'six', 'queen', 'happy', 'school', 'friend'] },
 ];
+// ABD dersleri (LANG 'en'): aynı aşamalar ABD klavyesinde; ev sırası A S D F J K L ;. Kimlikler "en-" ile başlar, ABD
+// öğrencisinin ilerlemesi Türkçe derslerinkine karışmaz. Kelimeler ve cümleler çocuğa göre İngilizce, Türkçe söz ve harf
+// yok; Türkçe derslerdeki gibi büyük harf (Shift) yok.
+const TYPING_STAGES_EN = ['Home row', 'Top row', 'Bottom row', 'Words and sentences'];
+const TYPING_LESSONS_EN = [
+  { id: 'en-fj', stage: 0, keys: 'fj', title: 'F and J', drills: ['fff', 'jjj', 'fj', 'jf', 'ffjj', 'jjff', 'fjf', 'jfj', 'fjfj'] },
+  { id: 'en-dk', stage: 0, keys: 'dk', title: 'D and K', drills: ['ddd', 'kkk', 'dk', 'kd', 'dkd', 'kdk', 'fdf', 'jkj', 'fdjk', 'kjdf'] },
+  { id: 'en-sl', stage: 0, keys: 'sl', title: 'S and L', drills: ['sss', 'lll', 'sl', 'ls', 'sls', 'lsl', 'sdf', 'lkj', 'fds', 'jkl', 'sdfjkl'] },
+  { id: 'en-a', stage: 0, keys: 'a;', title: 'A and semicolon', drills: ['a;a;', 'aaa', ';;;', 'a;a', ';a;', 'l;l;', 'asdf', 'jkl;', 'fdsa', ';lkj'],
+    words: ['as', 'ad', 'add', 'ads', 'all', 'ask', 'asks', 'dad', 'dads', 'sad', 'lad', 'lads', 'fall', 'falls', 'flask', 'salad', 'salads', 'salsa', 'alas', 'alfalfa'] },
+  { id: 'en-gh', stage: 0, keys: 'gh', title: 'G and H', drills: ['fgf', 'jhj', 'gh', 'hg', 'fgjh', 'ggg', 'hhh', 'gaga', 'haha'],
+    words: ['ah', 'aha', 'has', 'had', 'ash', 'gas', 'lag', 'dash', 'hash', 'half', 'hall', 'halls', 'glad', 'flag', 'flags', 'flash', 'shall', 'glass', 'gala', 'saga', 'haha'] },
+  { id: 'en-ei', stage: 1, keys: 'ei', title: 'E and I', drills: ['ded', 'kik', 'eee', 'iii', 'ed', 'ik', 'fed', 'kid', 'lid', 'did'],
+    words: ['he', 'she', 'if', 'is', 'his', 'see', 'sea', 'seed', 'feed', 'feel', 'fish', 'dish', 'kid', 'kids', 'lid', 'hide', 'side', 'slide', 'like', 'lake', 'egg', 'eggs', 'leaf', 'idea', 'field', 'shelf', 'hike', 'life', 'high', 'sail', 'glide', 'fig', 'dig', 'ski'] },
+  { id: 'en-ru', stage: 1, keys: 'ru', title: 'R and U', drills: ['frf', 'juj', 'ru', 'ur', 'rrr', 'uuu', 'fur', 'jur', 'ruru'],
+    words: ['us', 'use', 'red', 'rug', 'jug', 'hug', 'fur', 'jar', 'air', 'ear', 'hair', 'fair', 'fire', 'ride', 'read', 'deer', 'here', 'sure', 'rule', 'full', 'huge', 'girl', 'shark', 'sugar', 'fresh', 'large', 'laugh', 'radar', 'ruler', 'surf'] },
+  { id: 'en-ty', stage: 1, keys: 'ty', title: 'T and Y', drills: ['ftf', 'jyj', 'ty', 'yt', 'ttt', 'yyy', 'fty', 'jyt'],
+    words: ['yes', 'yet', 'try', 'day', 'say', 'stay', 'tea', 'eat', 'hat', 'the', 'they', 'that', 'this', 'sit', 'kite', 'yard', 'year', 'sky', 'fly', 'tree', 'fruit', 'tiger', 'turtle', 'sister', 'street', 'first', 'fast', 'kitty', 'teddy', 'tasty', 'thirsty', 'jet'] },
+  { id: 'en-ow', stage: 1, keys: 'ow', title: 'O and W', drills: ['lol', 'sws', 'ooo', 'www', 'lo', 'ws', 'olo', 'wsw'],
+    words: ['owl', 'dog', 'frog', 'wow', 'two', 'how', 'toy', 'joy', 'hot', 'row', 'grow', 'slow', 'show', 'word', 'work', 'wolf', 'wood', 'goat', 'road', 'story', 'water', 'white', 'sweet', 'tower', 'yellow', 'flower', 'forest', 'shadow', 'world', 'follow'] },
+  { id: 'en-pq', stage: 1, keys: 'pq', title: 'P and Q', drills: [';p;', 'aqa', 'ppp', 'qqq', 'pq', 'qp', 'pop', 'qaq'],
+    words: ['up', 'pet', 'pig', 'pie', 'top', 'pot', 'ship', 'shop', 'sheep', 'soup', 'happy', 'puppy', 'apple', 'paper', 'party', 'purple', 'pirate', 'parrot', 'spider', 'please', 'puddle', 'quiet', 'quilt', 'quest', 'squid', 'squirrel'] },
+  { id: 'en-vn', stage: 2, keys: 'vn', title: 'V and N', drills: ['fvf', 'jnj', 'vn', 'nv', 'vvv', 'nnn', 'fvn', 'jnv'],
+    words: ['an', 'no', 'on', 'van', 'fun', 'sun', 'run', 'ten', 'nine', 'five', 'have', 'love', 'give', 'nest', 'snow', 'oven', 'seven', 'river', 'never', 'snake', 'visit', 'video', 'wagon', 'travel', 'window', 'garden', 'dinner', 'planet', 'violin', 'penguin', 'vanilla'] },
+  { id: 'en-bm', stage: 2, keys: 'bm', title: 'B and M', drills: ['fbf', 'jmj', 'bm', 'mb', 'bbb', 'mmm', 'fbm', 'jmb'],
+    words: ['me', 'my', 'am', 'bed', 'bee', 'bus', 'bag', 'big', 'mom', 'map', 'man', 'milk', 'moon', 'ball', 'bird', 'book', 'boat', 'bear', 'baby', 'jump', 'swim', 'smile', 'lemon', 'mouse', 'robot', 'monkey', 'rabbit', 'banana', 'basket', 'summer', 'number', 'blanket', 'rainbow', 'umbrella', 'butterfly'] },
+  { id: 'en-c', stage: 2, keys: 'c,', title: 'C and comma', drills: ['dcd', 'k,k', 'c,', ',c', 'ccc', ',,,', 'dck', 'k,d'],
+    words: ['cat', 'car', 'cow', 'cup', 'cake', 'cold', 'coat', 'corn', 'clock', 'class', 'color', 'candy', 'crayon', 'cookie', 'circle', 'carrot', 'castle', 'chicken', 'chair', 'cheese', 'cloud', 'music', 'nice', 'rice', 'mice', 'dance', 'juice', 'pencil', 'pocket', 'picnic', 'cactus', 'octopus', 'bicycle', 'school', 'yes, please', 'red, blue', 'one, two'] },
+  { id: 'en-x', stage: 2, keys: 'x.', title: 'X and period', drills: ['sxs', 'l.l', 'x.', '.x', 'xxx', '...', 'sxl', 'l.s'],
+    words: ['ox', 'box', 'fox', 'six', 'mix', 'fix', 'wax', 'taxi', 'next', 'extra', 'relax', 'boxes', 'foxes', 'excited', 'the end.', 'good job.', 'well done.', 'six cats.'] },
+  { id: 'en-z', stage: 2, keys: 'z', title: 'Z', drills: ['aza', 'zzz', 'zaz', 'szs', 'zap', 'zip', 'zag', 'buzz'],
+    words: ['zoo', 'zap', 'zip', 'zero', 'zebra', 'lazy', 'crazy', 'pizza', 'puzzle', 'buzz', 'fizz', 'jazz', 'maze', 'prize', 'size', 'freeze', 'frozen', 'breeze', 'dozen', 'zigzag', 'lizard', 'wizard', 'blizzard', 'amazing'] },
+  { id: 'en-animals', stage: 3, title: 'Animals',
+    words: ['cat', 'dog', 'bird', 'fish', 'horse', 'cow', 'pig', 'sheep', 'goat', 'duck', 'chicken', 'rabbit', 'mouse', 'lion', 'tiger', 'bear', 'wolf', 'fox', 'zebra', 'giraffe',
+      'elephant', 'monkey', 'panda', 'koala', 'kangaroo', 'penguin', 'dolphin', 'whale', 'shark', 'octopus', 'turtle', 'frog', 'snake', 'owl', 'eagle', 'butterfly', 'bee', 'ant', 'spider', 'camel'] },
+  { id: 'en-colors', stage: 3, title: 'Colors and numbers',
+    words: ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'black', 'white', 'gray', 'brown', 'gold', 'silver', 'one', 'two', 'three', 'four', 'five', 'six',
+      'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'twenty', 'fifty', 'hundred'] },
+  { id: 'en-sent1', stage: 3, title: 'Sentences',
+    lines: ['the cat drank milk. a bird flew.', 'mom made a cake. it was sweet.', 'dad read me a book.', 'the ball fell down. we laughed.',
+      'we went to school early today.', 'the sea is blue. it is hot.', 'the apple is red and sweet.', 'a little bird is in the tree.'] },
+  { id: 'en-sent2', stage: 3, title: 'Long sentences',
+    lines: ['the weather is very nice today.', 'we played ball in the park.', 'my hero gets stronger every day.', 'we learn new words every day.',
+      'we type with all ten fingers.', 'we rode our bikes after school.', 'tomorrow we will go swimming.', 'reading books is so much fun.'] },
+  { id: 'en-home', stage: 3, title: 'School and home',
+    words: ['school', 'teacher', 'class', 'pencil', 'eraser', 'paper', 'book', 'desk', 'chair', 'table', 'door', 'window', 'house', 'room', 'kitchen', 'garden',
+      'family', 'friend', 'brother', 'sister', 'mother', 'father', 'lunch', 'dinner', 'breakfast', 'homework', 'computer', 'keyboard', 'screen', 'music'] },
+];
+const typingLessons = (lang = tLang()) => (lang === 'en' ? TYPING_LESSONS_EN : TYPING_LESSONS);
+const typingStages = (lang = tLang()) => (lang === 'en' ? TYPING_STAGES_EN : TYPING_STAGES);
 const pickOne = (list, rnd) => list[Math.floor(rnd() * list.length)];
 // "asas asas asas" gibi: bir alıştırma tekrar tekrar (ilk satırda dersin ilk alıştırması); karışık satırda ikişer
 // ikişer iki alıştırma.
@@ -124,9 +193,10 @@ function typingStars(chars, errors) {
 }
 // Ders sonuçlarından: her dersin en iyi yıldızı, bugün bitirdiği ders sayısı, kahramana katkısı. Her dersin yalnızca en
 // iyi sonucu sayılır (aynı dersi tekrar tekrar yapmak şişirmez): her yıldız 1 güç ve 5 altın; günün dersleri (en az bir
-// yıldızlı) bittiği her gün 5 altın daha.
+// yıldızlı) bittiği her gün 5 altın daha. Türkçe ve ABD dersleri ayrı kimliklerle birlikte sayılır (kazanılan yıldız
+// kaybolmaz; hangi derslerin açık olduğuna dilin dersleri bakar: typingOpen, typingNext).
 function typingStats(results, goal) {
-  const ids = new Set(TYPING_LESSONS.map((l) => l.id));
+  const ids = new Set([...TYPING_LESSONS, ...TYPING_LESSONS_EN].map((l) => l.id));
   const best = {}, days = {};
   for (const r of results) {
     if (!ids.has(r.lesson)) continue;
@@ -138,12 +208,13 @@ function typingStats(results, goal) {
   return { best, stars, power: stars, coins: stars * 5 + goalDays * 5, today: days[localDate()] || 0 };
 }
 // Ders açık mı: ilk ders her zaman; sonrakiler bir öncekinden üç yıldızla (velinin isteği: önce iyice öğrensin).
+// lessons: dilin dersleri (typingLessons).
 const TYPING_PASS = 3;
-const typingOpen = (best, i) => i === 0 || (best[TYPING_LESSONS[i - 1].id] || 0) >= TYPING_PASS;
+const typingOpen = (best, i, lessons = typingLessons()) => i === 0 || (best[lessons[i - 1].id] || 0) >= TYPING_PASS;
 // Sıradaki ders: açık olup üç yıldızı olmayan ilk ders; hepsi üç yıldızlıysa sonuncusu.
-function typingNext(best) {
-  const i = TYPING_LESSONS.findIndex((l, k) => typingOpen(best, k) && (best[l.id] || 0) < TYPING_PASS);
-  return i >= 0 ? i : TYPING_LESSONS.length - 1;
+function typingNext(best, lessons = typingLessons()) {
+  const i = lessons.findIndex((l, k) => typingOpen(best, k, lessons) && (best[l.id] || 0) < TYPING_PASS);
+  return i >= 0 ? i : lessons.length - 1;
 }
 // Günde kaç ders: aile isterse açar (velinin isteği), her sınıfta; açılmadıysa kapalı.
 const typingPerDay = (p) => p?.daily_typing ?? 0;
@@ -154,10 +225,10 @@ const typingPerDay = (p) => p?.daily_typing ?? 0;
 // Oyunun kelimeleri: en az bir yıldızla bitirdiği derslerin kelimeleri, sırayla ilk bitirmediği derse kadar; kelime azsa
 // (ilk dersler) tuş alıştırmaları da. Açılmış ama henüz yapmadığı dersin harfleri gelmez (velinin isteği, 2026-11-01:
 // çalışmadığı harfler çıkıyordu). Hiç ders bitirmediyse kelime yok, oyun ilk dersten sonra açılır. Boşluklu, noktalı ve
-// tek harfli olanlar alınmaz.
-function gameWords(best) {
+// tek harfli olanlar alınmaz. ABD öğrencisinde ABD derslerinin İngilizce kelimeleri (lessons: dilin dersleri).
+function gameWords(best, lessons = typingLessons()) {
   const words = new Set(), drills = new Set();
-  for (const l of TYPING_LESSONS) {
+  for (const l of lessons) {
     if (!(best[l.id] > 0)) break;
     for (const w of l.words || []) if (/^[a-zçğıöşü]{2,}$/.test(w)) words.add(w);
     for (const w of l.drills || []) if (/^[a-zçğıöşü]{2,}$/.test(w)) drills.add(w);
@@ -271,20 +342,29 @@ const gameIceAim = (list, cols, roofs) => list.filter((w) => cols.includes(w.hou
 
 /* Klavye: ses */
 
-// Tuşun adı ekranda (klavyedeki yazısı) ve seste (Türkçe okunuşu).
-const keyName = (ch) => (ch === ' ' ? 'boşluk' : ch === 'i' ? 'İ' : ch === 'ı' ? 'I' : ch.toLocaleUpperCase('tr'));
+// Tuşun adı ekranda (klavyedeki yazısı) ve seste (Türkçe okunuşu). ABD klavyesinde boşluk "space", harflerin büyüğü
+// İngilizce (i'nin büyüğü I).
+const keyName = (ch) => (tLang() === 'en' ? (ch === ' ' ? 'space' : ch.toUpperCase())
+  : ch === ' ' ? 'boşluk' : ch === 'i' ? 'İ' : ch === 'ı' ? 'I' : ch.toLocaleUpperCase('tr'));
 // "D'ye bas", "A'ya bas", "boşluğa bas": harfin okunuşuna göre ek.
 const KEY_TO = { 'a': 'ya', 'ı': 'ya', 'o': 'ya', 'u': 'ya', 'e': 'ye', 'i': 'ye', 'ö': 'ye', 'ü': 'ye', 'w': 'ya', 'x': 'e' };
 const keyTo = (ch) => ({ ' ': 'boşluğa', '.': 'noktaya', ',': 'virgüle' })[ch] || `${keyName(ch)}'${KEY_TO[ch] || 'ye'}`;
 const KEY_SAY = { ' ': 'boşluk', '.': 'nokta', ',': 'virgül', 'ğ': 'yumuşak ge', 'q': 'kü', 'w': 'dabılyu', 'x': 'iks' };
-const keySay = (ch) => KEY_SAY[ch] || (/[aeıioöuü]/.test(ch) ? ch : ch + 'e');
-const trVoice = () => (window.speechSynthesis?.getVoices() || []).find((v) => /^tr/i.test(v.lang)) || null;
+// İngilizce okunuşu: noktalama adıyla, harf büyük yazılır (ses tek harfi adıyla okusun: "A").
+const KEY_SAY_EN = { ' ': 'space', '.': 'period', ',': 'comma', ';': 'semicolon', "'": 'apostrophe', '/': 'slash' };
+const keySay = (ch) => (tLang() === 'en' ? KEY_SAY_EN[ch] || ch.toUpperCase() : KEY_SAY[ch] || (/[aeıioöuü]/.test(ch) ? ch : ch + 'e'));
+// Dersin dilindeki ses: Türkçe ya da İngilizce (önce ABD İngilizcesi).
+const sayVoice = () => {
+  const voices = window.speechSynthesis?.getVoices() || [];
+  return (tLang() === 'en' ? voices.find((v) => /^en[-_]US/i.test(v.lang)) || voices.find((v) => /^en/i.test(v.lang))
+    : voices.find((v) => /^tr/i.test(v.lang))) || null;
+};
 window.speechSynthesis?.getVoices(); // sesler geç yüklenir; ilk derste hazır olsun
 let typingVoice = true;
 try { typingVoice = localStorage.getItem('defter.typingVoice') !== '0'; } catch (e) { /* tarayıcı izin vermiyor */ }
-// Türkçe ses varsa söyler (yoksa sessiz; Türkçe olmayan sesle tuhaf okumasın).
-function sayTr(text) {
-  const voice = typingVoice && trVoice();
+// Dersin dilinde ses varsa söyler (yoksa sessiz; başka dildeki sesle tuhaf okumasın).
+function typingSay(text) {
+  const voice = typingVoice && sayVoice();
   if (!voice) return;
   const u = new SpeechSynthesisUtterance(text);
   u.voice = voice;
@@ -292,6 +372,11 @@ function sayTr(text) {
   u.rate = 1.05;
   speechSynthesis.cancel();
   speechSynthesis.speak(u);
+}
+// Yeni tuşu söyler: "Yeni tuş: de. Sol orta parmağınla bas." / "New key: D. Use your left middle finger."
+function sayNewKey(ch) {
+  const f = FINGER_OF[keyMap()[ch]];
+  typingSay(trEn(`Yeni tuş: ${keySay(ch)}. ${upFirst(FINGER_NAMES[f])}la bas.`, `New key: ${keySay(ch)}. Use your ${FINGER_NAMES_EN[f]}.`));
 }
 
 /* Klavye: ekrandaki klavye ve eller */
@@ -308,6 +393,19 @@ const TQ_ROWS = [
   [['ShiftLeft', 'Shift', 1.25], ['IntlBackslash', '<'], ['KeyZ', 'Z'], ['KeyX', 'X'], ['KeyC', 'C'], ['KeyV', 'V'], ['KeyB', 'B'], ['KeyN', 'N'],
     ['KeyM', 'M'], ['Comma', 'Ö'], ['Period', 'Ç'], ['Slash', '.'], ['ShiftRight', 'Shift', 2.75]],
   [['ControlLeft', 'Ctrl', 1.25], ['MetaLeft', '', 1.25], ['AltLeft', 'Alt', 1.25], ['Space', 'boşluk', 6.25], ['AltRight', 'Alt Gr', 1.25],
+    ['MetaRight', '', 1.25], ['ContextMenu', '', 1.25], ['ControlRight', 'Ctrl', 1.25]],
+];
+// ABD klavyesinin (ANSI) tuşları: harfler aynı yerde; Enter tek sırada, \ üst sırada, sol Shift geniş (yanında < tuşu yok).
+const US_ROWS = [
+  [['Backquote', '`'], ['Digit1', '1'], ['Digit2', '2'], ['Digit3', '3'], ['Digit4', '4'], ['Digit5', '5'], ['Digit6', '6'], ['Digit7', '7'],
+    ['Digit8', '8'], ['Digit9', '9'], ['Digit0', '0'], ['Minus', '-'], ['Equal', '='], ['Backspace', '⌫', 2]],
+  [['Tab', 'Tab', 1.5], ['KeyQ', 'Q'], ['KeyW', 'W'], ['KeyE', 'E'], ['KeyR', 'R'], ['KeyT', 'T'], ['KeyY', 'Y'], ['KeyU', 'U'], ['KeyI', 'I'],
+    ['KeyO', 'O'], ['KeyP', 'P'], ['BracketLeft', '['], ['BracketRight', ']'], ['Backslash', '\\', 1.5]],
+  [['CapsLock', 'Caps', 1.75], ['KeyA', 'A'], ['KeyS', 'S'], ['KeyD', 'D'], ['KeyF', 'F'], ['KeyG', 'G'], ['KeyH', 'H'], ['KeyJ', 'J'],
+    ['KeyK', 'K'], ['KeyL', 'L'], ['Semicolon', ';'], ['Quote', "'"], ['Enter', 'Enter', 2.25]],
+  [['ShiftLeft', 'Shift', 2.25], ['KeyZ', 'Z'], ['KeyX', 'X'], ['KeyC', 'C'], ['KeyV', 'V'], ['KeyB', 'B'], ['KeyN', 'N'],
+    ['KeyM', 'M'], ['Comma', ','], ['Period', '.'], ['Slash', '/'], ['ShiftRight', 'Shift', 2.75]],
+  [['ControlLeft', 'Ctrl', 1.25], ['MetaLeft', '', 1.25], ['AltLeft', 'Alt', 1.25], ['Space', 'space', 6.25], ['AltRight', 'Alt', 1.25],
     ['MetaRight', '', 1.25], ['ContextMenu', '', 1.25], ['ControlRight', 'Ctrl', 1.25]],
 ];
 const KB = { u: 44, gap: 4, pad: 8, top: 34 }; // tuş birimi, aralık, kenar; üstte ⌫ okunun yeri
@@ -334,7 +432,8 @@ function keyboardView() {
   };
   const svg = mk('svg', { viewBox: `0 0 ${KB_W} ${KB_H}`, class: 'kb', 'aria-hidden': 'true' });
   const keys = {};
-  TQ_ROWS.forEach((row, r) => {
+  const rows = tLang() === 'en' ? US_ROWS : TQ_ROWS, iso = rows === TQ_ROWS; // ISO'da Enter iki sıraya yayılır
+  rows.forEach((row, r) => {
     let at = 0;
     for (const [code, label, w = 1] of row) {
       const x = KB.pad + at * KB.u, y = KB.top + r * KB.u, width = w * KB.u - KB.gap;
@@ -342,7 +441,7 @@ function keyboardView() {
       if (code === 'EnterB') continue;
       const f = FINGER_OF[code] ?? 8;
       const g = mk('g', { class: 'k', style: `--f: ${FINGER_COLOR[f]}` }, svg);
-      if (code === 'Enter') {
+      if (code === 'Enter' && iso) {
         const x2 = KB.pad + 13.75 * KB.u, right = x + width, bottom = y + KB.u + KB_KEY;
         mk('path', { class: 'kc', fill: FINGER_TINT[f], d: `M${x} ${y} H${right} V${bottom} H${x2} V${y + KB_KEY} H${x} Z` }, g);
       } else {
@@ -351,7 +450,7 @@ function keyboardView() {
       if (label) mk('text', { class: label.length > 2 ? 'kl sm' : 'kl', x: x + width / 2, y: y + KB_KEY / 2 }, g).textContent = label;
       // F ve J'deki çıkıntı: bakmadan bulmak için
       if (code === 'KeyF' || code === 'KeyJ') mk('rect', { class: 'bump', x: x + width / 2 - 7, y: y + KB_KEY - 9, width: 14, height: 3, rx: 1.5 }, g);
-      keys[code] = { g, cx: x + width / 2, cy: y + KB_KEY / 2 + (code === 'Enter' ? KB.u / 2 : 0) };
+      keys[code] = { g, cx: x + width / 2, cy: y + KB_KEY / 2 + (code === 'Enter' && iso ? KB.u / 2 : 0) };
     }
   });
   // Eller: avuçlar klavyenin altında, parmaklar duruş tuşlarına uzanır.
@@ -409,7 +508,7 @@ function keyboardView() {
     clearTimeout(k.timer);
     k.timer = setTimeout(() => k.g.classList.remove('hit', 'miss'), 200);
   };
-  const el = h('div', { class: 'kb-box' });
+  const el = h('div', { class: 'kb-box', translate: 'no' }); // tuş yazıları çevrilmez
   el.append(svg);
   return { el, show, flash, keys };
 }
@@ -441,13 +540,17 @@ async function viewTyping() {
   const [hero, feed] = await Promise.all([typingHero(), loadFeed(state.student, false).catch(() => null)]); // feed: kahramanı besleme (feed.js)
   const { best } = hero.typing;
   const goal = typingPerDay(state.student);
-  const next = typingNext(best);
-  const lesson = TYPING_LESSONS[next];
+  const lessons = typingLessons(); // dilin dersleri: Türkçe ya da ABD
+  const next = typingNext(best, lessons);
+  const lesson = lessons[next];
   const kb = keyboardView();
   const tile = (l, i) => {
-    const open = typingOpen(best, i), stars = best[l.id] || 0;
+    const open = typingOpen(best, i, lessons), stars = best[l.id] || 0;
+    // İngilizce başlık Türkçe kalıbın içinde kalınca ekrandaki çeviri onu tanımıyor; ABD'de yazı baştan İngilizce.
     return h('button', { class: 'ty-lesson' + (i === next ? ' next' : ''), disabled: !open || null,
-      'aria-label': `Ders ${i + 1}: ${l.title}${open ? `, ${stars} yıldız` : ', kilitli: önceki dersten üç yıldız gerekiyor'}`, onclick: () => runTyping(i, hero) },
+      'aria-label': trEn(`Ders ${i + 1}: ${l.title}${open ? `, ${stars} yıldız` : ', kilitli: önceki dersten üç yıldız gerekiyor'}`,
+        `Lesson ${i + 1}: ${l.title}${open ? `, ${stars} ${stars === 1 ? 'star' : 'stars'}` : ', locked: get three stars in the lesson before it'}`),
+      onclick: () => runTyping(i, hero) },
       h('span', { class: 'small muted' }, `Ders ${i + 1}`), h('b', {}, l.title),
       h('span', { class: 'stars' }, open ? '⭐'.repeat(stars) + '☆'.repeat(3 - stars) : '🔒'));
   };
@@ -468,7 +571,7 @@ async function viewTyping() {
         + (feed ? ` Günün her dersi ${feed.parts.lesson} bronz; Kelime roketi de bronz kazandırır (günde en çok ${feed.parts.gameCap}).` : ''))),
     h('section', { class: 'card stack', style: 'gap: 10px' },
       goal ? h('div', { class: 'spread' }, h('b', { class: 'num' }, `Bugün ${Math.min(hero.typing.today, goal)}/${goal} ders`),
-        h('span', { class: 'small muted' }, `${TYPING_LESSONS.filter((l) => best[l.id] > 0).length}/${TYPING_LESSONS.length} ders bitti`)) : null,
+        h('span', { class: 'small muted' }, `${lessons.filter((l) => best[l.id] > 0).length}/${lessons.length} ders bitti`)) : null,
       goal ? h('div', { class: 'progress' }, h('i', { style: `width: ${Math.min(100, (hero.typing.today / goal) * 100)}%` })) : null,
       h('button', { class: 'primary block', onclick: () => runTyping(next, hero) }, `Başla: Ders ${next + 1} · ${lesson.title}`),
       h('p', { class: 'small muted' }, 'Parmakların böyle durur: işaret parmakların F ve J\'de (bu iki tuşta küçük çıkıntı var), başparmakların boşlukta.'),
@@ -481,22 +584,22 @@ async function viewTyping() {
         + 'onarılır; renkli 🌟 kelimeyi yazarsan süper silah kazanırsın, dört taneye kadar biriktirebilirsin (Ctrl\'ye iki kez bas, roketler '
         + 'bütün kelimeleri sırayla vursun; son çatı kalınca kendiliğinden ateşlenir). Oyun hızlanınca gelen buzlu ❄️ kelimeyi yazarsan '
         + 'çatıya buz makinesi takılır; makine yakındaki kelimelere kendiliğinden buzlu su püskürtüp onları yavaşlatır.'),
-      gameWords(hero.typing.best).length
+      gameWords(hero.typing.best, lessons).length
         ? h('button', { class: 'block', onclick: () => runTypingGame(hero) }, 'Oyna')
-        : h('p', { class: 'small' }, `İlk dersi (${TYPING_LESSONS[0].title}) bitirince oyun açılır.`)),
-    TYPING_STAGES.map((name, s) => [
+        : h('p', { class: 'small' }, `İlk dersi (${lessons[0].title}) bitirince oyun açılır.`)),
+    typingStages().map((name, s) => [
       h('h2', {}, name),
-      h('div', { class: 'ty-lessons' }, TYPING_LESSONS.map((l, i) => (l.stage === s ? tile(l, i) : null))),
+      h('div', { class: 'ty-lessons' }, lessons.map((l, i) => (l.stage === s ? tile(l, i) : null))),
     ]));
   kb.show({ all: true, codes: ['KeyF', 'KeyJ'] });
 }
 
 // Ders: önce parmaklar yerleşir (F ve J'ye basar), yeni tuşlar tanıtılır (her biri üç kez), sonra satırlar yazılır.
 // Soru çözme gibi açılır: alt menü gizli, geri tuşu önce sorar. Sonuç ders bitince kaydedilir.
-function runTyping(index, hero) {
-  const lesson = TYPING_LESSONS[index];
+function runTyping(index, hero, lessons = typingLessons()) {
+  const lesson = lessons[index];
   const run = {
-    track: 'typing', index, lesson, hero, lines: typingLines(lesson), li: 0, pos: 0, err: null,
+    track: 'typing', index, lessons, lesson, hero, lines: typingLines(lesson), li: 0, pos: 0, err: null,
     phase: 'ready', ready: new Set(), intro: [...(lesson.keys || '')], ii: 0, hits: 0,
     chars: 0, errors: 0, lineErrors: 0, points: 0, ms: 0, last: 0, misses: {}, kb: keyboardView(),
     leaveText: 'Dersten çıkılsın mı? Bu ders kaydedilmez, sonra baştan başlarsın.',
@@ -518,11 +621,8 @@ function runTyping(index, hero) {
   window.addEventListener('keydown', onKey, true);
   document.activeElement?.blur?.();
   drawTyping(run);
-  sayTr('İşaret parmaklarını F ve J tuşlarına koy.');
+  typingSay(trEn('İşaret parmaklarını F ve J tuşlarına koy.', 'Put your index fingers on F and J.'));
 }
-
-// Türkçe Q'da basılan tuş bu harf mi: önce tuşun yeri (kod), bilinmeyen tuşta yazdığı harf.
-const typedIs = (e, ch) => (e.code && FINGER_OF[e.code] != null && TQ_KEY[ch] ? e.code === TQ_KEY[ch] : (e.key || '').toLocaleLowerCase('tr') === ch);
 
 function typingKey(run, e) {
   const { kb } = run;
@@ -530,7 +630,7 @@ function typingKey(run, e) {
     if (e.code === 'KeyF' || e.code === 'KeyJ') { run.ready.add(e.code); kb.flash(e.code, true); }
     if (run.ready.size === 2) {
       run.phase = run.intro.length ? 'intro' : 'type';
-      if (run.intro.length) sayTr(`Yeni tuş: ${keySay(run.intro[0])}. ${upFirst(FINGER_NAMES[FINGER_OF[TQ_KEY[run.intro[0]]]])}la bas.`);
+      if (run.intro.length) sayNewKey(run.intro[0]);
     }
     return drawTyping(run);
   }
@@ -543,7 +643,7 @@ function typingKey(run, e) {
       run.ii++;
       run.hits = 0;
       if (run.ii >= run.intro.length) run.phase = 'type';
-      else sayTr(`Yeni tuş: ${keySay(run.intro[run.ii])}. ${upFirst(FINGER_NAMES[FINGER_OF[TQ_KEY[run.intro[run.ii]]]])}la bas.`);
+      else sayNewKey(run.intro[run.ii]);
     }
     return drawTyping(run);
   }
@@ -570,7 +670,7 @@ function typingKey(run, e) {
     run.misses[ch] = (run.misses[ch] || 0) + 1;
     run.err = e.key === ' ' ? '·' : e.key;
     kb.flash(e.code, false);
-    sayTr('Sağ serçe parmağınla geri sil.');
+    typingSay(trEn('Sağ serçe parmağınla geri sil.', 'Press backspace with your right pinky.'));
   }
   drawTyping(run);
 }
@@ -599,7 +699,7 @@ function drawTyping(run) {
   if (!run.view) {
     const v = run.view = { guide: h('div', { class: 'ty-guide', role: 'status' }), target: h('div', { class: 'ty-target' }),
       typed: h('div', { class: 'ty-typed' }), count: h('span', { class: 'small muted num' }), bar: h('i') };
-    const voice = trVoice() ? h('button', { class: 'ghost small' }) : null;
+    const voice = sayVoice() ? h('button', { class: 'ghost small' }) : null;
     const voiceLabel = () => { if (voice) voice.textContent = typingVoice ? '🔊 Sesli anlatım açık' : '🔇 Sesli anlatım kapalı'; };
     if (voice) voice.onclick = () => {
       typingVoice = !typingVoice;
@@ -613,9 +713,10 @@ function drawTyping(run) {
       h('div', { class: 'qhead stack', style: 'gap: 8px' },
         h('div', { class: 'spread' },
           h('button', { class: 'ghost', onclick: () => go('typing') }, '← Ara ver'),
-          h('b', {}, `Ders ${run.index + 1} · ${run.lesson.title}`), v.count),
+          h('b', {}, trEn(`Ders ${run.index + 1} · ${run.lesson.title}`, `Lesson ${run.index + 1} · ${run.lesson.title}`)), v.count),
         h('div', { class: 'progress' }, v.bar)),
-      h('section', { class: 'ty-wrap stack' }, v.guide, h('div', { class: 'ty-lines' }, v.target, v.typed), run.kb.el,
+      // Yazılacak satırlar ders içeriğidir, ekrandaki çeviri dokunmaz (translate="no").
+      h('section', { class: 'ty-wrap stack' }, v.guide, h('div', { class: 'ty-lines', translate: 'no' }, v.target, v.typed), run.kb.el,
         h('div', { class: 'spread small muted' }, h('span', {}, 'Klavyeye değil, ekrandaki klavyeye bak.'), voice)));
   }
   const v = run.view;
@@ -629,15 +730,18 @@ function drawTyping(run) {
   if (run.phase === 'ready') {
     fill(v.guide, '👆 İşaret parmaklarını F ve J\'ye koy. Bu iki tuşta küçük çıkıntı var, bakmadan bulabilirsin. Hazırsan F ve J\'ye bas.');
     fill(v.target, spans('f j', (i) => (i === 1 ? 'todo' : run.ready.has(i ? 'KeyJ' : 'KeyF') ? 'done' : 'cur')));
-    fill(v.typed, h('span', { class: 'small muted' }, 'Diğer parmakların yanlarında: sol elin A S D F, sağ elin J K L Ş üstünde.'));
+    fill(v.typed, h('span', { class: 'small muted' }, trEn('Diğer parmakların yanlarında: sol elin A S D F, sağ elin J K L Ş üstünde.',
+      'Your other fingers rest beside them: left hand on A S D F, right hand on J K L ;')));
     run.kb.show({ all: true, codes: ['KeyF', 'KeyJ'].filter((c) => !run.ready.has(c)) });
     return;
   }
   if (run.phase === 'intro') {
-    const ch = run.intro[run.ii], code = TQ_KEY[ch], f = FINGER_OF[code];
+    const ch = run.intro[run.ii], code = keyMap()[ch], f = FINGER_OF[code];
     if (run.introMiss) v.guide.classList.add('bad');
-    fill(v.guide, dot(f), run.introMiss ? `O tuş değil. ${upFirst(FINGER_NAMES[f])}la ${keyTo(ch)} bas.`
-      : `Yeni tuş: ${keyName(ch)} · ${FINGER_NAMES[f]}. ${upFirst(keyTo(ch))} üç kez bas.`);
+    fill(v.guide, dot(f), run.introMiss
+      ? trEn(`O tuş değil. ${upFirst(FINGER_NAMES[f])}la ${keyTo(ch)} bas.`, `Wrong key. Press ${keyName(ch)} with your ${FINGER_NAMES_EN[f]}.`)
+      : trEn(`Yeni tuş: ${keyName(ch)} · ${FINGER_NAMES[f]}. ${upFirst(keyTo(ch))} üç kez bas.`,
+        `New key: ${keyName(ch)} · ${FINGER_NAMES_EN[f]}. Press it three times.`));
     fill(v.target, h('span', { class: 'cur big' }, keyName(ch)));
     fill(v.typed, [0, 1, 2].map((i) => h('span', { class: i < run.hits ? 'lit' : 'slot' }, i < run.hits ? '✓' : '·')));
     run.kb.show({ codes: [code] });
@@ -654,12 +758,13 @@ function drawTyping(run) {
     run.kb.show({});
   } else if (run.err) {
     v.guide.classList.add('bad');
-    const ch = line[pos], f = FINGER_OF[TQ_KEY[ch]] ?? 8;
-    fill(v.guide, dot(7), `Yanlış tuş! Önce sağ serçe parmağınla ⌫ geri sil, sonra ${FINGER_NAMES[f]}la ${keyTo(ch)} bas.`);
-    run.kb.show({ erase: true, codes: [TQ_KEY[ch]] });
+    const ch = line[pos], f = FINGER_OF[keyMap()[ch]] ?? 8;
+    fill(v.guide, dot(7), trEn(`Yanlış tuş! Önce sağ serçe parmağınla ⌫ geri sil, sonra ${FINGER_NAMES[f]}la ${keyTo(ch)} bas.`,
+      `Wrong key! First press ⌫ backspace with your right pinky, then press ${keyName(ch)} with your ${FINGER_NAMES_EN[f]}.`));
+    run.kb.show({ erase: true, codes: [keyMap()[ch]] });
   } else {
-    const ch = line[pos], code = TQ_KEY[ch] || '', f = FINGER_OF[code] ?? 8;
-    fill(v.guide, dot(f), `${upFirst(FINGER_NAMES[f])} → ${keyName(ch)}`);
+    const ch = line[pos], code = keyMap()[ch] || '', f = FINGER_OF[code] ?? 8;
+    fill(v.guide, dot(f), `${upFirst(fingerName(f))} → ${keyName(ch)}`);
     run.kb.show({ codes: [code] });
   }
 }
@@ -690,9 +795,12 @@ async function endTyping(run) {
     hero.typing.stars += gained;
     hero.level = level;
   }
-  const nextOpen = run.index + 1 < TYPING_LESSONS.length && (stars >= TYPING_PASS || typingOpen(hero?.typing.best || {}, run.index + 1));
+  const nextOpen = run.index + 1 < run.lessons.length && (stars >= TYPING_PASS || typingOpen(hero?.typing.best || {}, run.index + 1, run.lessons));
   const maxErrors = Math.floor((run.chars * 5) / 95); // üç yıldızın (%95) izin verdiği yanlış
-  if (stars) sayTr(stars === 3 ? 'Harika! Üç yıldız.' : stars === 2 ? 'Aferin! İki yıldız.' : 'Aferin! Bir yıldız.');
+  if (stars) {
+    typingSay(trEn(stars === 3 ? 'Harika! Üç yıldız.' : stars === 2 ? 'Aferin! İki yıldız.' : 'Aferin! Bir yıldız.',
+      stars === 3 ? 'Great job! Three stars.' : stars === 2 ? 'Well done! Two stars.' : 'Well done! One star.'));
+  }
   render(
     h('section', { class: 'card stack', style: 'margin-top: 4vh; text-align: center; align-items: center' },
       h('h2', {}, stars ? 'Ders bitti! 🎉' : 'Biraz daha çalışalım 💪'),
@@ -705,8 +813,8 @@ async function endTyping(run) {
       misses.length ? h('p', { class: 'small' }, `En çok zorlandığın tuşlar: ${misses.join(', ')}`) : null,
       saved ? null : h('p', { class: 'error small' }, 'Sonuç kaydedilemedi; internetini kontrol et.'),
       h('div', { class: 'row', style: 'justify-content: center' },
-        h('button', { onclick: () => runTyping(run.index, hero) }, 'Tekrar dene'),
-        nextOpen ? h('button', { class: 'primary', onclick: () => runTyping(run.index + 1, hero) }, `Sonraki ders: ${TYPING_LESSONS[run.index + 1].title}`) : null,
+        h('button', { onclick: () => runTyping(run.index, hero, run.lessons) }, 'Tekrar dene'),
+        nextOpen ? h('button', { class: 'primary', onclick: () => runTyping(run.index + 1, hero, run.lessons) }, `Sonraki ders: ${run.lessons[run.index + 1].title}`) : null,
         h('button', { class: nextOpen ? 'ghost' : 'primary', onclick: () => go('typing') }, 'Derslere dön'))),
     feedHomeCard(), // besleme açıksa kahraman: dersin bronzuyla yedirebilir (feed.js)
     up ? h('section', { class: 'card stack party-inline', style: 'text-align: center; gap: 8px' },
@@ -788,7 +896,7 @@ function runTypingGame(hero) {
 // Oyun sayfası bir kez çizilir: gökyüzü, alt kenarda beş ev, altında yönerge ve ekrandaki klavye.
 function gameDraw(game) {
   const v = game.view = {
-    field: h('div', { class: 'tg-field' }), layer: h('div', { class: 'tg-layer' }), houses: [], pads: [],
+    field: h('div', { class: 'tg-field' }), layer: h('div', { class: 'tg-layer', translate: 'no' }), houses: [], pads: [], // düşen kelimeler çevrilmez
     score: h('b', { class: 'num' }), level: h('b', { class: 'num' }), roofs: h('b', { class: 'num' }),
     guide: h('div', { class: 'ty-guide', role: 'status' }),
     banner: h('div', { class: 'tg-banner', hidden: true }),
@@ -834,8 +942,8 @@ function gameGuide(game, missed = false) {
   const v = game.view, t = game.target;
   v.guide.className = 'ty-guide' + (missed ? ' bad' : '');
   if (t) {
-    const ch = t.text[t.pos], code = TQ_KEY[ch] || '', f = FINGER_OF[code] ?? 8;
-    fill(v.guide, fingerDot(f), `${missed ? 'O tuş değil. ' : ''}${upFirst(FINGER_NAMES[f])} → ${keyName(ch)}`);
+    const ch = t.text[t.pos], code = keyMap()[ch] || '', f = FINGER_OF[code] ?? 8;
+    fill(v.guide, fingerDot(f), `${missed ? trEn('O tuş değil. ', 'Wrong key. ') : ''}${upFirst(fingerName(f))} → ${keyName(ch)}`);
     game.kb.show({ codes: [code] });
   } else {
     const boom = !missed && game.power > 0;
@@ -1259,7 +1367,9 @@ function typingBox() {
       .order('created_at', { ascending: false }).limit(500))).filter((r) => r.lesson !== 'oyun');
     if (!rows.length) return;
     const stats = typingStats(rows, typingPerDay(state.student));
-    const last = rows[0], lesson = TYPING_LESSONS.find((l) => l.id === last.lesson);
+    // Çocuğun dersleri: son dersi ABD dersiyse ABD dersleri (ABD öğrencisi), değilse Türkçe dersler.
+    const last = rows[0], lessons = TYPING_LESSONS_EN.some((l) => l.id === last.lesson) ? TYPING_LESSONS_EN : TYPING_LESSONS;
+    const lesson = lessons.find((l) => l.id === last.lesson);
     const week = rows.filter((r) => r.created_at >= addDays(localDate(), -6) + 'T00:00:00');
     const miss = {};
     for (const r of week) for (const [c, n] of Object.entries(r.misses || {})) miss[c] = (miss[c] || 0) + n;
@@ -1268,7 +1378,7 @@ function typingBox() {
     fill(box,
       h('h2', {}, 'Klavye dersleri'),
       h('p', { class: 'small muted' }, 'On parmak klavye (çocuğun Klavye sekmesi, bilgisayarda).'),
-      h('p', {}, `${TYPING_LESSONS.filter((l) => stats.best[l.id] > 0).length}/${TYPING_LESSONS.length} ders bitti · ${stats.stars} ⭐ · bugün ${stats.today}${typingPerDay(state.student) ? '/' + typingPerDay(state.student) : ''} ders`),
+      h('p', {}, `${lessons.filter((l) => stats.best[l.id] > 0).length}/${lessons.length} ders bitti · ${stats.stars} ⭐ · bugün ${stats.today}${typingPerDay(state.student) ? '/' + typingPerDay(state.student) : ''} ders`),
       h('p', {}, `Son ders: ${lesson ? lesson.title : last.lesson}, ${'⭐'.repeat(last.stars) || 'yıldızsız'} (${rate(last)})`),
       week.length ? h('p', { class: 'small' }, `Son 7 günde ${week.length} ders` + (hard.length ? `; en çok zorlandığı tuşlar: ${hard.join(', ')}` : '')) : null);
     box.hidden = false;

@@ -1,6 +1,6 @@
 // Klavye derslerinin kontrolü: node tools/test-typing.mjs
 // Derslerdeki her harf o ana kadar öğrenilen tuşlarda mı, satırlar düzgün mü, yıldız ve kahramana katkı doğru mu,
-// klavyenin her tuşunun parmağı var mı.
+// klavyenin her tuşunun parmağı var mı. ABD öğrencisi (LANG 'en'): ABD klavyesi, İngilizce dersler ayrı kimliklerle.
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,8 @@ const code = [
   pick(src, '/* Klavye dersleri: saf kısım', '/* Klavye: ses */'),
   pick(src, 'const TQ_ROWS', 'const KB = '),
   'return { TQ_KEY, FINGER_OF, TYPING_LESSONS, typingLines, typingStars, typingStats, typingOpen, typingNext, typingPerDay, TQ_ROWS, localDate,'
+    + ' tLang, trEn, US_KEY, keyMap, typedIs, FINGER_NAMES, FINGER_NAMES_EN, TYPING_STAGES, TYPING_STAGES_EN, TYPING_LESSONS_EN, typingLessons,'
+    + ' typingStages, US_ROWS,'
     + ' gameWords, gameLevel, gameFall, gameEvery, gameMax, gameLen, gameWord, GAME_ROOFS, GAME_ROOF_HP,'
     + ' gameRepair, gameSuperWord, gameSuperDue, GAME_SUPER_GAP, GAME_SUPER_SLOW, GAME_DOUBLE_MS, gameVolley, GAME_VOLLEY_MS, GAME_POWER_MAX, GAME_CALM,'
     + ' gameGuard, GAME_GUARD_S, gameHouse, gameAvoid, gameIceDue, gameIceRoof, gameIceCols, gameIceSide, gameIceAim, GAME_ICE_LEVEL, GAME_ICE_FIRST,'
@@ -54,11 +56,67 @@ const rowsOk = T.TQ_ROWS.every((row) => row.reduce((n, k) => n + (k[2] || 1), 0)
 const fingersOk = T.TQ_ROWS.flat().every(([c]) => c === 'EnterB' || T.FINGER_OF[c] != null);
 check('klavye: her sıra 15 tuş birimi, her tuşun parmağı var', rowsOk && fingersOk, `${T.TQ_ROWS.flat().length - 1} tuş`);
 
+// ABD öğrencisi (LANG 'en'; velinin isteği, 2026-11-10: ABD öğrencilerine Türkçe hiçbir şey gösterilmez): ABD klavyesi,
+// İngilizce dersler ayrı kimliklerle, İngilizce kelimeler.
+const EN = T.TYPING_LESSONS_EN, TR_CHARS = /[çğıöşüÇĞİÖŞÜâîû]/;
+const enBad = [];
+const enKnown = new Set([' ']);
+EN.forEach((l) => {
+  if (l.keys) for (const c of l.keys) enKnown.add(c);
+  const allowed = l.stage < 3 ? enKnown : new Set(Object.keys(T.US_KEY));
+  for (const t of [...(l.drills || []), ...(l.words || []), ...(l.lines || [])]) {
+    const wrong = [...t].filter((c) => !allowed.has(c));
+    if (wrong.length) enBad.push(`${l.id}: "${t}" (${wrong.join('')})`);
+  }
+  if (l.keys) for (const w of l.words || []) if (![...w].some((c) => l.keys.includes(c))) enBad.push(`${l.id}: "${w}" yeni harf yok`);
+});
+check('ABD dersleri yalnızca öğrenilmiş harflerle; her kelimede dersin yeni harfi', !enBad.length, enBad.slice(0, 6).join(' | '));
+const trIds = new Set(T.TYPING_LESSONS.map((l) => l.id));
+check('ABD dersleri: kimlikler "en-" ile, tek, veritabanının kuralına uygun, Türkçe derslerle çakışmıyor; dört aşamanın hepsinde ders var',
+  new Set(EN.map((l) => l.id)).size === EN.length && EN.every((l) => /^en-[a-z0-9-]{1,37}$/.test(l.id) && !trIds.has(l.id))
+  && T.TYPING_STAGES_EN.length === 4 && [0, 1, 2, 3].every((s) => EN.some((l) => l.stage === s)), `${EN.length} ders`);
+// Türkçe derslerin kelimelerinden ABD derslerinde de geçenler yalnızca bunlar; hepsi yaygın İngilizce sözler. (Türkçe
+// derslerin "İngilizce kelimeler" dersi sayılmaz.)
+const SHARED = ['ad', 'aha', 'as', 'gala', 'koala', 'nine', 'on', 'top', 'zebra'];
+const trWords = new Set(T.TYPING_LESSONS.filter((l) => l.id !== 'ingilizce').flatMap((l) => l.words || []));
+const shared = [...new Set(EN.flatMap((l) => l.words || []))].filter((w) => trWords.has(w) && !SHARED.includes(w));
+const enText = [...T.TYPING_STAGES_EN, ...T.FINGER_NAMES_EN, ...T.US_ROWS.flat().map((k) => k[1]),
+  ...EN.flatMap((l) => [l.title, l.keys || '', ...(l.drills || []), ...(l.words || []), ...(l.lines || [])])];
+check('ABD derslerinde, parmak adlarında ve klavyesinde Türkçe harf ya da Türkçe söz yok', !enText.some((t) => TR_CHARS.test(t)) && !shared.length,
+  [enText.find((t) => TR_CHARS.test(t)), ...shared].filter(Boolean).join(', '));
+const allEnKeys = new Set(EN.flatMap((l) => [...(l.keys || '')]));
+check('ABD dersleri: alfabenin bütün harfleri, noktalı virgül, virgül ve nokta öğretiliyor', [...'abcdefghijklmnopqrstuvwxyz;,.'].every((c) => allEnKeys.has(c)));
+check('ABD klavyesi: harfler aynı yerde, i I tuşunda; ; \' , . / [ ] \\ ` - = ABD yerlerinde; her tuşun parmağı var',
+  T.US_KEY.i === 'KeyI' && T.US_KEY.a === 'KeyA' && T.US_KEY[';'] === 'Semicolon' && T.US_KEY["'"] === 'Quote' && T.US_KEY[','] === 'Comma'
+  && T.US_KEY['.'] === 'Period' && T.US_KEY['/'] === 'Slash' && T.US_KEY['['] === 'BracketLeft' && T.US_KEY[']'] === 'BracketRight'
+  && T.US_KEY['\\'] === 'Backslash' && T.US_KEY['`'] === 'Backquote' && T.US_KEY['-'] === 'Minus' && T.US_KEY['='] === 'Equal'
+  && Object.values(T.US_KEY).every((c) => T.FINGER_OF[c] != null) && !Object.keys(T.US_KEY).some((c) => TR_CHARS.test(c)));
+const usRows = T.US_ROWS.flat();
+check('ABD klavyesinin çizimi: her sıra 15 tuş birimi, her tuşun parmağı var, Enter tek sırada, ev sırası A S D F G H J K L ; \'',
+  T.US_ROWS.every((row) => row.reduce((n, k) => n + (k[2] || 1), 0) === 15) && usRows.every(([c]) => T.FINGER_OF[c] != null)
+  && !usRows.some(([c]) => c === 'EnterB' || c === 'IntlBackslash') && T.US_ROWS[2].slice(1, 12).map((k) => k[1]).join(' ') === "A S D F G H J K L ; '",
+  `${usRows.length} tuş`);
+const press = (code, key) => ({ code, key });
+check('basılan tuş: ABD klavyesinde I tuşu i, \' tuşu i değil, nokta Period\'da; Türkçe Q\'da I tuşu ı, İ tuşu i; bilinmeyen tuşta yazdığı harf',
+  T.typedIs(press('KeyI', 'i'), 'i', T.US_KEY) && !T.typedIs(press('Quote', "'"), 'i', T.US_KEY) && T.typedIs(press('Period', '.'), '.', T.US_KEY)
+  && T.typedIs(press('Semicolon', ';'), ';', T.US_KEY) && !T.typedIs(press('Slash', '/'), '.', T.US_KEY)
+  && T.typedIs(press('KeyI', 'ı'), 'ı', T.TQ_KEY) && !T.typedIs(press('KeyI', 'ı'), 'i', T.TQ_KEY) && T.typedIs(press('Quote', 'i'), 'i', T.TQ_KEY)
+  && T.typedIs(press('Slash', '.'), '.', T.TQ_KEY) && T.typedIs(press('', 'I'), 'i', T.US_KEY) && T.typedIs(press('', 'I'), 'ı', T.TQ_KEY));
+// Dil her çağrıda LANG'tan okunur (profil yüklenince değişebilir).
+const trDefault = T.tLang() === 'tr' && T.typingLessons() === T.TYPING_LESSONS && T.keyMap() === T.TQ_KEY && T.typingStages() === T.TYPING_STAGES
+  && T.trEn('a', 'b') === 'a';
+globalThis.LANG = 'en';
+const enNow = T.tLang() === 'en' && T.typingLessons() === EN && T.keyMap() === T.US_KEY && T.typingStages() === T.TYPING_STAGES_EN && T.trEn('a', 'b') === 'b'
+  && T.typingNext({}) === 0 && T.gameWords({ 'en-fj': 3 }).length > 0 && T.gameWords({ 'en-fj': 3 }).every((w) => /^[fj]+$/.test(w))
+  && T.gameWords({ fj: 3 }).length === 0;
+delete globalThis.LANG;
+check('dil: LANG yoksa Türkçe; LANG "en" olunca ABD dersleri, ABD klavyesi ve İngilizce; her çağrıda yeniden okunur', trDefault && enNow && T.tLang() === 'tr');
+
 // Satırlar: tohumlu rastgele ile; genişliği aşmaz, boş değil; ilk alıştırma satırı tek alıştırmanın tekrarı.
 let seed = 7;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 const lineBad = [];
-for (const l of T.TYPING_LESSONS) {
+for (const l of [...T.TYPING_LESSONS, ...EN]) {
   for (let k = 0; k < 20; k++) {
     const lines = T.typingLines(l, rnd);
     const width = l.lines ? 40 : l.stage === 0 ? 22 : 28;
@@ -86,6 +144,16 @@ check('klavye yıldızları kahramana: en iyi sonuç, tekrar şişirmez', st.sta
   JSON.stringify(st.best));
 check('klavye altını: yıldız başına 5, günün dersleri bittiği gün 5', st.coins === 5 * 5 + 5, `altın ${st.coins}, bugün ${st.today}`);
 check('bugün bitirilen ders sayısı (yıldızlı)', st.today === 1);
+// ABD derslerinin ilerlemesi ayrı kimliklerle (velinin isteği: karışmasın): kahramana ikisinin yıldızı da gider; hangi ABD
+// dersinin açık olduğuna yalnızca ABD sonuçları bakar.
+const mixed = [{ lesson: 'fj', stars: 3, created_at: at('2026-10-29') }, { lesson: 'en-fj', stars: 2, created_at: at('2026-10-29') },
+  { lesson: 'en-dk', stars: 3, created_at: at(today) }];
+const ms = T.typingStats(mixed, 0);
+check('ABD ilerlemesi ayrı: dersler kendi kimlikleriyle sayılır, kahramana ikisinin yıldızı; ABD derslerinin kilidi ve sıradakisi yalnızca ABD sonuçlarından',
+  ms.best.fj === 3 && ms.best['en-fj'] === 2 && ms.best['en-dk'] === 3 && ms.stars === 8 && ms.today === 1
+  && T.typingNext({ fj: 3 }, EN) === 0 && !T.typingOpen({ fj: 3 }, 1, EN) && T.typingNext({ 'en-fj': 3 }, EN) === 1
+  && T.typingNext({ 'en-fj': 3 }, T.TYPING_LESSONS) === 0 && T.typingNext(Object.fromEntries(EN.map((l) => [l.id, 3])), EN) === EN.length - 1,
+  JSON.stringify(ms.best));
 
 // Kilit ve sıradaki ders.
 // Önce iyice öğrensin (velinin isteği): sonraki ders üç yıldızla açılır.
@@ -117,6 +185,12 @@ check('hiç ders bitirmediyse oyun kelimesi yok (oyun ilk dersten sonra açılı
 check('eşik değişmeden önce bitirdiği ders de sayılır (en az bir yıldız)', mid.length > T.gameWords(fourDone).length && onlyKnown(stuck), `${mid.length} kelime`);
 check('oyun kelimeleri: boşluk, nokta, tek harf yok; kelime çoksa tuş alıştırması yok',
   all.every((w) => /^[a-zçğıöşü]{2,}$/u.test(w)) && !all.includes('fff') && !all.includes('yaz geldi.') && all.includes('kedi'), `${all.length} kelime`);
+const enAll = T.gameWords(Object.fromEntries(EN.map((l) => [l.id, 3])), EN);
+const enFour = T.gameWords(Object.fromEntries(EN.slice(0, 4).map((l) => [l.id, 3])), EN);
+check('ABD oyun kelimeleri: İngilizce, yalnızca bitirdiği ABD derslerinin harflerinden; Türkçe derslerin ilerlemesi ABD oyununu açmaz',
+  enAll.length > 200 && enAll.every((w) => /^[a-z]{2,}$/.test(w)) && enAll.includes('cat') && !enAll.includes('kedi')
+  && enFour.length >= 12 && enFour.every((w) => /^[asdfjkl]+$/.test(w)) && T.gameWords({ fj: 3, dk: 3 }, EN).length === 0,
+  `${enAll.length} kelime, ilk dört dersten ${enFour.length}`);
 const levels = Array.from({ length: 25 }, (_, i) => i + 1);
 const falls = levels.map(T.gameFall), gaps = levels.map(T.gameEvery);
 // Hızlanma 12. seviyeden sonra da sürer (velinin isteği, 2026-11-03: hızlı yazınca oyun hiç bitmiyordu).

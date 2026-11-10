@@ -311,6 +311,20 @@ Her maddenin yanında nasıl denendiği yazar:
   sayfasında da görünür. [O]
   - Her dersin en iyi yıldızı 1 güç verir; aynı dersi tekrarlamak şişirmez.
   - Her yeni yıldız 5 altın, günün dersleri bittiği her gün 5 altın.
+- ABD öğrencisi (LANG 'en'; velinin isteği, 2026-11-10: ABD öğrencilerine Türkçe hiçbir şey gösterilmez). Türkçe dersler ve
+  Türkçe öğrencinin ilerlemesi değişmedi. Elle deneme ABD test hesabıyla (ABD4 ya da ABD7). [O], ders ve oyun [E]
+  - Ekrandaki klavye ABD klavyesi (US QWERTY, 61 tuş): ; ' , . / [ ] \ ` - = ABD yerlerinde, Enter tek sırada; Ş, Ğ, Ü, Ö,
+    Ç, İ yok. Basılan tuş ABD yerine göre denetlenir: I tuşu i'dir (Türkçe Q'da ı). [O]
+  - 20 İngilizce ders, aynı aşamalar: Home row (F J, D K, S L, A ;, G H), Top row (E I, R U, T Y, O W, P Q), Bottom row
+    (V N, B M, C ve virgül, X ve nokta, Z), Words and sentences (hayvanlar, renkler ve sayılar, iki cümle dersi, okul ve ev).
+    Her derste yalnızca öğrenilmiş harfler; Türkçe söz ve harf yok. [O]
+  - İlerleme ayrı ders kimlikleriyle ("en-…"): Türkçe derslerin yıldızları ABD derslerini ve oyununu açmaz. Kahramana iki
+    dersin yıldızları da sayılır. [O]
+  - Yönerge ve sesli anlatım İngilizce: parmak adları ("left index finger"), "New key: E · left middle finger. Press it three
+    times.", "Wrong key! First press ⌫ backspace with your right pinky, then…". İngilizce ses varsa (önce ABD İngilizcesi)
+    sesli söylenir. Ders başlığı "Lesson 6 · E and I". [E]
+  - Kelime roketinin kelimeleri bitirdiği ABD derslerinin İngilizce kelimeleri. [O]
+  - Yazılacak satırlar, düşen kelimeler ve klavyenin tuş yazıları ekrandaki çeviriye girmez (translate="no").
 
 **Okuduğum kitap** (ilkokul, Yükle sekmesi) [A], gönderme ve sorular [E]
 - Çocuk okuduğu kitabın sayfalarını fotoğraflar. Genelde hikâye kitabı olur, ama her tür kitap gönderilebilir.
