@@ -25,11 +25,13 @@ const SUBJECTS = {
   // İlkokul dersleri (LGS'de yok).
   hayat: { name: 'Hayat Bilgisi', coef: 1, sec: 90 },
   sosyal: { name: 'Sosyal Bilgiler', coef: 1, sec: 90 },
+  // ABD (velinin isteği, 2026-11-10): İngilizce Dil Sanatları; okuma parçalı sorular uzun okunur. Ekranda zaten İngilizce.
+  ela: { name: 'English Language Arts', coef: 1, sec: 120 },
 };
 const maxSeconds = (subject) => SUBJECTS[subject]?.sec || 90;
 // LGS kitapçık sırası: sözel oturum Türkçe, İnkılap, Din, İngilizce; sayısal oturum Matematik, Fen.
 // İlkokul dersleri sonda (öğretmen ders seçimi gibi genel listeler için).
-const SUBJECT_ORDER = ['turkce', 'inkilap', 'din', 'ingilizce', 'matematik', 'fen', 'hayat', 'sosyal'];
+const SUBJECT_ORDER = ['turkce', 'inkilap', 'din', 'ingilizce', 'matematik', 'fen', 'hayat', 'sosyal', 'ela'];
 const LGS_SUBJECTS = SUBJECT_ORDER.slice(0, 6);
 
 // Sınıfa göre dersler. 8. sınıf LGS'ye hazırlanır; küçük sınıflar sadece pratik yapar.
@@ -41,15 +43,15 @@ const GRADE_SUBJECTS = {
   4: ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din'],
 };
 const PRIMARY_ORDER = ['turkce', 'matematik', 'hayat', 'fen', 'sosyal', 'ingilizce', 'din'];
-// ABD müfredatı (velinin isteği, 2026-11-10): şimdilik yalnız Matematik ('matematik' anahtarı, ekranda "Math").
-// Okuma (ELA), Fen ve Sosyal sonra eklenecek. Yabancı dil (İngilizce kelime kartları) ABD'de yok.
+// ABD müfredatı (velinin isteği, 2026-11-10): İngilizce Dil Sanatları ('ela'), Matematik, Fen ('fen', ekranda Science) ve
+// Sosyal ('sosyal', ekranda Social Studies). Yabancı dil (İngilizce kelime kartları) ABD'de yok.
 // Müfredat (velinin isteği, 2026-11-09): ülke koduyla başlayan kimlik; 'tr' Türkiye (MEB), ileride 'us-pa' gibi. Konular
 // sınıfın yanında müfredata göre de seçilir (başka ülkenin aynı sınıftaki konuları karışmasın). LGS'ye özgü her şey
 // (dersler, sayaç, denemeler, seyrek konu ayarı) yalnızca Türkiye müfredatındaki 8. sınıf içindir.
 const studentCurriculum = (p) => p?.curriculum || 'tr';
 const isLgsStudent = (p) => studentCurriculum(p) === 'tr' && (!p?.grade || p.grade >= 8);
 const studentGrades = (p) => [...new Set([p?.grade || 8, ...(p?.extra_grades || [])])];
-const US_SUBJECTS = ['matematik'];
+const US_SUBJECTS = ['ela', 'matematik', 'fen', 'sosyal'];
 function studentSubjects(p) {
   if (typeof isUsCurriculum === 'function' && isUsCurriculum(p)) return US_SUBJECTS;
   if (isLgsStudent(p)) return LGS_SUBJECTS;
@@ -62,7 +64,7 @@ function studentSubjects(p) {
 // sınıflarda Türkçe ve Matematik ağır basar. Velinin planında olmayan bir ders (sonradan açılan üst
 // sınıf dersi gibi) varsayılan payını alır.
 const DEFAULT_PLAN = { turkce: 9, inkilap: 4, din: 4, ingilizce: 4, matematik: 10, fen: 9 };
-const PRIMARY_WEIGHT = { turkce: 3, matematik: 3, fen: 2, hayat: 2, sosyal: 2, ingilizce: 1, din: 1 };
+const PRIMARY_WEIGHT = { turkce: 3, matematik: 3, fen: 2, hayat: 2, sosyal: 2, ingilizce: 1, din: 1, ela: 3 };
 function dailyPlan(p) {
   const subjects = studentSubjects(p);
   const total = p?.daily_questions || 40;

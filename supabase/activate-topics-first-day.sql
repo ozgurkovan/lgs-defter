@@ -17,7 +17,7 @@ begin
            (t.lgs_avg is not null and t.lgs_avg < 0.5 and s.rare_factor = 0) as off,
            s.id in (select id from fresh) as first_day,
            row_number() over (partition by s.id
-                              order by case when t.subject in ('turkce','matematik','fen') then 0 else 1 end,
+                              order by case when t.subject in ('turkce','ela','matematik','fen') then 0 else 1 end,
                                        t.planned_start, t.subject, t.sort) as n
     from profiles s
     join topics t on t.grade = s.grade and t.curriculum = s.curriculum

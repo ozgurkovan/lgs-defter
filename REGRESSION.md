@@ -60,7 +60,9 @@ Her maddenin yanında nasıl denendiği yazar:
     yer tutucu uyuşmazlığını ve İngilizcede Türkçe harfi yakalar. [O]
   - Şakalar, bilmeceler, fabllar, şiirler (kamu malı), velinin tatlı söz önerileri ve şakacı selamlar ABD'de İngilizce
     içerikten gelir (`tools/i18n/content-en.json`). [A]
-  - Dersler yalnız Matematik ("Math"); konular Pennsylvania matematiği, 2., 3., 4. ve 7. sınıf, Common Core standartlarına göre
+  - Dersler (2026-11-10): English Language Arts (`ela`), Math, Science (`fen`) ve Social Studies (`sosyal`); ELA, Fen ve
+    Sosyal konuları Pennsylvania'nın kendi standartlarından (PA Core ELA, STEELS 2023, PA sosyal bilgiler; CC BY 4.0;
+    `supabase/topics-us-pa-other.sql`, `supabase/us-subjects.sql`). Matematik konuları Pennsylvania matematiği, 2., 3., 4. ve 7. sınıf, Common Core standartlarına göre
     (`supabase/topics-us-pa-math.sql`, CC BY 4.0), 2026-27 okul yılına yayılmış haftalarla; haftası gelen konu kendiliğinden
     açılır. Türk öğrenciye ABD konusu, ABD öğrencisine Türk konusu hiç gelmez. [O] (`test-country-curriculum.sql`), [A]
   - ABD'de İngilizce kelime kartları (sekme, ayar satırı) ve LGS yok. Klavye dersleri ABD klavyesiyle ve İngilizce kelimelerle

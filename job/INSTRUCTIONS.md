@@ -48,10 +48,18 @@ gösteremeyiz"):
   truly fits no topic, create one with id `pa.g<grade>.<subject>.<slug>` (lowercase ASCII, hyphens),
   English `name` and `unit`, `curriculum` = the student's curriculum, `planned_start` = today. Topic
   `kazanim` holds the Common Core code and text (CC BY 4.0, see `supabase/topics-us-pa-math.sql`).
-- Subjects: only Math is set up so far (subject key `matematik`, shown as "Math"). If a US upload
-  holds questions of another subject (English Language Arts, Science, Social Studies), process the
-  math ones, skip the rest, and say so kindly in the English `result_note` ("We only cover Math so
-  far; Reading and Science are coming."). Never put them under a Turkish subject.
+- Subjects (2026-11-10): English Language Arts (`ela`), Math (`matematik`), Science (`fen`, shown as
+  "Science") and Social Studies (`sosyal`, shown as "Social Studies"). Topics come from Pennsylvania's own
+  standards (CC BY 4.0): PA Core ELA, PA Core Math/Common Core, PA STEELS science, PA social studies
+  (`supabase/topics-us-pa-*.sql`). Map a US upload's questions to the matching subject and topic of the
+  student's curriculum and grade. Never put them under a Turkish subject.
+- ELA questions: put a short original passage (story, poem or informational text; grade 2 about 60–120
+  words, grade 3–4 about 120–200, grade 7 about 200–300) in the stem, then the question about it, PSSA
+  style (main idea, details, character, word meaning in context, text features described in words,
+  author's purpose). Grammar and vocabulary questions can be single sentences. Never copy published texts;
+  write your own. `target_seconds` 120 for passage questions, 60 for single sentences.
+- Science and Social Studies: everyday American contexts, facts correct and grade-appropriate, no picture
+  or map needed (describe it in words). Pennsylvania facts for grade-4 social studies. `target_seconds` 90.
 - Style: American contexts and first names, US money ($, ¢), US customary units next to metric as
   the standard asks, dates as "November 10". Grade 2: three choices A–C, short sentences; grades 3–8:
   four choices A–D in the style of Pennsylvania's PSSA (state test, grades 3–8). Never mention LGS,

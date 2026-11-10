@@ -43,7 +43,7 @@ begin
   -- Yeni sınıfın haftası gelmiş konuları hemen takibe girer (üst sınıf konuları kendiliğinden açılmaz, veli işaretler).
   with due as (
     select t.id as topic_id,
-           row_number() over (order by case when t.subject in ('turkce','matematik','fen') then 0 else 1 end,
+           row_number() over (order by case when t.subject in ('turkce','ela','matematik','fen') then 0 else 1 end,
                                        t.planned_start, t.subject, t.sort) as n
     from topics t
     where t.grade = g and t.curriculum = cur and t.planned_start <= today

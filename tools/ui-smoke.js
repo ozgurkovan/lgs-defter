@@ -36,7 +36,7 @@
       return results.join('\n');
     }
     // ABD hesabı (velinin isteği, 2026-11-10: "ABD öğrencilerine Türkçe hiçbir şey gösteremeyiz"): her sayfa açılır, görünen
-    // yazıda, düğme etiketlerinde ve yer tutucularda tek bir Türkçe yazı yok; dersler yalnız Matematik; kelime kartları ve
+    // yazıda, düğme etiketlerinde ve yer tutucularda tek bir Türkçe yazı yok; dersler ELA, Matematik, Fen, Sosyal; kelime kartları ve
     // LGS yok; şakalar, fabllar ve şiirler İngilizce. Türkçe hesapların kontrolleri burada çalışmaz (yazılar İngilizce).
     if (typeof LANG !== 'undefined' && LANG === 'en') {
       const TR = /[çğıöşüÇĞİÖŞÜ]/;
@@ -75,8 +75,10 @@
         Object.entries(bad).map(([k, v]) => `${k}: ${v.join(' / ').slice(0, 120)}`).join(' | ') || `${allowedTabs().length} sayfa`);
       go('topics'); await settle();
       const subjects = studentSubjects(state.student);
-      check('ABD: dersler yalnız Matematik, konular Pennsylvania müfredatından', subjects.join() === 'matematik' && pageText().includes('math')
-        && !/turkish|science|lgs/.test(pageText()), subjects.join());
+      // Dersler (2026-11-10): İngilizce Dil Sanatları, Matematik, Fen, Sosyal; Konular sayfasında dördü de, Türk dersi ve LGS yok.
+      const tp = pageText();
+      check('ABD: dersler ELA, Matematik, Fen, Sosyal; konular Pennsylvania müfredatından', subjects.join() === 'ela,matematik,fen,sosyal'
+        && ['english language arts', 'math', 'science', 'social studies'].every((w) => tp.includes(w)) && !/turkish|lgs|history of the turkish/.test(tp), subjects.join());
       check('ABD: İngilizce kelime kartları yok', !allowedTabs().includes('words') && wordsPerDay(state.student) === 0);
       let cardTr = null;
       // Kart sayfaya eklenince çevrilir (docs/i18n.js sayfadaki yazıyı çevirir); bu yüzden önce eklenir, sonra okunur.
