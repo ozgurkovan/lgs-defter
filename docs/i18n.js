@@ -51,6 +51,13 @@ function i18nPatterns(dict) {
   return pats.sort((a, b) => b.literal - a.literal);
 }
 
+// Kalıbın yakaladığı parçalar kalıbın kendi yazısından çok uzunsa (ör. "{0}, {1} bronz{2}" bütün bir paragrafı yutuyor)
+// eşleşme sayılmaz; cümle cümle ya da parça parça çeviri denenir.
+function i18nFits(p, r) {
+  const grabbed = r.slice(1).reduce((n, g) => n + (g ? g.length : 0), 0);
+  return grabbed <= Math.max(40, 3 * p.literal);
+}
+
 function i18nFill(en, groups) {
   return en.replace(/\{(\d+)(?:\|([^|}]*)\|([^}]*))?\}/g, (all, i, one, many) => {
     const g = groups[+i];
@@ -91,7 +98,7 @@ function tCore(text, depth = 0) {
         for (const p of I18N.patterns) {
           if (!p.re.source.startsWith('^' + pre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) continue;
           const r = p.re.exec(pre + key);
-          if (!r) continue;
+          if (!r || !i18nFits(p, r)) continue;
           const groups = [];
           p.order.forEach((idx, k) => { groups[idx] = r[k + 1]; });
           out = i18nFill(p.en, groups).replace(/^[,·;.]\s*/, '');
@@ -104,7 +111,7 @@ function tCore(text, depth = 0) {
   if (out === undefined && looksTurkish(key)) {
     for (const p of I18N.patterns) {
       const r = p.re.exec(key);
-      if (!r) continue;
+      if (!r || !i18nFits(p, r)) continue;
       const groups = [];
       p.order.forEach((idx, k) => { groups[idx] = r[k + 1]; });
       out = i18nFill(p.en, groups);
