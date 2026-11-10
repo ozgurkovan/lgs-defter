@@ -42,6 +42,8 @@ Her maddenin yanında nasıl denendiği yazar:
 **Giriş ve uygulama**
 - E-posta ve şifreyle giriş. Hata mesajları ayrı: internet yok, sunucuya ulaşılamıyor, çok deneme, şifre yanlış. "Şifremi unuttum" bağlantısı. [E]
 - Yeni sürüm yayınlanınca uygulama kendini yeniler (Ctrl+F5 gerekmez). Soru çözerken, denemedeyken ya da gönderilmemiş fotoğraf varken beklenir. [E]
+- Aynı tarayıcıda başka sekmede başka biri giriş yaparsa açık sekmeler yenilenip o kişiyi gösterir; eski sekme eski oturumu
+  geri yazıp yeni giriş yapanı önceki hesaba döndürmez (2026-11-10). [A]
 - Geri: üst çubuktaki "← Geri" ve tarayıcının geri tuşu bir önceki sayfaya döner; ilk sayfada tarayıcı tuşu siteden çıkar. [A]
 - Ülke ve müfredat ayrımı (velinin isteği, 2026-11-09; `supabase/country-curriculum.sql`): konular sınıfın yanında müfredata
   göre de seçilir (`topics.curriculum`, `profiles.curriculum`; bugün hepsi `tr`). Başka müfredatın aynı sınıftaki konusu

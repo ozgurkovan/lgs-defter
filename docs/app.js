@@ -5140,6 +5140,9 @@ if (linkError) {
 
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') viewLogin();
+  // Aynı tarayıcıda başka sekmede başka biri giriş yaptıysa bu sekme yenilenir (2026-11-10: veli kardeşinin hesabıyla
+  // girince açık kalan öbür sekme eski oturumu geri yazıp onu velinin hesabına döndürüyordu).
+  if (session?.user && state.user && session.user.id !== state.user.id) { location.reload(); return; }
   if (event === 'PASSWORD_RECOVERY') {
     state.inRecovery = true;
     state.user = session?.user || state.user;
