@@ -385,7 +385,8 @@ Her maddenin yanında nasıl denendiği yazar:
 - "… mesaj bırak":
   - tatlı söz ya da şaka önerisi, imza;
   - bütün çocuklara gönderme;
-  - okundu bilgisi, geri alma.
+  - okundu bilgisi, geri alma. Altında yalnızca son mesaj görünür: tarih, imza, "Okudu" ya da "Henüz okumadı" (velinin
+    isteği, 2026-11-10; önceden son beş mesaj). [A]
 - Birlikte bakılacaklar ("Birlikte baktık" ile listeden çıkar).
 - **Benzer sorularla dene** (velinin isteği, 2026-11-09): çocuk yanlış yaptığı soruyu "anladım" deyince veli birkaç benzer
   soruyla dener. Sorular sekmesinde kaçırdığı her sorunun, Birlikte bakılacaklar'daki her sorunun ve raporda zayıf konunun

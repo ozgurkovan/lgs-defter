@@ -470,6 +470,15 @@
     const d = navDepth(); go(a); await settle();
     check('Aynı sayfayı yeniden açmak geçmişe kayıt eklemez', navDepth() === d, `derinlik ${d} → ${navDepth()}`);
 
+    // Mesaj kutusu (2026-11-10): yalnızca son mesaj görünür, okudu ya da okumadı etiketiyle. Salt okunur.
+    if (role === 'parent') {
+      go('report'); await settle();
+      for (let i = 0; i < 40 && !pageText().includes('mesaj bırak'); i++) await wait(150);
+      const notes = [...document.querySelectorAll('#app .note.small')].filter((x) => /Okudu|Henüz okumadı/.test(x.textContent));
+      check('Mesaj kutusu: yalnızca son mesaj, okudu ya da okumadı etiketiyle', notes.length <= 1 && (pageText().includes('son mesaj') || !notes.length),
+        notes.length ? `${notes.length} mesaj` : 'hiç mesaj yok');
+    }
+
     // Rapor, Gün gün çalışma (2026-11-09): tablodaki doğru ya da yanlış sayısına dokununca o konunun soruları tablonun altında
     // açılır, soru metni yüklenir; yeniden dokununca kapanır. Salt okunur. Çalıştığı bir gün yoksa atlanır.
     if (role !== 'student') {

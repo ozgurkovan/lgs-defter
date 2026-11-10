@@ -1763,8 +1763,8 @@ function messageBox() {
 
   const loadList = async () => {
     const rows = await q(sb.from('family_messages').select('id, body, signature, created_at, seen_at, from_id')
-      .eq('student_id', kid.id).order('created_at', { ascending: false }).limit(5));
-    fill(list, rows.length ? h('p', { class: 'label', style: 'margin-top: 6px' }, 'Son mesajlar') : null, rows.map((m) => h('div', { class: 'note small' },
+      .eq('student_id', kid.id).order('created_at', { ascending: false }).limit(1)); // yalnız son mesaj (velinin isteği, 2026-11-10)
+    fill(list, rows.length ? h('p', { class: 'label', style: 'margin-top: 6px' }, 'Son mesaj') : null, rows.map((m) => h('div', { class: 'note small' },
       h('div', { class: 'spread' },
         h('span', { class: 'muted' }, new Date(m.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
           + (m.signature ? ` · ${m.signature}` : '')),
