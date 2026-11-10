@@ -1479,19 +1479,21 @@ const TOGETHER_KIND = {
 };
 const togetherKind = (r) => (r.needs_help ? 'help' : r.understood === false ? 'notUnderstood' : 'guess');
 
-function togetherCard(qn, t, ...extra) {
+function togetherCard(qn, t, when, study) {
   const [label, color] = TOGETHER_KIND[t.kind];
+  const head = h('div', { class: 'spread' },
+    h('div', { class: 'row' }, subjTag(qn.subject), h('span', { class: 'small muted' }, t.topic || '')),
+    h('span', { class: 'tag ' + color }, t.kind === 'guess' ? `${label}, ${t.correct ? 'doğru' : 'yanlış'}` : label));
+  if (study) return h('article', { class: 'card stack', style: 'gap: 8px' }, head, study, when);
   return h('article', { class: 'card stack', style: 'gap: 8px' },
-    h('div', { class: 'spread' },
-      h('div', { class: 'row' }, subjTag(qn.subject), h('span', { class: 'small muted' }, t.topic || '')),
-      h('span', { class: 'tag ' + color }, t.kind === 'guess' ? `${label}, ${t.correct ? 'doğru' : 'yanlış'}` : label)),
+    head,
     qn.image_path ? lazyImg('questions', qn.image_path) : null,
     qn.stem ? h('p', { class: 'stem small' }, qn.stem) : null,
     h('div', { class: 'stack', style: 'gap: 4px' }, ['A', 'B', 'C', 'D'].filter((k) => qn.choices?.[k] !== undefined).map((k) =>
       h('div', { class: 'opt small' + (k === qn.answer ? ' right' : k === t.answer ? ' wrong' : '') },
         h('b', {}, k), h('span', {}, qn.choices[k]), k === t.answer ? h('span', { class: 'muted' }, ' ← seçimi') : null))),
     qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, qn.solution)) : null,
-    extra);
+    when);
 }
 
 function loadTogether() {
@@ -1895,19 +1897,25 @@ async function viewTogether() {
     rows.length ? rows.map((r) => {
       const when = h('p', { class: 'small muted' }, [trackName[r.track],
         new Date(r.answered_at).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })].filter(Boolean).join(' · '));
-      const card = togetherCard(r.questions || {}, { answer: r.answer, correct: r.correct, kind: togetherKind(r), topic: r.questions?.topics?.name }, when);
+      const info = { answer: r.answer, correct: r.correct, kind: togetherKind(r), topic: r.questions?.topics?.name };
+      // Veli ve öğretmende kartın kendisi "birlikte çöz" kartıdır (velinin isteği, 2026-11-10): cevap ve çözüm gizli, çocuk
+      // yanlarında çözer, öğretmen nerede takıldığını görür; sonra çözüm (kapalı), "anladı mı?", benzer soru. Benzer
+      // soruların hepsini doğru yaparsa soru kendiliğinden "birlikte bakıldı" olur. Öğrenci kendi sayfasında cevabı görür.
+      const study = canMark && r.questions ? studyCard(...reviewStudy(r, r.questions), async ({ right, total }) => {
+        if (right < total) return;
+        try { await q(sb.rpc('mark_together', { rid: r.id })); btn.remove(); toast('Hepsi doğru: birlikte bakıldı olarak işaretlendi.'); } catch (e) { /* düğmeyle işaretlenebilir */ }
+      }) : null;
+      const card = study ? togetherCard(r.questions, info, when, study) : togetherCard(r.questions || {}, info, when);
+      let btn = null;
       if (canMark) {
-        const btn = h('button', { class: 'block', onclick: async () => {
+        btn = h('button', { class: 'block', onclick: async () => {
           btn.disabled = true;
           try { await q(sb.rpc('mark_together', { rid: r.id })); }
           catch (e) { btn.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
           card.remove();
           toast('Listeden çıkarıldı.');
         } }, 'Birlikte baktık');
-        // Benzer sorularla dene (veli): hepsini doğru yaparsa soru kendiliğinden "birlikte bakıldı" sayılır.
-        // Birlikte çöz (2026-11-10): cevap gizli, çocuk yeniden çözer, sonra çözüm, "anladı mı?", benzer soru.
-        const check = r.questions ? togetherButton(reviewStudy(r, r.questions)) : null;
-        card.append(...(check || []), btn);
+        card.append(btn);
       }
       return card;
     }) : h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'Şu an birlikte bakılacak soru yok.')));
@@ -4365,7 +4373,7 @@ function checkPanel(src, onDone) {
    Yeniden çözüm, soru havuzdaysa, 'check' tarzıyla çocuğun adına kaydedilir (doğruysa bronz); hata tekrarına yeniden
    girmez. Kâğıt denemenin fotoğrafında şıklar yoktur: yalnız A–D harfleri.
    data: { content, choices, answer, chosen, blank, solution, questionId }; src: checkPanel kaynağı. */
-function studyCard(data, src) {
+function studyCard(data, src, onDone) {
   const canWrite = ['parent', 'teacher'].includes(state.profile?.role);
   const keys = data.choices ? ['A', 'B', 'C', 'D'].filter((k) => data.choices[k] !== undefined) : ['A', 'B', 'C', 'D'];
   const after = h('div', { class: 'stack', style: 'gap: 8px', hidden: true });
@@ -4391,11 +4399,13 @@ function studyCard(data, src) {
       h('p', { class: 'study-result' }, h('b', { style: `color: var(--${correct ? 'green' : 'red'})` },
         k ? (correct ? 'Doğru.' : `Yanlış. Doğru cevap ${data.answer || '?'}.`) : `Doğru cevap ${data.answer || '?'}.`),
       first ? h('span', { class: 'small muted' }, ` ${first}`) : null),
-      data.solution ? h('div', { class: 'note small' }, h('b', {}, 'Çözüm: '), data.solution) : h('p', { class: 'small muted' }, 'Bu sorunun yazılı çözümü yok; birlikte çözün.'),
+      // Çözüm kapalı durur (velinin isteği, 2026-11-10): önce birlikte konuşsunlar, gerekirse açsınlar.
+      data.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, data.solution))
+        : h('p', { class: 'small muted' }, 'Bu sorunun yazılı çözümü yok; birlikte çözün.'),
       canSimilar ? h('div', { class: 'stack', style: 'gap: 6px' },
         h('p', { class: 'small' }, h('b', {}, 'Anladı mı?'), ' Çözümü birlikte inceleyin, sonra sorun.'),
         h('div', { class: 'row' },
-          h('button', { class: 'primary', onclick: () => fill(ask, h('p', { class: 'small muted' }, 'Anladı: benzer bir soruyla deneyelim.'), checkPanel(src)) }, 'Anladım, benzer soru gelsin'),
+          h('button', { class: 'primary', onclick: () => fill(ask, h('p', { class: 'small muted' }, 'Anladı: benzer bir soruyla deneyelim.'), checkPanel(src, onDone)) }, 'Anladım, benzer soru gelsin'),
           h('button', { class: 'ghost', onclick: () => fill(ask, h('p', { class: 'small' }, 'Sorun değil. Konuyu birlikte bir kez daha anlatın; hazır olunca benzer sorularla deneyin.'),
             ...(checkButton(src) || [])) }, 'Anlamadım')),
         ask) : null);

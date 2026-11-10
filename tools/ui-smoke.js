@@ -617,7 +617,8 @@
         const hiddenFirst = !!card && card.querySelectorAll('button.choice').length >= 2 && !card.querySelector('.choice.right, .choice.wrong')
           && !/Doğru cevap|Çözüm:/.test(card.textContent);
         card?.querySelector('button.ghost')?.click(); await wait(100);
-        const revealed = !!card && !!card.querySelector('.choice.right') && /Doğru cevap|Doğru\./.test(card.textContent) && /Anladı mı\?/.test(card.textContent);
+        const revealed = !!card && !!card.querySelector('.choice.right') && /Doğru cevap|Doğru\./.test(card.textContent) && /Anladı mı\?/.test(card.textContent)
+          && !(card.querySelector('details')?.open);
         [...(card?.querySelectorAll('button') || [])].find((x) => x.textContent.startsWith('Anladım'))?.click();
         for (let i = 0; i < 40 && /aranıyor/.test(card?.querySelector('.check-panel')?.textContent || 'aranıyor'); i++) await wait(150);
         const panel = card?.querySelector('.check-panel');
@@ -626,6 +627,14 @@
         check('Veli ya da öğretmen: "Birlikte çöz" cevabı gizler, "Cevabı göster" açar, "Anladım" benzer soruyu getirir', btn.hidden && hiddenFirst && revealed && (asked || none),
           `${hiddenFirst ? 'gizli' : 'gizli değil'}, ${revealed ? 'açıldı' : 'açılmadı'}, ` + (asked ? panel.textContent.match(/Benzer soru 1 \/ \d/)[0] : none ? 'benzer soru kalmadı' : (panel?.textContent || 'panel yok').slice(0, 80)));
       } else check('Veli ya da öğretmen: "Birlikte çöz"', true, 'kaçırdığı soru yok, atlandı');
+      // Birlikte bakılacaklar (2026-11-10): kartın kendisi birlikte çöz kartı; cevap ve çözüm gizli. Salt okunur.
+      go('together'); await settle();
+      const tCard = document.querySelector('#app article.card');
+      if (tCard) {
+        const ok = !!tCard.querySelector('.study-card') && tCard.querySelectorAll('.study-card .choice').length >= 2
+          && !tCard.querySelector('.choice.right, .choice.wrong, .opt') && !/Çözüm/.test(tCard.textContent) && !!tCard.querySelector('button.block');
+        check('Birlikte bakılacaklar: kart birlikte çöz kartı, cevap ve çözüm gizli, "Birlikte baktık" düğmesi durur', ok, tCard.textContent.slice(0, 60));
+      } else check('Birlikte bakılacaklar: birlikte çöz kartı', true, 'birlikte bakılacak soru yok, atlandı');
     }
 
     // Ülke ve müfredat ayrımı (2026-11-09): seçili öğrencinin müfredatı Türkiye; konuların hepsi onun müfredatından gelir

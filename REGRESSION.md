@@ -333,6 +333,9 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Birlikte bakılacaklar** [A]
 - Boş geçtiği, tahmin ettiği ve "anlamadım" dediği sorular, ayrı sayfada.
+- Veli ve öğretmende kartın kendisi "birlikte çöz" kartıdır (velinin isteği, 2026-11-10): cevap ve çözüm gizli, çocuk
+  yanlarında çözer; sonra doğru/yanlış, ilk seçimi, çözüm (kapalı, dokununca açılır), "anladı mı?", benzer soru. Öğrenci
+  kendi sayfasında cevabı ve çözümü görür. [A]
 
 **Deneme sekmesi** [A], içindekiler [E]
 - Gerçek LGS kitapçıkları (2024–2026, sözel ve sayısal). Bu sorular günlük tekrarda gelmez.
@@ -401,9 +404,9 @@ Her maddenin yanında nasıl denendiği yazar:
     isteği, 2026-11-10; önceden son beş mesaj). [A]
 - Birlikte bakılacaklar ("Birlikte baktık" ile listeden çıkar).
 - **Birlikte çöz** (velinin isteği, 2026-11-10): yanlış sorunun açıldığı her yerde (deneme kutusu, derse göre yanlışlar,
-  zayıf konunun soruları; Sorular, Birlikte bakılacaklar ve Gün gün listelerinde "Birlikte çöz" düğmesiyle) cevap ve çözüm
+  zayıf konunun soruları, Birlikte bakılacaklar; Sorular ve Gün gün listelerinde "Birlikte çöz" düğmesiyle) cevap ve çözüm
   önce gizlidir: şıklar düğmedir, çocuk soruyu velinin ya da öğretmeninin yanında yeniden çözer. Sonra doğru/yanlış, doğru
-  cevap, ilk seferdeki seçimi (ya da boş bıraktığı) ve çözüm açılır; "Cevabı göster" çözmeden açar. Ardından "Anladı mı?":
+  cevap, ilk seferdeki seçimi (ya da boş bıraktığı) ve çözüm (kapalı, dokununca açılır) gelir; "Cevabı göster" çözmeden açar. Ardından "Anladı mı?":
   "Anladım" benzer soruyu aynı kartta sorar, "Anlamadım" konuya birlikte bakmayı önerir (benzer soru düğmesi yine durur).
   Yeniden çözüm havuzdaki soruysa 'check' tarzıyla kaydedilir (doğruysa bronz), hata tekrarına yeniden girmez. Kâğıt
   denemenin fotoğrafında yalnız A–D harfleri. Öğrencide yok. [A]
