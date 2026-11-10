@@ -65,6 +65,9 @@ Her maddenin yanında nasıl denendiği yazar:
     (Klavye bölümüne bakın). [A]
   - Saatlik görev ABD öğrencisi için yalnız ABD konularını kullanır ve öğrencinin ya da velinin göreceği her şeyi İngilizce
     yazar; Matematik dışı ABD yüklemelerini nazikçe atlar (`job/INSTRUCTIONS.md`, "US students"). [E]
+  - Yeni öğrencinin (henüz hiç konu tekrarı yok) ilk konu tekrarları açıldığı gün başlar, ertesi gün değil; ilk gün ana
+    sayfa boş kalmaz (velinin gözlemi, 2026-11-10; `supabase/activate-topics-first-day.sql`). Sonraki konular eskisi gibi
+    ertesi günden 7 güne yayılır. [O], [A]
   - Yeni hesaplar ekleyen velinin müfredatını alır (ABD velisinin çocuğu ABD konularıyla başlar;
     `supabase/functions/family`). [A]
 - Büyük okumalar eksiksiz gelir. Supabase bir istekte en çok 1000 satır verir; uygulamanın ortak okuma yardımcısı (`q`) sonuç
