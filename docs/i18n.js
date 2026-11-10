@@ -7,7 +7,7 @@
 
 let LANG = 'tr';
 let LOCALE = 'tr-TR';
-const I18N = { en: null, content: null, patterns: [], miss: new Set(), observer: null };
+const I18N = { en: null, content: null, patterns: [], miss: new Set(), observer: null, cache: new Map() };
 const I18N_TR_LETTERS = /[çğıöşüÇĞİÖŞÜ]/;
 // Türkçe harf taşımayan ama Türkçe olan yaygın ekran sözcükleri (tools/i18n-extract.mjs ile aynı liste).
 const I18N_TR_WORDS = new Set(('Kapat Geri Rapor Konular Konu Sorular Soru Deneme Denemeler Ayarlar Ayar Kitap Kitaplar Kelime Kelimeler Klavye ' +
@@ -61,13 +61,46 @@ function i18nFill(en, groups) {
 }
 
 // Yazının çevirisi; çevirisi yoksa kendisi. Baştaki ve sondaki boşluklar korunur.
+// Aynı yazı bir kez çevrilir (oyundaki kelimeler, tekrar tekrar çizilen sayfalar): sonuç önbellekte durur.
 function t(text, depth = 0) {
+  if (depth || LANG !== 'en' || !I18N.en || text === null || text === undefined) return tCore(text, depth);
+  const s = String(text);
+  let c = I18N.cache.get(s);
+  if (c === undefined) {
+    c = tCore(s, 0);
+    if (I18N.cache.size > 8000) I18N.cache.clear();
+    I18N.cache.set(s, c);
+  }
+  return c;
+}
+function tCore(text, depth = 0) {
   if (LANG !== 'en' || !I18N.en || text === null || text === undefined) return text;
   const s = String(text);
   const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s);
   const key = m[2];
   if (!key) return s;
   let out = I18N.en[key];
+  // Sözlükte başında ", " ya da "· " ile duran parça (kodda öncekine eklenmiş): o biçimiyle aranır, baştaki işaret atılır.
+  if (out === undefined && looksTurkish(key) && !/^[,·;.]/.test(key)) {
+    for (const pre of [', ', '· ', '; ', '. ']) {
+      const en = I18N.en[pre + key];
+      if (en !== undefined) { out = en.replace(/^[,·;.]\s*/, ''); break; }
+    }
+    if (out === undefined) {
+      for (const pre of [', ', '· ', '; ', '. ']) {
+        for (const p of I18N.patterns) {
+          if (!p.re.source.startsWith('^' + pre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) continue;
+          const r = p.re.exec(pre + key);
+          if (!r) continue;
+          const groups = [];
+          p.order.forEach((idx, k) => { groups[idx] = r[k + 1]; });
+          out = i18nFill(p.en, groups).replace(/^[,·;.]\s*/, '');
+          break;
+        }
+        if (out !== undefined) break;
+      }
+    }
+  }
   if (out === undefined && looksTurkish(key)) {
     for (const p of I18N.patterns) {
       const r = p.re.exec(key);
@@ -106,13 +139,14 @@ function t(text, depth = 0) {
     const pm = /^([^A-Za-zÇĞİÖŞÜçğıöşüâîû0-9"“'(]*)([\s\S]*?)([.!?…:]*)$/.exec(key);
     if (pm && (pm[1] || pm[3]) && pm[2]) {
       const inner = t(pm[2], depth + 1);
-      if (inner !== pm[2]) out = pm[1] + inner + pm[3];
+      if (inner !== pm[2] && !looksTurkish(inner)) out = pm[1] + inner + pm[3]; // yarım kalan çeviri kabul edilmez
     }
   }
   // Arka arkaya eklenmiş cümleler: en uzun çevrilebilen cümle dizisi aranır (iki şablonun birleştiği paragraflar).
-  if (out === undefined && looksTurkish(key) && depth < 3 && /[.!?] \S/.test(key)) {
+  // Yalnızca en üst düzeyde ve en çok 12 cümlede (iç içe denemeler uzun paragraflarda sayfayı kilitliyordu).
+  if (out === undefined && looksTurkish(key) && depth === 0 && /[.!?] \S/.test(key)) {
     const sent = key.split(/(?<=[.!?…]) (?=\S)/);
-    if (sent.length > 1) {
+    if (sent.length > 1 && sent.length <= 12) {
       const res = [];
       let ok = true;
       for (let i = 0; i < sent.length;) {
@@ -120,7 +154,8 @@ function t(text, depth = 0) {
         for (; j > i; j--) {
           const chunk = sent.slice(i, j).join(' ');
           const tr = t(chunk, depth + 1);
-          if (tr !== chunk || !looksTurkish(chunk)) { got = tr; break; }
+          // Birden çok cümlelik parça yalnızca tamamen çevrildiyse alınır; tek cümle kısmen de olsa alınır.
+          if (!looksTurkish(chunk) || (tr !== chunk && (j === i + 1 || !looksTurkish(tr)))) { got = tr; break; }
         }
         if (got === null) { ok = false; break; }
         res.push(got);
@@ -147,11 +182,27 @@ function t(text, depth = 0) {
 }
 
 const I18N_ATTRS = ['placeholder', 'aria-label', 'title', 'alt'];
+// Çevirinin yazdığı yazı bir daha çevrilmez: düğüm ve yazdığımız değer saklanır. Yoksa içinde Türkçe parça kalan bir
+// çeviri, gözlemci tarafından yeni yazı sanılıp sonsuza dek yeniden çevriliyordu (sayfa kilitleniyordu, 2026-11-10).
+const I18N_DONE = new WeakMap();
+function i18nSetText(node, v) {
+  if (I18N_DONE.get(node) === v) return;
+  const n = t(v);
+  I18N_DONE.set(node, n);
+  if (n !== v) node.nodeValue = n;
+}
+function i18nSetAttr(el, a, v) {
+  const key = 'a:' + a, seen = I18N_DONE.get(el) || {};
+  if (seen[key] === v) return;
+  const n = t(v);
+  seen[key] = n;
+  I18N_DONE.set(el, seen);
+  if (n !== v) el.setAttribute(a, n);
+}
 function i18nNode(node) {
   if (node.nodeType === 3) {
     if (node.parentElement?.closest('[translate="no"], script, style')) return;
-    const v = node.nodeValue, n = t(v);
-    if (n !== v) node.nodeValue = n;
+    i18nSetText(node, node.nodeValue);
     return;
   }
   if (node.nodeType !== 1 || node.closest('[translate="no"]')) return;
@@ -160,7 +211,7 @@ function i18nNode(node) {
   for (const el of [node, ...node.querySelectorAll('[placeholder],[aria-label],[title],[alt]')]) {
     for (const a of I18N_ATTRS) {
       const v = el.getAttribute?.(a);
-      if (v) { const n = t(v); if (n !== v) el.setAttribute(a, n); }
+      if (v) i18nSetAttr(el, a, v);
     }
   }
 }
@@ -173,7 +224,7 @@ function i18nWatch() {
       else if (r.type === 'characterData') i18nNode(r.target);
       else if (r.type === 'attributes') {
         const v = r.target.getAttribute(r.attributeName);
-        if (v) { const n = t(v); if (n !== v) r.target.setAttribute(r.attributeName, n); }
+        if (v) i18nSetAttr(r.target, r.attributeName, v);
       }
     }
   });
@@ -182,33 +233,43 @@ function i18nWatch() {
   document.title = t(document.title);
 }
 
+// Sözlüğü bir kez yükler (aynı anda gelen istekler aynı yüklemeyi bekler); yükleme düşerse bir kez daha dener. Zayıf
+// bağlantıda ya da sunucu bağlantıyı kesince sözlüksüz kalınmasın.
 function i18nLoad() {
   if (I18N.en) return Promise.resolve();
-  const v = (document.currentScript?.src || [...document.scripts].find((s) => /i18n\.js/.test(s.src))?.src || '').split('?v=')[1] || '';
-  return new Promise((resolve, reject) => {
+  if (I18N.loading) return I18N.loading;
+  const v = ([...document.scripts].find((s) => /i18n.js/.test(s.src))?.src || '').split('?v=')[1] || '';
+  const once = (n) => new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'i18n-en.js' + (v ? '?v=' + v : '');
-    s.onload = () => {
-      I18N.en = window.I18N_EN || {};
-      I18N.content = window.I18N_CONTENT || {};
-      I18N.patterns = i18nPatterns(I18N.en);
-      resolve();
-    };
-    s.onerror = () => reject(new Error('Language file could not be loaded. Check your connection and reload.'));
+    s.src = 'i18n-en.js' + (v ? '?v=' + v : '') + (n ? '&r=' + n : '');
+    s.onload = () => (window.I18N_EN ? resolve() : reject(new Error('empty')));
+    s.onerror = () => { s.remove(); reject(new Error('Language file could not be loaded. Check your connection and reload.')); };
     document.head.append(s);
   });
+  I18N.loading = once(0).catch(() => once(1)).then(() => {
+    I18N.en = window.I18N_EN || {};
+    I18N.content = window.I18N_CONTENT || {};
+    I18N.patterns = i18nPatterns(I18N.en);
+    if (I18N.observer) i18nNode(document.body); // sözlük gelmeden çizilen her şey şimdi çevrilir
+    document.title = t(document.title);
+  }).catch((e) => { I18N.loading = null; throw e; });
+  return I18N.loading;
 }
 
-// Dili ayarlar. İngilizceden Türkçeye dönüşte sayfa yenilenir (ekrandaki yazılar zaten çevrilmiş olabilir).
+// Dili ayarlar. İngilizceden Türkçeye dönüşte sayfa yenilenir (ekrandaki yazılar zaten çevrilmiş olabilir). İngilizcede
+// sözlük yüklenene kadar beklenir (ilk sayfa Türkçe çizilmesin).
 async function setLang(lang) {
   lang = lang === 'en' ? 'en' : 'tr';
   try { localStorage.setItem('defter.lang', lang); } catch (e) { /* önemli değil */ }
-  if (lang === LANG) { if (lang === 'en') i18nWatch(); return; }
-  if (lang === 'tr') { location.reload(); return new Promise(() => {}); }
-  await i18nLoad();
+  if (lang === 'tr') {
+    if (LANG === 'tr') return;
+    location.reload();
+    return new Promise(() => {});
+  }
   LANG = 'en';
   LOCALE = 'en-US';
   document.documentElement.lang = 'en';
+  await i18nLoad();
   i18nWatch();
 }
 // Profilden dil: ABD müfredatındaki hesap (öğrenci, veli, öğretmen) İngilizce görür.
@@ -229,6 +290,6 @@ for (const fn of ['confirm', 'alert', 'prompt']) {
   const want = saved || (/^tr\b/i.test(navigator.language || 'tr') ? 'tr' : 'en');
   if (want === 'en') {
     LANG = 'en'; LOCALE = 'en-US'; document.documentElement.lang = 'en';
-    I18N.ready = i18nLoad().then(() => { if (document.body) i18nWatch(); else document.addEventListener('DOMContentLoaded', i18nWatch); }).catch(() => {});
+    I18N.ready = i18nLoad().then(() => { if (document.body) i18nWatch(); else document.addEventListener('DOMContentLoaded', i18nWatch); }).catch(() => { /* setLang yeniden dener */ });
   } else I18N.ready = Promise.resolve();
 })();

@@ -4202,8 +4202,9 @@ function familySection() {
 
     const person = (m, extra) => h('div', { class: 'member' },
       h('div', { class: 'stack', style: 'gap: 0; min-width: 0' },
-        h('b', {}, m.display_name + (m.id === me ? ' (sen)' : '') + (m.grade ? ` · ${m.grade}. sınıf` : '') +
-          (m.role === 'teacher' ? ` · ${m.subjects ? m.subjects.map((s) => SUBJECTS[s]?.name).join(', ') : 'bütün dersler'}` : '')),
+        // Ad, "(sen)" ve sınıf ayrı parçalar: ad olduğu gibi kalır, öbürleri İngilizce katmanda ayrı ayrı çevrilir.
+        h('b', {}, h('span', { translate: 'no' }, m.display_name), m.id === me ? ' (sen)' : null, m.grade ? ` · ${m.grade}. sınıf` : null,
+          m.role === 'teacher' ? ` · ${m.subjects ? m.subjects.map((s) => SUBJECTS[s]?.name).join(', ') : 'bütün dersler'}` : null),
         h('span', { class: 'small muted', style: 'overflow-wrap: anywhere' }, m.email)),
       extra || null);
 

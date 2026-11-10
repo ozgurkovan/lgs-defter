@@ -40,7 +40,15 @@
     if (typeof LANG !== 'undefined' && LANG === 'en') {
       const TR = /[çğıöşüÇĞİÖŞÜ]/;
       const visibleTurkish = () => {
-        const lines = document.body.innerText.split('\n').map((s) => s.trim()).filter((s) => s && (TR.test(s) || looksTurkish(s)));
+        // Kişi adları (translate="no", ör. test velisinin adı "ABD Veli") yazı sayılmaz; görünen öbür bütün metin taranır.
+        const texts = [];
+        const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+          const el = n.parentElement;
+          if (!el || el.closest('[translate="no"], script, style, [hidden]') || !el.getClientRects().length) continue;
+          texts.push(n.nodeValue);
+        }
+        const lines = texts.flatMap((s) => s.split('\n')).map((s) => s.trim()).filter((s) => s && (TR.test(s) || looksTurkish(s)));
         const attrs = [...document.querySelectorAll('[aria-label],[placeholder],[title]')].filter((el) => el.offsetParent !== null || el === document.activeElement)
           .flatMap((el) => ['aria-label', 'placeholder', 'title'].map((a) => el.getAttribute(a)).filter(Boolean)).filter((v) => TR.test(v) || looksTurkish(v));
         return [...new Set([...lines, ...attrs])];
