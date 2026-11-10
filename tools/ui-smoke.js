@@ -497,7 +497,7 @@
           first.click();
           const slot = card.querySelector('.exam-wrongs');
           for (let i = 0; i < 40 && /Yükleniyor/.test(slot.textContent); i++) await wait(150);
-          shown = !slot.hidden && (slot.querySelectorAll('.opt, img, .stem').length >= 1 || /bulunamadı/.test(slot.textContent)) ? 'ok' : slot.textContent.slice(0, 60);
+          shown = !slot.hidden && (slot.querySelectorAll('.choice, img, .stem').length >= 1 || /bulunamadı/.test(slot.textContent)) && !slot.querySelector('.choice.right') ? 'ok' : slot.textContent.slice(0, 60);
           first.click(); await wait(100); hidden = slot.hidden;
         }
         const options = sel.options.length;
@@ -576,13 +576,14 @@
         weakBtn.scrollIntoView({ block: 'center' }); weakBtn.click();
         const slot = weakBtn.nextElementSibling;
         for (let i = 0; i < 40 && /Yükleniyor/.test(slot?.textContent || 'Yükleniyor'); i++) await wait(150);
-        const shown = !!slot && !slot.hidden && (slot.querySelectorAll('.opt, img, .stem, .exam-img').length >= 1 || /bulunamadı|havuzda değil/.test(slot.textContent));
+        const shown = !!slot && !slot.hidden && (slot.querySelectorAll('.choice, img, .stem, .exam-img').length >= 1 || /bulunamadı|havuzda değil/.test(slot.textContent));
+        const hiddenAns = !!slot && !slot.querySelector('.choice.right, .choice.wrong') && !/Çözüm:/.test(slot.textContent);
         weakBtn.click(); await wait(100);
         const groups = [...document.querySelectorAll('#app h3.weak-group')].map((x) => x.textContent.split(' · ')[0]);
         const order = studentSubjects(state.student).map((s) => SUBJECTS[s].name);
         const grouped = new Set(groups).size === groups.length && groups.every((g, i) => i === 0 || order.indexOf(groups[i - 1]) <= order.indexOf(g));
-        check('Rapor: zayıf konular derse göre gruplu; "Yanlış soruları göster" soruları açar, yeniden dokununca kapanır', shown && slot.hidden && grouped && pageText().includes('yanlışlar nereden geliyor'),
-          shown ? `${slot.querySelectorAll('.opt').length} şık` : (slot?.textContent || 'panel yok').slice(0, 80));
+        check('Rapor: zayıf konular derse göre gruplu; "Yanlış soruları göster" soruları cevabı gizli açar, yeniden dokununca kapanır', shown && hiddenAns && slot.hidden && grouped && pageText().includes('yanlışlar nereden geliyor'),
+          shown ? `${slot.querySelectorAll('.choice').length} şık, cevap ${hiddenAns ? 'gizli' : 'açık'}` : (slot?.textContent || 'panel yok').slice(0, 80));
       } else check('Rapor: zayıf konuda "Yanlış soruları göster"', true, 'zayıf konu yok, atlandı');
       // Günün yanlışları derse göre gruplu (2026-11-09): her dersin başlığı bir kez çıkar, başlıktaki sayı altındaki yanlış
       // sayısına eşittir, dersler öğrencinin ders sırasıyla gelir.
@@ -597,27 +598,34 @@
       } else check('Rapor: günün yanlışları derse göre gruplu', true, 'o gün yanlış yok, atlandı');
     }
 
-    // Velinin "Benzer sorularla dene"si (2026-11-09): Sorular sayfasında kaçırdığı sorunun altında düğme; basınca panel açılır,
-    // benzer soru (şıklarıyla) ya da "benzer soru kalmadı" notu gelir. Şıklara dokunulmaz: hiçbir şey yazılmaz. Veli ve
-    // öğretmende var (öğretmen kendi dersinde), öğrencide yok.
+    // Velinin "Birlikte çöz"ü (2026-11-10; "Benzer sorularla dene"nin yerine, benzer sorular kartın içinde): Sorular sayfasında
+    // kaçırdığı sorunun altında düğme; basınca kart açılır: şıklar düğme, cevap ve çözüm gizli. "Cevabı göster" doğru cevabı,
+    // ilk seçimini ve çözümü açar, "Anladı mı?" sorar; "Anladım" benzer soruyu (ya da "kalmadı" notunu) getirir. Şıklara
+    // dokunulmaz: hiçbir şey yazılmaz. Veli ve öğretmende var (öğretmen kendi dersinde), öğrencide yok.
     if (role !== 'student') {
       go('questions'); await settle();
       const tabs = [...document.querySelectorAll('#app .chip')];
       let btn = null;
       for (const name of ['Denemeler', 'Tekrarlar']) {
         tabs.find((x) => x.textContent === name)?.click(); await wait(150);
-        btn = [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Benzer sorularla dene');
+        btn = [...document.querySelectorAll('#app button')].find((x) => x.textContent === 'Birlikte çöz');
         if (btn) break;
       }
       if (btn) {
-        btn.click();
-        for (let i = 0; i < 40 && /aranıyor/.test(document.querySelector('#app .check-panel')?.textContent || 'aranıyor'); i++) await wait(150);
-        const panel = document.querySelector('#app .check-panel');
+        btn.click(); await wait(150);
+        const card = btn.nextElementSibling?.querySelector('.study-card');
+        const hiddenFirst = !!card && card.querySelectorAll('button.choice').length >= 2 && !card.querySelector('.choice.right, .choice.wrong')
+          && !/Doğru cevap|Çözüm:/.test(card.textContent);
+        card?.querySelector('button.ghost')?.click(); await wait(100);
+        const revealed = !!card && !!card.querySelector('.choice.right') && /Doğru cevap|Doğru\./.test(card.textContent) && /Anladı mı\?/.test(card.textContent);
+        [...(card?.querySelectorAll('button') || [])].find((x) => x.textContent.startsWith('Anladım'))?.click();
+        for (let i = 0; i < 40 && /aranıyor/.test(card?.querySelector('.check-panel')?.textContent || 'aranıyor'); i++) await wait(150);
+        const panel = card?.querySelector('.check-panel');
         const asked = !!panel && panel.querySelectorAll('button.choice').length >= 2 && /Benzer soru 1 \/ \d/.test(panel.textContent);
         const none = !!panel && /benzer soru kalmadı/.test(panel.textContent);
-        check('Veli ya da öğretmen: "Benzer sorularla dene" kaçırdığı sorunun altında benzer soruyu açar', btn.hidden && (asked || none),
-          asked ? panel.textContent.match(/Benzer soru 1 \/ \d/)[0] : none ? 'benzer soru kalmadı' : (panel?.textContent || 'panel yok').slice(0, 80));
-      } else check('Veli ya da öğretmen: "Benzer sorularla dene"', true, 'kaçırdığı soru yok, atlandı');
+        check('Veli ya da öğretmen: "Birlikte çöz" cevabı gizler, "Cevabı göster" açar, "Anladım" benzer soruyu getirir', btn.hidden && hiddenFirst && revealed && (asked || none),
+          `${hiddenFirst ? 'gizli' : 'gizli değil'}, ${revealed ? 'açıldı' : 'açılmadı'}, ` + (asked ? panel.textContent.match(/Benzer soru 1 \/ \d/)[0] : none ? 'benzer soru kalmadı' : (panel?.textContent || 'panel yok').slice(0, 80)));
+      } else check('Veli ya da öğretmen: "Birlikte çöz"', true, 'kaçırdığı soru yok, atlandı');
     }
 
     // Ülke ve müfredat ayrımı (2026-11-09): seçili öğrencinin müfredatı Türkiye; konuların hepsi onun müfredatından gelir

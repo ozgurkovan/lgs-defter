@@ -1905,11 +1905,8 @@ async function viewTogether() {
           toast('Listeden çıkarıldı.');
         } }, 'Birlikte baktık');
         // Benzer sorularla dene (veli): hepsini doğru yaparsa soru kendiliğinden "birlikte bakıldı" sayılır.
-        const check = checkButton({ questionId: r.question_id, topicId: r.questions?.topic_id, styles: r.questions?.styles, variantOf: r.questions?.variant_of },
-          async ({ right, total }) => {
-            if (right < total) return;
-            try { await q(sb.rpc('mark_together', { rid: r.id })); btn.remove(); toast('Hepsi doğru: birlikte bakıldı olarak işaretlendi.'); } catch (e) { /* düğmeyle işaretlenebilir */ }
-          });
+        // Birlikte çöz (2026-11-10): cevap gizli, çocuk yeniden çözer, sonra çözüm, "anladı mı?", benzer soru.
+        const check = r.questions ? togetherButton(reviewStudy(r, r.questions)) : null;
         card.append(...(check || []), btn);
       }
       return card;
@@ -4361,6 +4358,80 @@ function checkPanel(src, onDone) {
   })().catch(() => fill(box, h('p', { class: 'small error' }, 'Benzer sorular yüklenemedi, tekrar dene.')));
   return box;
 }
+/* Birlikte çöz kartı (velinin isteği, 2026-11-10): yanlış sorunun cevabı ve çözümü önce gizli. Çocuk soruyu velinin ya da
+   öğretmeninin yanında yeniden çözer (şıklara dokunur); sonra doğru/yanlış, doğru cevap, ilk seferdeki seçimi ve çözüm
+   açılır. Ardından "Anladı mı?": "Anladım" deyince benzer soru (checkPanel) burada sorulur; "Anlamadım" deyince konuya
+   birlikte bir kez daha bakmaları önerilir, benzer soru düğmesi yine durur. "Cevabı göster" çözmeden açar (eski görünüm).
+   Yeniden çözüm, soru havuzdaysa, 'check' tarzıyla çocuğun adına kaydedilir (doğruysa bronz); hata tekrarına yeniden
+   girmez. Kâğıt denemenin fotoğrafında şıklar yoktur: yalnız A–D harfleri.
+   data: { content, choices, answer, chosen, blank, solution, questionId }; src: checkPanel kaynağı. */
+function studyCard(data, src) {
+  const canWrite = ['parent', 'teacher'].includes(state.profile?.role);
+  const keys = data.choices ? ['A', 'B', 'C', 'D'].filter((k) => data.choices[k] !== undefined) : ['A', 'B', 'C', 'D'];
+  const after = h('div', { class: 'stack', style: 'gap: 8px', hidden: true });
+  const startedAt = Date.now();
+  let done = false;
+  const reveal = async (k) => {
+    if (done) return;
+    done = true;
+    const correct = !!k && k === data.answer;
+    const wrongKey = k ? (correct ? null : k) : (data.chosen !== data.answer ? data.chosen : null);
+    btns.forEach((b) => { b.disabled = true; b.classList.toggle('right', b.dataset.k === data.answer); b.classList.toggle('wrong', b.dataset.k === wrongKey); });
+    hint.hidden = true;
+    if (k && canWrite && data.questionId) {
+      try {
+        await q(sb.from('reviews').insert({ student_id: sid(), question_id: data.questionId, track: 'check', answer: k, correct,
+          duration_sec: Math.round((Date.now() - startedAt) / 1000), hint_used: false }));
+      } catch (e) { /* kayıt olmasa da inceleme sürer */ }
+    }
+    const first = data.blank ? 'İlk seferde boş bırakmıştı.' : data.chosen ? `İlk seferde ${data.chosen} seçmişti.` : '';
+    const ask = h('div', { class: 'stack', style: 'gap: 6px' });
+    const canSimilar = canWrite && src?.topicId;
+    fill(after,
+      h('p', { class: 'study-result' }, h('b', { style: `color: var(--${correct ? 'green' : 'red'})` },
+        k ? (correct ? 'Doğru.' : `Yanlış. Doğru cevap ${data.answer || '?'}.`) : `Doğru cevap ${data.answer || '?'}.`),
+      first ? h('span', { class: 'small muted' }, ` ${first}`) : null),
+      data.solution ? h('div', { class: 'note small' }, h('b', {}, 'Çözüm: '), data.solution) : h('p', { class: 'small muted' }, 'Bu sorunun yazılı çözümü yok; birlikte çözün.'),
+      canSimilar ? h('div', { class: 'stack', style: 'gap: 6px' },
+        h('p', { class: 'small' }, h('b', {}, 'Anladı mı?'), ' Çözümü birlikte inceleyin, sonra sorun.'),
+        h('div', { class: 'row' },
+          h('button', { class: 'primary', onclick: () => fill(ask, h('p', { class: 'small muted' }, 'Anladı: benzer bir soruyla deneyelim.'), checkPanel(src)) }, 'Anladım, benzer soru gelsin'),
+          h('button', { class: 'ghost', onclick: () => fill(ask, h('p', { class: 'small' }, 'Sorun değil. Konuyu birlikte bir kez daha anlatın; hazır olunca benzer sorularla deneyin.'),
+            ...(checkButton(src) || [])) }, 'Anlamadım')),
+        ask) : null);
+    after.hidden = false;
+  };
+  const btns = keys.map((k) => h('button', { class: 'choice', 'data-k': k, 'aria-label': `${k} şıkkı`, onclick: () => reveal(k) },
+    h('b', {}, k), data.choices ? h('span', {}, data.choices[k]) : null));
+  const hint = h('div', { class: 'spread' },
+    h('p', { class: 'small muted' }, 'Önce yeniden çözsün: cevap ve çözüm sonra açılır.'),
+    h('button', { class: 'ghost small', onclick: () => reveal(null) }, 'Cevabı göster'));
+  return h('div', { class: 'study-card stack', style: 'gap: 8px' }, data.content, h('div', { class: 'stack', style: 'gap: 6px' }, btns), hint, after);
+}
+// Birlikte çöz kartının verisi: denemedeki sorudan (exam_questions satırı; eşleşen havuz sorusu varsa şıkları) ya da tekrar
+// sorusundan (reviews satırı + havuz sorusu). [data, src] döner.
+const questionBody = (qn) => [qn?.image_path ? lazyImg('questions', qn.image_path) : null, qn?.stem ? h('p', { class: 'stem small' }, qn.stem) : null];
+function examStudy(e, topicId) {
+  const qn = e.image_path ? null : e.questions;
+  return [{ content: e.image_path ? lazyImg('photos', e.image_path) : questionBody(qn), choices: qn?.choices || null, answer: e.correct_answer,
+    chosen: e.student_answer, blank: e.outcome === 'bos', solution: e.solution, questionId: e.question_id || null },
+  { examQuestionId: e.id, questionId: e.question_id || null, topicId: topicId ?? e.topic_id, styles: e.styles }];
+}
+function reviewStudy(r, qn, topicId) {
+  const qid = r.question_id || qn.id;
+  return [{ content: questionBody(qn), choices: qn.choices, answer: qn.answer, chosen: r.answer, blank: !!r.needs_help, solution: qn.solution, questionId: qid },
+    { questionId: qid, topicId: topicId ?? qn.topic_id, styles: qn.styles, variantOf: qn.variant_of }];
+}
+// "Birlikte çöz" düğmesi (listelerde): basınca kart açılır. make: [data, src] ya da bunu veren (async olabilir) işlev.
+function togetherButton(make) {
+  const slot = h('div', {});
+  const btn = h('button', { class: 'block', onclick: async () => {
+    btn.hidden = true;
+    try { const [data, src] = typeof make === 'function' ? await make() : make; slot.append(studyCard(data, src)); }
+    catch (e) { btn.hidden = false; toast('Soru yüklenemedi, tekrar dene.'); }
+  } }, 'Birlikte çöz');
+  return [btn, slot];
+}
 // "Benzer sorularla dene" düğmesi: veli ve öğretmen (öğretmen kendi dersinde; cevapları çocuğun adına yazma izni
 // supabase/teacher-check.sql), konusu bilinen soruda. Öğrencide yok.
 function checkButton(src, onDone) {
@@ -4416,7 +4487,7 @@ async function viewQuestions() {
       r.misconception ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Kavram yanılgısı: '), r.misconception) : null,
       r.scratch_note ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Karalamasında: '), r.scratch_note) : null) : null,
     r.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, r.solution)) : null,
-    r.outcome !== 'dogru' ? checkButton({ examQuestionId: r.id, questionId: r.question_id || null, topicId: r.topic_id, styles: r.styles }) : null);
+    r.outcome !== 'dogru' && ['parent', 'teacher'].includes(state.profile?.role) ? togetherButton(examStudy(r)) : null);
 
   const reviewCard = (r) => {
     const qn = r.questions || {};
@@ -4440,7 +4511,7 @@ async function viewQuestions() {
       ].filter(Boolean).join(' · ')),
       !r.correct && r.confidence >= 75 ? h('p', { class: 'small error' }, 'Emin olduğu hâlde yanlış: kavram yanılgısı olabilir.') : null,
       qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, qn.solution)) : null,
-      !r.correct ? checkButton({ questionId: r.question_id, topicId: qn.topic_id, styles: qn.styles, variantOf: qn.variant_of }) : null);
+      !r.correct ? togetherButton(reviewStudy(r, qn)) : null);
   };
 
   function draw() {
@@ -4536,10 +4607,7 @@ async function viewReport() {
                 h('button', { class: 'ghost small', onclick: () => { open = null; slot.hidden = true; btn.setAttribute('aria-expanded', 'false'); } }, 'Kapat')),
               rows.length ? rows.map((e) => h('div', { class: 'stack', style: 'gap: 6px; padding-top: 8px; border-top: 1px solid var(--rule)' },
                 h('p', { class: 'small muted' }, `${e.q_no}. soru · ${e.topics?.name || topicName[e.topic_id]?.name || ''}`),
-                examQuestionContent(e),
-                h('p', { class: 'small' }, kind === 'bos' ? `Boş bıraktı. Doğru cevap ${e.correct_answer || '?'}.` : `Cevabı ${e.student_answer || '?'} · doğrusu ${e.correct_answer || '?'}`),
-                e.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, e.solution)) : null,
-                checkButton({ examQuestionId: e.id, questionId: e.question_id || null, topicId: e.topic_id, styles: e.styles })))
+                studyCard(...examStudy(e))))
                 : h('p', { class: 'small muted' }, 'Soru bulunamadı; deneme henüz işlenmemiş olabilir.'));
           } catch (e) { fill(slot, h('p', { class: 'small error' }, 'Sorular yüklenemedi, tekrar dene.')); }
         } }, n);
@@ -4622,10 +4690,7 @@ async function viewReport() {
           h('h4', { class: 'wrong-group', style: 'margin: 10px 0 0' }, `${g.name} · ${g.rows.length} soru`),
           g.rows.map((e) => h('div', { class: 'stack', style: 'gap: 6px; padding-top: 8px; border-top: 1px solid var(--rule)' },
             h('p', { class: 'small muted' }, `${e.exams?.name || 'Deneme'} · ${e.q_no}. soru · ${fmtDate(e.exams?.exam_date)} · ${e.outcome === 'bos' ? 'boş' : 'yanlış'}`),
-            examQuestionContent(e),
-            h('p', { class: 'small' }, e.outcome === 'bos' ? `Boş bıraktı. Doğru cevap ${e.correct_answer || '?'}.` : `Cevabı ${e.student_answer || '?'} · doğrusu ${e.correct_answer || '?'}`),
-            e.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, e.solution)) : null,
-            checkButton({ examQuestionId: e.id, questionId: e.question_id || null, topicId: e.topic_id, styles: e.styles })))))
+            studyCard(...examStudy(e))))))
           : h('p', { class: 'small muted' }, 'Bu derste yanlış ya da boş soru bulunamadı.'));
       } catch (e) {
         loaded = false;
@@ -4719,25 +4784,17 @@ async function viewReport() {
         ]);
         const byId = Object.fromEntries(qs.map((x) => [x.id, x]));
         const trackName = { mistake: 'hata tekrarı', topic: 'konu tekrarı', extra: 'ek çalışma', practice: 'konu çalışması', deneme: 'deneme', check: 'veli/öğretmen denemesi' };
-        const opts = (qn, chosen) => h('div', { class: 'stack', style: 'gap: 4px' }, ['A', 'B', 'C', 'D'].filter((k) => qn.choices?.[k] !== undefined).map((k) =>
-          h('div', { class: 'opt small' + (k === qn.answer ? ' right' : k === chosen ? ' wrong' : '') }, h('b', {}, k), h('span', {}, qn.choices[k]),
-            k === chosen ? h('span', { class: 'muted' }, ' ← seçimi') : null)));
         const revCards = wrongRevs.map((r) => {
           const qn = byId[r.question_id];
           return h('div', { class: 'stack', style: 'gap: 6px; padding-top: 10px; border-top: 1px solid var(--rule)' },
             h('p', { class: 'small muted' }, [fmtDate(localDate(new Date(r.answered_at))), trackName[r.track],
               r.needs_help ? 'boş geçti' : null, CONFIDENCE_LEVELS.find(([c]) => c === r.confidence)?.[1]].filter(Boolean).join(' · ')),
-            qn ? [qn.image_path ? lazyImg('questions', qn.image_path) : null, qn.stem ? h('p', { class: 'stem small' }, qn.stem) : null, opts(qn, r.answer),
-              qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, qn.solution)) : null,
-              checkButton({ questionId: qn.id, topicId: id, styles: qn.styles, variantOf: qn.variant_of })]
+            qn ? studyCard(...reviewStudy(r, qn, id))
               : h('p', { class: 'small muted' }, 'Soru artık havuzda değil.'));
         });
         const examCards = exs.map((e) => h('div', { class: 'stack', style: 'gap: 6px; padding-top: 10px; border-top: 1px solid var(--rule)' },
           h('p', { class: 'small muted' }, `${e.exams?.name || 'Deneme'} · ${e.q_no}. soru · ${fmtDate(e.exams?.exam_date)} · ${e.outcome === 'bos' ? 'boş' : 'yanlış'}`),
-          examQuestionContent(e),
-          h('p', { class: 'small' }, e.outcome === 'bos' ? `Boş bıraktı. Doğru cevap ${e.correct_answer || '?'}.` : `Cevabı ${e.student_answer || '?'} · doğrusu ${e.correct_answer || '?'}`),
-          e.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, e.solution)) : null,
-          checkButton({ examQuestionId: e.id, questionId: e.question_id || null, topicId: id, styles: e.styles })));
+          studyCard(...examStudy(e, id))));
         fill(slot, revCards.length || examCards.length
           ? [h('p', { class: 'small muted' }, `${revCards.length + examCards.length} soru. Öğretmeniyle ya da birlikte üstünden geçin.`), ...revCards, ...examCards]
           : h('p', { class: 'small muted' }, 'Son 30 günde bu konuda yanlış soru bulunamadı.'));
@@ -5010,7 +5067,11 @@ function dayReport(reviews, items, topicName) {
               + (r.confidence >= 75 ? ' Emin olduğu hâlde yanlış: kavram yanılgısı olabilir.' : '')
               + (r.together_at ? ` Birlikte baktınız (${fmtDate(localDate(new Date(r.together_at)))}).` : '')),
             it && it.state === 'active' && it.due_date > day ? h('p', { class: 'small muted' }, `Bu konu tekrar soruları ${fmtDate(it.due_date)} günü gelecek.`) : null,
-            questionDetails(r))];
+            questionDetails(r),
+            ['parent', 'teacher'].includes(state.profile?.role) ? togetherButton(async () => {
+              const qn = await q(sb.from('questions').select('id, topic_id, stem, choices, answer, solution, image_path, styles, variant_of').eq('id', r.question_id).single());
+              return reviewStudy(r, qn);
+            }) : null)];
         })] : h('p', { class: 'small', style: 'color: var(--green)' }, 'Bu gün hiç yanlışı yok.'));
   };
   draw();

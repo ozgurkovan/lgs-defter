@@ -506,6 +506,10 @@ td.wrap { white-space: normal; min-width: 160px; }
 .num-link[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); text-decoration: none; }
 
 /* Velinin benzer soru denemesi: yanlış sorunun kartının altında açılan panel. */
+/* Birlikte çöz kartı: şıklar düğme, cevap açılınca doğru/yanlış renkleri. */
+.study-card { margin-top: 4px; }
+.study-card .choice:disabled { opacity: 1; cursor: default; }
+.study-card .study-result { margin: 0; }
 .check-panel { gap: 10px; margin-top: 4px; padding-top: 12px; border-top: 1px dashed var(--rule); }
 .check-panel .choice:disabled { opacity: 1; cursor: default; }
 

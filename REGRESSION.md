@@ -400,7 +400,14 @@ Her maddenin yanında nasıl denendiği yazar:
   - okundu bilgisi, geri alma. Altında yalnızca son mesaj görünür: tarih, imza, "Okudu" ya da "Henüz okumadı" (velinin
     isteği, 2026-11-10; önceden son beş mesaj). [A]
 - Birlikte bakılacaklar ("Birlikte baktık" ile listeden çıkar).
-- **Benzer sorularla dene** (velinin isteği, 2026-11-09): çocuk yanlış yaptığı soruyu "anladım" deyince veli birkaç benzer
+- **Birlikte çöz** (velinin isteği, 2026-11-10): yanlış sorunun açıldığı her yerde (deneme kutusu, derse göre yanlışlar,
+  zayıf konunun soruları; Sorular, Birlikte bakılacaklar ve Gün gün listelerinde "Birlikte çöz" düğmesiyle) cevap ve çözüm
+  önce gizlidir: şıklar düğmedir, çocuk soruyu velinin ya da öğretmeninin yanında yeniden çözer. Sonra doğru/yanlış, doğru
+  cevap, ilk seferdeki seçimi (ya da boş bıraktığı) ve çözüm açılır; "Cevabı göster" çözmeden açar. Ardından "Anladı mı?":
+  "Anladım" benzer soruyu aynı kartta sorar, "Anlamadım" konuya birlikte bakmayı önerir (benzer soru düğmesi yine durur).
+  Yeniden çözüm havuzdaki soruysa 'check' tarzıyla kaydedilir (doğruysa bronz), hata tekrarına yeniden girmez. Kâğıt
+  denemenin fotoğrafında yalnız A–D harfleri. Öğrencide yok. [A]
+- **Benzer sorularla dene** (velinin isteği, 2026-11-09; artık Birlikte çöz kartının içinde "Anladım" deyince açılır): çocuk yanlış yaptığı soruyu "anladım" deyince veli birkaç benzer
   soruyla dener. Sorular sekmesinde kaçırdığı her sorunun, Birlikte bakılacaklar'daki her sorunun ve raporda zayıf konunun
   yanlış sorularının altında düğme. Veli ve öğretmen (öğretmen kendi dersinde; velinin isteği, 2026-11-09: öğrenci öğretmen
   eşliğinde çözebilsin, `teacher-check.sql`); öğrencide yok. [A]
