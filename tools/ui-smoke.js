@@ -20,6 +20,20 @@
   const check = (name, ok, detail = '') => results.push(`${ok ? 'OK  ' : 'HATA'} ${name}${detail ? ` (${detail})` : ''}`);
   try {
     const role = state.profile.role;
+    // Yalnızca test hesaplarıyla (velinin isteği, 2026-11-10): giriş yapan hesap bir test hesabı, sayfaları açılacak çocuk
+    // (öğrencide kendisi, veli ve öğretmende seçili çocuk) bir test çocuğu değilse test hiçbir sayfa açmadan durur. Test
+    // öğretmeni gerçek bir çocuğa da bağlı; o seçiliyken onun sayfaları açılıp okunurdu. Kimlikler tools/test-accounts.mjs'teki
+    // TEST_ACCOUNTS ile aynı (regression.mjs denetler).
+    const TEST_KIDS = ['dbdb25a7-5944-49b6-94b0-fcd855a205ed', 'c16864e7-684c-42fb-bb5e-f99c05b2a219', // irftest, test4
+      '543d12a4-a7c8-464a-92ce-1bd23d37eec5', '6d0357bd-35f9-4a55-b8ab-ceb6dcd4e6d1']; // abd4, abd7
+    const TEST_ADULTS = ['eac9fc92-6e78-4e48-a81b-409aff6678c9', '0502e009-7d69-40a9-b7c6-ceedaad1012f', // testveli, testogretmen
+      '39be86d3-9683-41f6-8e2a-a6621594803f']; // abdveli
+    const kidId = role === 'student' ? state.profile.id : state.student?.id;
+    if (!(role === 'student' ? TEST_KIDS : TEST_ADULTS).includes(state.profile.id) || !TEST_KIDS.includes(kidId)) {
+      check('Yalnızca test hesabıyla ve test çocuğuyla', false,
+        `test durdu, hiçbir sayfa açılmadı: ${role === 'student' ? 'bir test öğrencisiyle gir' : 'test hesabıyla gir, bir test çocuğu seç'}`);
+      return results.join('\n');
+    }
     const root = rootTab();
     const pages = role === 'student'
       ? { home: ['hata tekrarı', 'konu tekrarı'], upload: ['deneme çöz', 'karma deneme'], send: ['soru ekle', 'kâğıt deneme'],

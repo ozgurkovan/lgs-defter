@@ -18,9 +18,12 @@ Her maddenin yanında nasıl denendiği yazar:
    - öğrenci IrfTest (8. sınıf);
    - ilkokul öğrencisi test4.sinif (4. sınıf);
    - test velisi;
-   - test öğretmeni (IrfTest'te matematik). Öğretmenle önce seçili çocuğun IrfTest olduğuna bakılır.
+   - test öğretmeni (test4.sinif'e bağlanınca; hesap Isla'ya da bağlı, önce seçili çocuğun test4 olduğuna bakılır).
 
-   Bütün satırlar `OK` olmalı. Bu test hiçbir şey kaydetmez.
+   Bütün satırlar `OK` olmalı. Bu test hiçbir şey kaydetmez. Yalnızca test hesaplarıyla çalışır (velinin isteği, 2026-11-10):
+   giriş yapan hesap test hesabı değilse ya da sayfaları açılacak çocuk (öğrencide kendisi, veli ve öğretmende seçili çocuk)
+   test çocuğu değilse tek satır "HATA Yalnızca test hesabıyla ve test çocuğuyla" yazar, hiçbir sayfa açmaz. Kimlik listesi
+   `tools/test-accounts.mjs` ile aynı olmalı; yeni test hesabı eklenince `ui-smoke.js`'e de eklenir (1. adım denetler).
 
    İkinci bir Claude oturumu kendi önizlemesini başka bir portta açabilir (örneğin 5501). Aile fonksiyonu yalnızca 5500'e ve
    canlı siteye izin verir, o yüzden velinin Aile denetimi orada "İşlem yapılamadı" der; Aile bölümü 5500'de denenir.

@@ -12,7 +12,7 @@
 // Arayüz denetimi (tools/ui-smoke.js) ve elle bakılacaklar: REGRESSION.md.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
-import { testAccountEmail } from './test-accounts.mjs';
+import { testAccountEmail, TEST_ACCOUNTS } from './test-accounts.mjs';
 
 let failed = 0;
 const report = (good, name, detail = '') => {
@@ -41,6 +41,11 @@ const rawMagic = readdirSync('tools').filter((f) => f.endsWith('.mjs')).filter((
 const onlyTest = refused.startsWith('Giriş bağlantısı yalnızca');
 report(onlyTest && !rawMagic.length, 'Giriş bağlantısı yalnızca test hesaplarına',
   [!onlyTest && `başka adres: ${refused}`, rawMagic.length && `adresi doğrudan alan: ${rawMagic.join(', ')}`].filter(Boolean).join('; '));
+// Ekran testi yalnızca test hesaplarıyla çalışır (velinin isteği, 2026-11-10); oradaki kimlik listesi test-accounts.mjs ile aynı olmalı.
+const smokeSrc = readFileSync('tools/ui-smoke.js', 'utf8');
+const smokeMissing = Object.entries(TEST_ACCOUNTS).filter(([, id]) => !smokeSrc.includes(id)).map(([name]) => name);
+report(!smokeMissing.length, 'Ekran testi yalnızca test hesaplarıyla',
+  smokeMissing.length ? `ui-smoke.js listesinde yok: ${smokeMissing.join(', ')}` : `${Object.keys(TEST_ACCOUNTS).length} test hesabı`);
 
 // 2
 const sched = node(['tools/test-schedule.mjs']).trim().split(/\r?\n/).filter(Boolean);
