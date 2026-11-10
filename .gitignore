@@ -4,3 +4,6 @@
 node_modules/
 # Saatlik görevin indirdiği fotoğraflar ve ara dosyalar
 .work/
+# İngilizce katmanın ara listesi (node tools/i18n-extract.mjs üretir)
+tools/i18n/keys.json
+tools/i18n/missing.json

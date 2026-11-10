@@ -41,13 +41,17 @@ const GRADE_SUBJECTS = {
   4: ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din'],
 };
 const PRIMARY_ORDER = ['turkce', 'matematik', 'hayat', 'fen', 'sosyal', 'ingilizce', 'din'];
+// ABD müfredatı (velinin isteği, 2026-11-10): şimdilik yalnız Matematik ('matematik' anahtarı, ekranda "Math").
+// Okuma (ELA), Fen ve Sosyal sonra eklenecek. Yabancı dil (İngilizce kelime kartları) ABD'de yok.
 // Müfredat (velinin isteği, 2026-11-09): ülke koduyla başlayan kimlik; 'tr' Türkiye (MEB), ileride 'us-pa' gibi. Konular
 // sınıfın yanında müfredata göre de seçilir (başka ülkenin aynı sınıftaki konuları karışmasın). LGS'ye özgü her şey
 // (dersler, sayaç, denemeler, seyrek konu ayarı) yalnızca Türkiye müfredatındaki 8. sınıf içindir.
 const studentCurriculum = (p) => p?.curriculum || 'tr';
 const isLgsStudent = (p) => studentCurriculum(p) === 'tr' && (!p?.grade || p.grade >= 8);
 const studentGrades = (p) => [...new Set([p?.grade || 8, ...(p?.extra_grades || [])])];
+const US_SUBJECTS = ['matematik'];
 function studentSubjects(p) {
+  if (typeof isUsCurriculum === 'function' && isUsCurriculum(p)) return US_SUBJECTS;
   if (isLgsStudent(p)) return LGS_SUBJECTS;
   const set = new Set(studentGrades(p).flatMap((g) => GRADE_SUBJECTS[g] || ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din']));
   return PRIMARY_ORDER.filter((s) => set.has(s));
@@ -170,7 +174,7 @@ function daysBetween(a, b) {
 }
 function fmtDate(day) {
   if (!day) return '';
-  return parseDay(day).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
+  return parseDay(day).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' });
 }
 function fmtDuration(sec) {
   const m = Math.floor(sec / 60), s = sec % 60;
@@ -196,12 +200,14 @@ function authErrorText(error, wrongText = 'Bilgiler hatalı.') {
 const lastVowel = (s) => [...s.toLocaleLowerCase('tr')].filter((ch) => 'aeıioöuü'.includes(ch)).pop() || 'e';
 // Sevgi hitabı: Mert → Mertçiğim, Can → Cancığım, Ayla → Aylacığım, Umut → Umutçuğum.
 function endearing(name) {
+  if (LANG === 'en') return name;
   const last = name.toLocaleLowerCase('tr').slice(-1);
   const c = 'çfhkpsşt'.includes(last) ? 'ç' : 'c';
   return name + c + { a: 'ığım', ı: 'ığım', e: 'iğim', i: 'iğim', o: 'uğum', u: 'uğum', ö: 'üğüm', ü: 'üğüm' }[lastVowel(name)];
 }
 // Yönelme eki: Mert'e, Can'a, Ayla'ya.
 function toName(name) {
+  if (LANG === 'en') return name;
   const endsVowel = 'aeıioöuü'.includes(name.toLocaleLowerCase('tr').slice(-1));
   return `${name}'${endsVowel ? 'y' : ''}${'eiöü'.includes(lastVowel(name)) ? 'e' : 'a'}`;
 }
@@ -209,6 +215,8 @@ function toName(name) {
 function playfulGreeting(name) {
   const n = (name || '').split(' ')[0];
   if (!n || Math.random() > 0.35) return null;
+  const en = i18nContent('PLAYFUL', null);
+  if (en) return en[Math.floor(Math.random() * en.length)].replace('{name}', n);
   const list = [`${endearing(n)}, napıyon?`, `Selam ${n}! Bugün de döktürüyoruz.`, 'Hoş geldin şampiyon!',
     `${endearing(n)}, hazır mısın?`, `Merhaba ${n}, beyin ısındı mı?`];
   return list[Math.floor(Math.random() * list.length)];
@@ -216,6 +224,7 @@ function playfulGreeting(name) {
 
 function youtubeSearch(topic) {
   const grade = state.student?.grade || 8;
+  if (LANG === 'en') return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`grade ${grade} math ${topic || ''} lesson`);
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${grade >= 8 ? 'LGS ' : ''}${grade}. sınıf ${topic || ''} konu anlatımı`);
 }
 function subjTag(subject, text) {
@@ -464,8 +473,9 @@ let pendingTab = null; // oturumdan ya da denemeden düğmeyle çıkarken: oturu
 const navDepth = () => history.state?.depth ?? 0;
 const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.student ? 'report' : 'settings');
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
+// ABD'de İngilizce kelime kartları yok (yabancı dil ABD öğrencisi için ayrı bir iş).
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', 'words', 'shop', 'typing', 'hero', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together']
+  ? ['home', ...(typeof isUsCurriculum === 'function' && isUsCurriculum(state.profile) ? [] : ['words']), 'shop', 'typing', 'hero', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together']
   : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
 function goBack() {
   if (navDepth() > 0) history.back();
@@ -549,6 +559,7 @@ async function start() {
       h('button', { onclick: signOut }, 'Çıkış yap')));
   }
   state.profile = profile;
+  await setLang(langForProfile(profile));
   // Öğrenci kendi verisiyle çalışır; veli bağlı olduğu bütün çocukları görür ve aralarında geçiş yapar.
   // Öğretmen, sadece velilerin kendisine açtığı çocukları görür (salt okunur).
   await loadStudents();
@@ -1052,7 +1063,7 @@ async function viewHome() {
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
-      h('p', { class: 'label' }, new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })),
+      h('p', { class: 'label' }, new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })),
       h('h1', {}, playfulGreeting(name) || (name ? `${hello}, ${name}` : hello)),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null),
     // Kahramanı besleme açıksa kahraman burada konuşur: acıkınca yardım ister, çalışmaya çağırır (feed.js). Kapalıysa görünmez.
@@ -1557,7 +1568,7 @@ const JOKES = [
   ['Saat tam 3\'te akrep ile yelkovan arasındaki açı kaç derece?', '90 derece, dik açı!', 'bulmaca', 'buyuk'],
 ];
 const JOKE_LABEL = { saka: 'Bir şaka', bilmece: 'Bir bilmece', bulmaca: 'Bir bulmaca' };
-const jokesFor = (p) => { const small = (p?.grade ?? 8) <= 4; return JOKES.filter((j) => !j[3] || (j[3] === 'kucuk') === small); };
+const jokesFor = (p) => { const small = (p?.grade ?? 8) <= 4; return i18nContent('JOKES', JOKES).filter((j) => !j[3] || (j[3] === 'kucuk') === small); };
 // Fıkralar (Nasreddin Hoca, Temel): halk fıkraları, kısa anlatımla; sonu dokununca açılır.
 const FIKRALAR = [
   ['Nasreddin Hoca komşusundan bir kazan ödünç alır. Geri verirken içine küçük bir tencere koyar: "Kazanın doğurdu!" Komşu sevinir. Bir süre sonra Hoca kazanı yine ödünç alır ama geri getirmez. Komşu sorunca Hoca "Kazanın öldü" der. Komşu şaşırır: "Kazan ölür mü hiç?"',
@@ -1595,13 +1606,13 @@ function jokeCard(prefix) {
   const poemShare = poemsOpen().length ? 0.33 : 0.15;
   if (r < poemShare) return poemCard(prefix);
   const fikra = r < poemShare + 0.25;
-  const list = fikra ? FIKRALAR : jokesFor(state.student);
+  const list = fikra ? i18nContent('FIKRALAR', FIKRALAR) : jokesFor(state.student);
   const pick = pickFresh(list, (x) => (fikra ? 'f:' : 'j:') + x[0].slice(0, 40));
   const [question, answer] = pick;
   const kind = fikra ? 'Bir fıkra' : JOKE_LABEL[pick[2]] || 'Bir şaka';
   const punch = h('p', { class: 'msg', hidden: true }, answer);
   const reveal = h('button', { class: 'ghost small', onclick: () => { punch.hidden = false; reveal.remove(); } }, fikra ? 'Sonunu gör' : 'Cevabı gör');
-  return h('section', { class: 'card msg-card' }, h('p', { class: 'label' }, prefix ? `${prefix}: ${kind.toLocaleLowerCase('tr')}` : kind),
+  return h('section', { class: 'card msg-card' }, h('p', { class: 'label' }, prefix ? `${prefix}: ${t(kind).toLocaleLowerCase(LANG === 'en' ? 'en' : 'tr')}` : kind),
     h('p', { class: 'msg' }, question), punch, reveal);
 }
 
@@ -1680,7 +1691,7 @@ const POEM_TIPS = [
   'Bir de birine oku: annene, babana ya da kardeşine, gözlerine bakarak!',
   'Önce fısıldayarak, sonra gür bir sesle oku. Hangisi bu şiire daha çok yakıştı?',
 ];
-const poemsFor = (p) => { const small = (p?.grade ?? 8) <= 4; return POEMS.filter((x) => !x.level || (x.level === 'kucuk') === small); };
+const poemsFor = (p) => { const small = (p?.grade ?? 8) <= 4; return i18nContent('POEMS', POEMS).filter((x) => !x.level || (x.level === 'kucuk') === small); };
 // Küçük harf, şapkasız, noktalamasız; iki dizenin ortak sonu en az iki harfse kafiye sayılır.
 const poemNorm = (s) => s.toLocaleLowerCase('tr').replace(/[âîû]/g, (c) => ({ â: 'a', î: 'i', û: 'u' })[c])
   .replace(/[^a-zçğıöşü ]/g, '').replace(/\s+/g, ' ').trim();
@@ -1743,7 +1754,7 @@ function poemCard(prefix) {
     fill(after, check ? h('p', { class: 'note small' }, `Senin dizen: “${said}”\n${check.text}`) : null,
       h('p', { class: 'small' }, h('strong', {}, 'Kafiye: '), poem.rhyme),
       h('p', { class: 'small' }, poem.note),
-      h('p', { class: 'small muted' }, '🎤 ' + (poem.tip || POEM_TIPS[Math.floor(Math.random() * POEM_TIPS.length)])));
+      h('p', { class: 'small muted' }, '🎤 ' + (poem.tip || i18nContent('POEM_TIPS', POEM_TIPS)[Math.floor(Math.random() * POEM_TIPS.length)])));
     after.hidden = false;
   } }, 'Devamını gör');
   return h('section', { class: 'card msg-card' },
@@ -1768,7 +1779,7 @@ function messageBox() {
       .eq('student_id', kid.id).order('created_at', { ascending: false }).limit(1)); // yalnız son mesaj (velinin isteği, 2026-11-10)
     fill(list, rows.length ? h('p', { class: 'label', style: 'margin-top: 6px' }, 'Son mesaj') : null, rows.map((m) => h('div', { class: 'note small' },
       h('div', { class: 'spread' },
-        h('span', { class: 'muted' }, new Date(m.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+        h('span', { class: 'muted' }, new Date(m.created_at).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
           + (m.signature ? ` · ${m.signature}` : '')),
         h('span', { class: 'tag ' + (m.seen_at ? 'green' : '') }, m.seen_at ? 'Okudu' : 'Henüz okumadı')),
       h('p', { style: 'margin-top: 4px; white-space: pre-wrap' }, m.body),
@@ -1799,8 +1810,8 @@ function messageBox() {
     h('p', { class: 'small muted' }, 'Uygulamayı açınca ana sayfasında görür; "Okudum" deyince kapanır.'),
     body,
     h('div', { class: 'chips' },
-      h('button', { class: 'chip', onclick: () => idea(SWEET_LINES) }, 'Tatlı bir söz'),
-      h('button', { class: 'chip', onclick: () => idea(JOKES.map(([j, a]) => `${j} ${a}`)) }, 'Bir şaka')),
+      h('button', { class: 'chip', onclick: () => idea(i18nContent('SWEET_LINES', SWEET_LINES)) }, 'Tatlı bir söz'),
+      h('button', { class: 'chip', onclick: () => idea(i18nContent('JOKES', JOKES).map(([j, a]) => `${j} ${a}`)) }, 'Bir şaka')),
     h('label', { class: 'field' }, 'İmza', signature),
     all ? h('label', { class: 'row small', for: 'msg-all' }, all, 'Bütün çocuklara gönder') : null,
     send, list);
@@ -1851,7 +1862,7 @@ function poemBox() {
         const [label, color] = tag[r.result] || [r.result, ''];
         return h('div', { class: 'stack', style: 'gap: 4px; padding: 8px 0; border-top: 1px solid var(--rule)' },
           h('div', { class: 'spread' },
-            h('span', { class: 'small muted' }, new Date(r.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+            h('span', { class: 'small muted' }, new Date(r.created_at).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
               + (p ? ` · ${p.by}` : '')),
             h('span', { class: 'tag ' + color }, label)),
           p ? h('p', { class: 'small muted', style: 'white-space: pre-line; font-style: italic' }, p.show.join('\n')) : null,
@@ -1896,7 +1907,7 @@ async function viewTogether() {
         : 'Anlamadığın ya da tahmin ettiğin sorular. Velin ya da öğretmeninle birlikte üstünden geçin.')),
     rows.length ? rows.map((r) => {
       const when = h('p', { class: 'small muted' }, [trackName[r.track],
-        new Date(r.answered_at).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })].filter(Boolean).join(' · '));
+        new Date(r.answered_at).toLocaleString(LOCALE, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })].filter(Boolean).join(' · '));
       const info = { answer: r.answer, correct: r.correct, kind: togetherKind(r), topic: r.questions?.topics?.name };
       // Veli ve öğretmende kartın kendisi "birlikte çöz" kartıdır (velinin isteği, 2026-11-10): cevap ve çözüm gizli, çocuk
       // yanlarında çözer, öğretmen nerede takıldığını görür; sonra çözüm (kapalı), "anladı mı?", benzer soru. Benzer
@@ -2298,7 +2309,7 @@ function savedExam() {
 }
 function storeExam(e) { try { localStorage.setItem(examKey(), JSON.stringify(e)); } catch (err) { /* depolama kapalı: deneme yine sürer */ } }
 function dropExam() { try { localStorage.removeItem(examKey()); } catch (err) { /* önemli değil */ } }
-const fmtNet = (n) => n.toFixed(2).replace('.', ',');
+const fmtNet = (n) => (LANG === 'en' ? n.toFixed(2) : n.toFixed(2).replace('.', ','));
 // Deneme sorusunun içeriği: kâğıt denemede kırpılmış fotoğraf, uygulama içi denemede havuzdaki soru (şıklar işaretli).
 function examQuestionContent(r) {
   if (r.image_path) return lazyImg('photos', r.image_path);
@@ -3016,7 +3027,7 @@ function nextWordBox(box, ok, confidence) {
   return box ? Math.max(1, box - 1) : 1;
 }
 // Günde kaç kelime kartı: aile isterse açar (velinin isteği), her sınıfta; açılmadıysa kapalı.
-const wordsPerDay = (p) => p?.daily_words ?? 0;
+const wordsPerDay = (p) => (typeof isUsCurriculum === 'function' && isUsCurriculum(p) ? 0 : p?.daily_words ?? 0);
 const WORD_PRAISE = ['Aferin! 🎉', 'Süper! ⭐', 'Harika! 👏', 'Doğru! 🙌', 'Bravo! 🌟'];
 let wordList = null;
 async function loadWords() {
@@ -3328,7 +3339,7 @@ function heroScene(student, level, owned, mood) {
   }
   return box;
 }
-const upFirst = (t) => t.charAt(0).toLocaleUpperCase('tr') + t.slice(1);
+const upFirst = (x) => x.charAt(0).toLocaleUpperCase(LANG === 'en' ? 'en' : 'tr') + x.slice(1);
 const reduceMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 // Penceredeki araç ve manzara: gittiği yere götüren araç elindeyse onunla oraya gider; değilse (bir sonrakine
 // biriktiriyorsa) son aracıyla bulunduğu yerde dolaşır. Hiç aracı yoksa yürüyor, pencere yok.
@@ -4033,6 +4044,7 @@ function planSection(p) {
       'Aile isterse açar; kapalıyken sekme görünmez. Okuldaki İngilizce dersinden ayrı: İngilizce kelimeler, kolaydan zora. '
         + `Açıkken günde kaç kart gelsin? Bugün ${new Set(wordRows.map((r) => r.word)).size} kart çözdü. ${wordsLine}`
         + 'Kelime kahramanının görünüşü (kız ya da erkek, saç, fotoğraftan benzetme) Aile bölümünde.', '2px');
+    if (isUsCurriculum(p)) wordsRow.hidden = true; // ABD'de İngilizce kelime kartları yok
     const typingRow = switchRow('Klavye dersleri (Klavye sekmesi)', typingPerDay(p) > 0, typingPerDay(p), 10, 2,
       'Aile isterse açar, her sınıfta. On parmak klavye: ekranda klavye ve eller, hangi parmağın hangi tuşa basacağı yanar. '
         + 'Bilgisayarda yapılır, telefonda sekme görünmez. Açıkken günde kaç ders? Kazandığı yıldızlar kelime kahramanını güçlendirir.', '1px');
@@ -4521,7 +4533,7 @@ async function viewQuestions() {
           k === r.answer ? h('span', { class: 'muted' }, ' ← seçimi') : null))),
       h('p', { class: 'small muted' }, [
         { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', practice: 'Konu çalışması', deneme: 'Deneme', check: 'Veli/öğretmen denemesi' }[r.track] || '',
-        new Date(r.answered_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+        new Date(r.answered_at).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
         r.confidence ? `emin %${r.confidence}` : null,
         `süre ${fmtDuration(r.duration_sec)} / ${fmtDuration(max)}${r.duration_sec > max ? ' (aştı)' : ''}`,
         r.hint_used ? 'ipucu kullandı' : null,
@@ -4880,7 +4892,7 @@ async function viewReport() {
   const load = h('section', { class: 'card' },
     h('h2', {}, 'Önümüzdeki 7 gün'),
     h('p', { class: 'small muted' }, 'Günü gelen tekrar maddesi sayısı (hata + konu).'),
-    upcoming.map((u, i) => bar(i === 0 ? 'Bugün' : parseDay(u.day).toLocaleDateString('tr-TR', { weekday: 'long' }), u.n, maxUp, 'var(--accent)')));
+    upcoming.map((u, i) => bar(i === 0 ? 'Bugün' : parseDay(u.day).toLocaleDateString(LOCALE, { weekday: 'long' }), u.n, maxUp, 'var(--accent)')));
 
   // İşleme durumu
   const job = h('section', { class: 'card' },
@@ -4891,7 +4903,7 @@ async function viewReport() {
     feedbackRows.length ? h('p', { class: 'small muted' },
       `Soru bildirimi: ${feedbackRows.length}. Kontrol edilen ${feedbackRows.filter((f) => f.status === 'checked').length}, ` +
       `hatalı bulunan ${feedbackRows.filter((f) => f.verdict === 'soru_hatali').length}.`) : null,
-    runs[0] ? h('p', { class: 'small muted' }, `Saatlik görev en son ${new Date(runs[0].started_at).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })} çalıştı.`) : null);
+    runs[0] ? h('p', { class: 'small muted' }, `Saatlik görev en son ${new Date(runs[0].started_at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })} çalıştı.`) : null);
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
@@ -4989,7 +5001,7 @@ function dayReport(reviews, items, topicName) {
         h('button', { class: 'ghost small', onclick: () => { picked = null; draw(); } }, 'Kapat')),
       list.map((r) => h('div', { class: 'stack', style: 'gap: 4px; padding-top: 8px; border-top: 1px solid var(--rule)' },
         h('p', { class: 'small muted' }, [
-          new Date(r.answered_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), trackName[r.track],
+          new Date(r.answered_at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }), trackName[r.track],
           r.needs_help ? 'boş geçti' : null, CONFIDENCE_LEVELS.find(([c]) => c === r.confidence)?.[1],
           fmtDuration(r.duration_sec || 0) + (r.hint_used ? ', ipucuyla' : ''),
         ].filter(Boolean).join(' · ')),
@@ -5002,7 +5014,7 @@ function dayReport(reviews, items, topicName) {
     const prev = days.filter((d) => d < day).pop();
     const next = days.find((d) => d > day) || today;
     const label = day === today ? 'Bugün' : day === addDays(today, -1) ? 'Dün'
-      : parseDay(day).toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' });
+      : parseDay(day).toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' });
     const nav = h('div', { class: 'spread' },
       h('button', { class: 'ghost small', disabled: !prev || null, onclick: () => { day = prev; draw(); } }, '‹ Önceki'),
       h('b', {}, label),
@@ -5072,7 +5084,7 @@ function dayReport(reviews, items, topicName) {
               h('div', { class: 'row' }, subjTag(r.questions?.subject), h('span', { class: 'small' }, topicName[r.questions?.topic_id]?.name || '')),
               h('span', { class: 'tag ' + v[1] }, v[0])),
             h('p', { class: 'small muted' }, [
-              new Date(r.answered_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+              new Date(r.answered_at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }),
               trackName[r.track], conf, fmtDuration(r.duration_sec || 0) + (r.hint_used ? ', ipucuyla' : ''),
             ].filter(Boolean).join(' · ')),
             h('p', { class: 'small' }, (r.needs_help ? 'Boş geçti, "birlikte bakalım" dedi. ' : '') + v[2]

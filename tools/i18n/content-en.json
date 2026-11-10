@@ -1,0 +1,546 @@
+{
+ "_source": "us/content-en-US.json (draft 2026-11-09); poems are public domain, jokes and riddles traditional, fables retold.",
+ "JOKES": [
+  [
+   "Why was six afraid of seven?",
+   "Because seven ate nine!",
+   "saka"
+  ],
+  [
+   "What did zero say to eight?",
+   "\"Nice belt!\"",
+   "saka"
+  ],
+  [
+   "Why was the math book sad?",
+   "It had too many problems.",
+   "saka"
+  ],
+  [
+   "What did the pencil say to the eraser?",
+   "\"What would I do with my mistakes without you?\"",
+   "saka"
+  ],
+  [
+   "Why did the kid bring a ladder to school?",
+   "To get to high school!",
+   "saka"
+  ],
+  [
+   "Where do pencils go on vacation?",
+   "Pencil-vania!",
+   "saka"
+  ],
+  [
+   "Why did the student eat his homework?",
+   "The teacher said it was a piece of cake.",
+   "saka"
+  ],
+  [
+   "What do you call a bear with no teeth?",
+   "A gummy bear!",
+   "saka",
+   "kucuk"
+  ],
+  [
+   "What do you call cheese that isn't yours?",
+   "Nacho cheese!",
+   "saka"
+  ],
+  [
+   "Why don't eggs tell jokes?",
+   "They'd crack each other up.",
+   "saka"
+  ],
+  [
+   "What did one wall say to the other wall?",
+   "\"I'll meet you at the corner.\"",
+   "saka"
+  ],
+  [
+   "Why did the scarecrow win a prize?",
+   "He was outstanding in his field.",
+   "saka"
+  ],
+  [
+   "Why did the computer go to the doctor?",
+   "It had a virus.",
+   "saka"
+  ],
+  [
+   "Why can't your nose be 12 inches long?",
+   "Because then it would be a foot!",
+   "saka"
+  ],
+  [
+   "Knock, knock. Who's there? Lettuce. Lettuce who?",
+   "Lettuce in, it's cold out here!",
+   "saka",
+   "kucuk"
+  ],
+  [
+   "Knock, knock. Who's there? Boo. Boo who?",
+   "Don't cry, it's only a joke!",
+   "saka",
+   "kucuk"
+  ],
+  [
+   "Why should you never argue with a 90-degree angle?",
+   "It's always right.",
+   "saka",
+   "buyuk"
+  ],
+  [
+   "What did the triangle say to the circle?",
+   "\"You're pointless.\"",
+   "saka",
+   "buyuk"
+  ],
+  [
+   "Why do plants hate math?",
+   "It gives them square roots.",
+   "saka",
+   "buyuk"
+  ],
+  [
+   "What is a math teacher's favorite season?",
+   "Sum-mer!",
+   "saka",
+   "buyuk"
+  ],
+  [
+   "Parallel lines have so much in common.",
+   "It's a shame they'll never meet.",
+   "saka",
+   "buyuk"
+  ],
+  [
+   "Why was the fraction nervous about meeting the decimal?",
+   "It knew it would have to convert.",
+   "saka",
+   "buyuk"
+  ],
+  [
+   "What has hands but can't clap?",
+   "A clock.",
+   "bilmece"
+  ],
+  [
+   "What gets wetter the more it dries?",
+   "A towel.",
+   "bilmece"
+  ],
+  [
+   "What has to be broken before you can use it?",
+   "An egg.",
+   "bilmece"
+  ],
+  [
+   "I'm tall when I'm young and short when I'm old. What am I?",
+   "A candle.",
+   "bilmece"
+  ],
+  [
+   "What has keys but can't open a single lock?",
+   "A piano.",
+   "bilmece"
+  ],
+  [
+   "What is full of holes but still holds water?",
+   "A sponge.",
+   "bilmece"
+  ],
+  [
+   "What can you catch but not throw?",
+   "A cold.",
+   "bilmece"
+  ],
+  [
+   "What has one eye but can't see?",
+   "A needle.",
+   "bilmece"
+  ],
+  [
+   "What kind of tree fits in your hand?",
+   "A palm tree.",
+   "bilmece",
+   "kucuk"
+  ],
+  [
+   "What begins with T, ends with T, and has T in it?",
+   "A teapot.",
+   "bilmece"
+  ],
+  [
+   "What goes up but never comes down?",
+   "Your age.",
+   "bilmece"
+  ],
+  [
+   "Which month has 28 days?",
+   "All of them!",
+   "bilmece"
+  ],
+  [
+   "What word is spelled wrong in every dictionary?",
+   "\"Wrong.\"",
+   "bilmece",
+   "buyuk"
+  ],
+  [
+   "The more you take, the more you leave behind. What are they?",
+   "Footsteps.",
+   "bilmece",
+   "buyuk"
+  ],
+  [
+   "You have 2 quarters, 1 dime and 3 pennies. How many cents is that?",
+   "63 cents.",
+   "bulmaca",
+   "kucuk"
+  ],
+  [
+   "How many inches are in 2 feet?",
+   "24 inches.",
+   "bulmaca",
+   "kucuk"
+  ],
+  [
+   "What comes next: 2, 4, 8, 16, …?",
+   "32. Each number is double the one before.",
+   "bulmaca"
+  ],
+  [
+   "A bus leaves at 3:15 PM and the ride takes 50 minutes. When does it arrive?",
+   "At 4:05 PM.",
+   "bulmaca"
+  ],
+  [
+   "Which weighs more: a pound of feathers or a pound of bricks?",
+   "Neither. They both weigh one pound.",
+   "bulmaca"
+  ],
+  [
+   "A farmer has 5 hens. Each hen lays 2 eggs a day. How many eggs in a week?",
+   "70 eggs.",
+   "bulmaca",
+   "buyuk"
+  ],
+  [
+   "What is half of two plus two?",
+   "Three. Half of two is one, and one plus two is three.",
+   "bulmaca",
+   "buyuk"
+  ],
+  [
+   "A pizza is cut into 8 slices. You eat a quarter of it. How many slices are left?",
+   "6 slices.",
+   "bulmaca",
+   "buyuk"
+  ]
+ ],
+ "FIKRALAR": [
+  [
+   "A hare made fun of a tortoise for being slow, so the tortoise challenged him to a race. The hare sprinted ahead, saw how far behind the tortoise was, and lay down for a nap. The tortoise kept walking, step after step.",
+   "When the hare woke up, the tortoise was crossing the finish line. Slow and steady wins the race."
+  ],
+  [
+   "A shepherd boy was bored, so he shouted, \"Wolf! Wolf!\" The villagers ran up the hill and found no wolf. He laughed and did it again the next day. Then one evening a real wolf came, and the boy shouted as loud as he could.",
+   "Nobody came. If you fool people for fun, they stop believing you when it matters."
+  ],
+  [
+   "A hungry fox saw a bunch of ripe grapes hanging high on a vine. He jumped and jumped but could not reach them. At last he walked away with his nose in the air.",
+   "\"They were probably sour anyway,\" he said. It's easy to dislike what you can't have."
+  ],
+  [
+   "A mouse ran over a sleeping lion's nose and woke him. The lion caught her, but she begged, \"Let me go and one day I'll help you.\" The lion laughed and let her go. Later, hunters trapped the lion in a net of ropes.",
+   "The mouse heard him roar, came running, and chewed through the ropes. No kindness is too small to matter."
+  ],
+  [
+   "A thirsty crow found a pitcher with a little water at the bottom. Her beak could not reach it. She looked around, then began dropping pebbles into the pitcher, one by one.",
+   "The water rose with every pebble until she could drink. A little thinking beats a lot of pushing."
+  ],
+  [
+   "All summer the ants carried grain to their nest while the grasshopper sang in the sun. \"Why work so hard?\" he asked. \"Winter is coming,\" said the ants. When the snow fell, the grasshopper had nothing to eat.",
+   "He knocked on the ants' door, and they shared, but he never skipped the work again. Prepare today for what you'll need tomorrow."
+  ],
+  [
+   "A dog was carrying a bone across a bridge when he saw another dog in the water below, holding an even bigger bone. He snapped at it.",
+   "His own bone fell into the stream and was gone. The other dog was only his reflection. Wanting too much can cost you what you already have."
+  ],
+  [
+   "The North Wind and the Sun argued about who was stronger. They agreed that whoever could make a traveler take off his coat would win. The Wind blew as hard as he could, but the traveler only pulled his coat tighter.",
+   "Then the Sun shone gently. The traveler grew warm and took off his coat himself. Kindness works where force fails."
+  ]
+ ],
+ "POEMS": [
+  {
+   "id": "en-twinkle",
+   "show": [
+    "Twinkle, twinkle, little star,",
+    "How I wonder what you are!",
+    "Up above the world so high,"
+   ],
+   "hide": [
+    "Like a diamond in the sky."
+   ],
+   "rhyme": "star – are, high – sky",
+   "by": "Jane Taylor, 1806",
+   "note": "This poem is more than 200 years old, and people still sing it. The lines rhyme two by two: star and are, high and sky.",
+   "level": "kucuk"
+  },
+  {
+   "id": "en-star-light",
+   "show": [
+    "Star light, star bright,",
+    "First star I see tonight,",
+    "I wish I may, I wish I might,"
+   ],
+   "hide": [
+    "Have the wish I wish tonight."
+   ],
+   "rhyme": "bright – tonight – might – tonight",
+   "by": "Traditional rhyme",
+   "ask": "Finish the wish. Your line should end with the same sound as \"bright\".",
+   "note": "People say this rhyme when they see the first star of the evening. Every line ends with the same sound, which makes it easy to remember.",
+   "level": "kucuk"
+  },
+  {
+   "id": "en-hey-diddle",
+   "show": [
+    "Hey diddle diddle,",
+    "The cat and the fiddle,",
+    "The cow jumped over the moon;",
+    "The little dog laughed to see such sport,"
+   ],
+   "hide": [
+    "And the dish ran away with the spoon."
+   ],
+   "rhyme": "diddle – fiddle, moon – spoon",
+   "by": "Mother Goose (anonymous)",
+   "ask": "What silly thing happens last? Make your line end with a word that rhymes with \"moon\".",
+   "note": "This is a nonsense rhyme. Cows can't jump over the moon and dishes can't run. The fun is in the picture it puts in your head.",
+   "level": "kucuk"
+  },
+  {
+   "id": "en-buckle",
+   "show": [
+    "One, two, buckle my shoe;",
+    "Three, four, shut the door;",
+    "Five, six, pick up sticks;",
+    "Seven, eight, lay them straight;"
+   ],
+   "hide": [
+    "Nine, ten, a big fat hen."
+   ],
+   "rhyme": "two – shoe, four – door, six – sticks, eight – straight, ten – hen",
+   "by": "Counting rhyme (anonymous)",
+   "ask": "What rhymes with \"ten\"? Make up your own last line.",
+   "note": "Counting rhymes helped children learn their numbers long before there were worksheets. Each number rhymes with the last word of its line.",
+   "level": "kucuk"
+  },
+  {
+   "id": "en-swing",
+   "show": [
+    "How do you like to go up in a swing,",
+    "Up in the air so blue?",
+    "Oh, I do think it the pleasantest thing"
+   ],
+   "hide": [
+    "Ever a child can do!"
+   ],
+   "rhyme": "swing – thing, blue – do",
+   "by": "Robert Louis Stevenson, 1885",
+   "note": "Stevenson wrote a whole book of poems about being a child. Read it out loud and you can feel the swing going up and back."
+  },
+  {
+   "id": "en-rain",
+   "show": [
+    "The rain is raining all around,",
+    "It falls on field and tree,",
+    "It rains on the umbrellas here,"
+   ],
+   "hide": [
+    "And on the ships at sea."
+   ],
+   "rhyme": "tree – sea",
+   "by": "Robert Louis Stevenson, 1885",
+   "ask": "Where else is it raining? End your line with a word that rhymes with \"tree\".",
+   "note": "The poem starts close by and ends far away: from the umbrellas next to you to ships out at sea. The same rain falls on all of them.",
+   "level": "kucuk"
+  },
+  {
+   "id": "en-bed-in-summer",
+   "show": [
+    "In winter I get up at night",
+    "And dress by yellow candle-light.",
+    "In summer, quite the other way,"
+   ],
+   "hide": [
+    "I have to go to bed by day."
+   ],
+   "rhyme": "night – light, way – day",
+   "by": "Robert Louis Stevenson, 1885",
+   "note": "In summer the sun sets late, so bedtime comes while it is still light outside. Stevenson grew up before electric lights, so he dressed by candle."
+  },
+  {
+   "id": "en-wind",
+   "show": [
+    "Who has seen the wind?",
+    "Neither I nor you:",
+    "But when the leaves hang trembling,"
+   ],
+   "hide": [
+    "The wind is passing through."
+   ],
+   "rhyme": "you – through",
+   "by": "Christina Rossetti, 1872",
+   "note": "You can't see the wind, only what it does. The poet shows something invisible by pointing at the leaves."
+  },
+  {
+   "id": "en-old-man-beard",
+   "show": [
+    "There was an Old Man with a beard,",
+    "Who said, \"It is just as I feared!—",
+    "Two Owls and a Hen,",
+    "Four Larks and a Wren,"
+   ],
+   "hide": [
+    "Have all built their nests in my beard!\""
+   ],
+   "rhyme": "beard – feared – beard, Hen – Wren",
+   "by": "Edward Lear, 1846",
+   "ask": "What happened to his beard? End your line with \"beard\".",
+   "note": "This is a limerick: five lines, where lines one, two and five rhyme and the two short lines in the middle rhyme with each other. Limericks are meant to be silly."
+  },
+  {
+   "id": "en-crocodile",
+   "show": [
+    "How doth the little crocodile",
+    "Improve his shining tail,",
+    "And pour the waters of the Nile"
+   ],
+   "hide": [
+    "On every golden scale!"
+   ],
+   "rhyme": "crocodile – Nile, tail – scale",
+   "by": "Lewis Carroll, 1865",
+   "note": "This is from Alice's Adventures in Wonderland. \"Doth\" is an old way of saying \"does\". Carroll was making fun of a very serious poem that children had to memorize."
+  },
+  {
+   "id": "en-nobody",
+   "show": [
+    "I'm nobody! Who are you?",
+    "Are you nobody, too?",
+    "Then there's a pair of us — don't tell!"
+   ],
+   "hide": [
+    "They'd banish us, you know."
+   ],
+   "rhyme": "you – too",
+   "by": "Emily Dickinson, published 1891",
+   "note": "Dickinson wrote almost 1,800 poems and showed very few of them to anyone. Here she says that being a quiet \"nobody\" with one good friend can be better than being famous.",
+   "level": "buyuk"
+  },
+  {
+   "id": "en-hope",
+   "show": [
+    "\"Hope\" is the thing with feathers",
+    "That perches in the soul,",
+    "And sings the tune without the words,"
+   ],
+   "hide": [
+    "And never stops at all,"
+   ],
+   "rhyme": "soul – all (a near rhyme)",
+   "by": "Emily Dickinson, published 1891",
+   "note": "The poet never says the word \"bird\", but you can see one. Comparing hope to a small bird that keeps singing is called a metaphor.",
+   "level": "buyuk"
+  },
+  {
+   "id": "en-tyger",
+   "show": [
+    "Tyger Tyger, burning bright,",
+    "In the forests of the night;",
+    "What immortal hand or eye,"
+   ],
+   "hide": [
+    "Could frame thy fearful symmetry?"
+   ],
+   "rhyme": "bright – night, eye – symmetry",
+   "by": "William Blake, 1794",
+   "note": "Blake spelled \"tiger\" his own way. He is asking a question: who could make an animal this beautiful and this frightening? \"Symmetry\" means that both sides match, like a tiger's stripes.",
+   "level": "buyuk"
+  },
+  {
+   "id": "en-woods",
+   "show": [
+    "The woods are lovely, dark and deep,",
+    "But I have promises to keep,",
+    "And miles to go before I sleep,"
+   ],
+   "hide": [
+    "And miles to go before I sleep."
+   ],
+   "rhyme": "deep – keep – sleep – sleep",
+   "by": "Robert Frost, 1923",
+   "ask": "How does the poem end? Here is a hint: the poet repeats himself.",
+   "note": "Frost ends the poem by saying the same line twice. The second time it feels heavier, as if the traveler is tired and still has a long way to go.",
+   "level": "buyuk"
+  },
+  {
+   "id": "en-road",
+   "show": [
+    "Two roads diverged in a wood, and I—",
+    "I took the one less traveled by,"
+   ],
+   "hide": [
+    "And that has made all the difference."
+   ],
+   "rhyme": "I – by",
+   "by": "Robert Frost, 1916",
+   "ask": "He chose the road fewer people took. What do you think he says about that choice?",
+   "note": "\"Diverged\" means split in two. People often quote these lines when they talk about making their own choice instead of following the crowd.",
+   "level": "buyuk"
+  },
+  {
+   "id": "en-paul-revere",
+   "show": [
+    "Listen, my children, and you shall hear",
+    "Of the midnight ride of Paul Revere,",
+    "On the eighteenth of April, in Seventy-five;",
+    "Hardly a man is now alive"
+   ],
+   "hide": [
+    "Who remembers that famous day and year."
+   ],
+   "rhyme": "hear – Revere – year, five – alive",
+   "by": "Henry Wadsworth Longfellow, 1860",
+   "note": "In 1775 Paul Revere rode through the night to warn that British soldiers were coming. Longfellow wrote the poem 85 years later, and it made the ride famous.",
+   "level": "buyuk"
+  }
+ ],
+ "POEM_TIPS": [
+  "Now read the whole poem out loud with feeling: pause a little at commas and a bit longer at periods.",
+  "Read the rhyming words a little louder; you will hear the music of the poem.",
+  "Read it to someone, like your mom, dad or a sibling, and look them in the eyes!",
+  "First whisper it, then read it in a big, strong voice. Which one fits this poem better?"
+ ],
+ "SWEET_LINES": [
+  "I'm so proud of you!",
+  "You're doing great. Keep going!",
+  "Ice cream is on me tonight. Promise!",
+  "Don't be afraid of mistakes. That's how we learn.",
+  "I love you so much."
+ ],
+ "PLAYFUL": [
+  "Hey {name}, what's up?",
+  "Look who's here: {name}!",
+  "Welcome back, champ!",
+  "{name}! Ready to crush it today?",
+  "Hi {name}, is your brain warmed up?",
+  "Good to see you, superstar!",
+  "{name} is in the house!",
+  "Hey hey, {name}! Let's do this."
+ ]
+}

@@ -1,7 +1,7 @@
 -- Ülke ve müfredat ayrımı testi: başka müfredatın konusu (aynı sınıf, haftası gelmiş) Türk öğrenciye açılmaz; öğrencinin
 -- müfredatı değişince ona açılır; müfredatı çocuk değiştiremez, veli değiştirir; geçersiz kimlik reddedilir. Sonuç hata
 -- mesajıyla döner; her şey geri alınır.
--- beklenen: {"varsayilan":"tr","baska_mufredat":0,"kendi_mufredati":1,"cocuk_ayar":"reddedildi","veli_ayar":"us-pa","gecersiz":"reddedildi","tr_konulari_tr":true}
+-- beklenen: {"varsayilan":"tr","baska_mufredat":0,"kendi_mufredati":1,"cocuk_ayar":"reddedildi","veli_ayar":"us-pa","gecersiz":"reddedildi","tr_konulari_tr":true,"karisik_takip":0}
 do $$
 declare
   kid uuid := (select id from public.profiles where display_name = 'IrfTest' and role = 'student');
@@ -10,7 +10,11 @@ declare
   r jsonb := '{}';
 begin
   r := r || jsonb_build_object('varsayilan', (select curriculum from public.profiles where id = kid),
-    'tr_konulari_tr', (select bool_and(curriculum = 'tr') from public.topics));
+    -- ABD konuları (2026-11-10) pa. ile başlar ve us-pa'dır; geri kalan her konu tr. Hiçbir Türk öğrencinin takibinde ABD
+    -- konusu, hiçbir ABD öğrencisinin takibinde Türk konusu yok.
+    'tr_konulari_tr', (select bool_and((id like 'pa.%') = (curriculum = 'us-pa')) from public.topics),
+    'karisik_takip', (select count(*) from public.topic_status ts join public.profiles p on p.id = ts.student_id
+      join public.topics t on t.id = ts.topic_id where t.curriculum <> p.curriculum));
   -- Aynı sınıfın, haftası gelmiş bir ABD konusu: Türk öğrenciye açılmaz
   insert into public.topics (id, subject, name, grade, planned_start, curriculum)
     values ('zz-test.us-pa.math', 'matematik', 'Test topic', g, current_date - 7, 'us-pa');

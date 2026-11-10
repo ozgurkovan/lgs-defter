@@ -34,6 +34,58 @@
         `test durdu, hiçbir sayfa açılmadı: ${role === 'student' ? 'bir test öğrencisiyle gir' : 'test hesabıyla gir, bir test çocuğu seç'}`);
       return results.join('\n');
     }
+    // ABD hesabı (velinin isteği, 2026-11-10: "ABD öğrencilerine Türkçe hiçbir şey gösteremeyiz"): her sayfa açılır, görünen
+    // yazıda, düğme etiketlerinde ve yer tutucularda tek bir Türkçe yazı yok; dersler yalnız Matematik; kelime kartları ve
+    // LGS yok; şakalar, fabllar ve şiirler İngilizce. Türkçe hesapların kontrolleri burada çalışmaz (yazılar İngilizce).
+    if (typeof LANG !== 'undefined' && LANG === 'en') {
+      const TR = /[çğıöşüÇĞİÖŞÜ]/;
+      const visibleTurkish = () => {
+        const lines = document.body.innerText.split('\n').map((s) => s.trim()).filter((s) => s && (TR.test(s) || looksTurkish(s)));
+        const attrs = [...document.querySelectorAll('[aria-label],[placeholder],[title]')].filter((el) => el.offsetParent !== null || el === document.activeElement)
+          .flatMap((el) => ['aria-label', 'placeholder', 'title'].map((a) => el.getAttribute(a)).filter(Boolean)).filter((v) => TR.test(v) || looksTurkish(v));
+        return [...new Set([...lines, ...attrs])];
+      };
+      const bad = {};
+      for (const tab of allowedTabs().filter((x) => !['konu', 'reasons'].includes(x))) {
+        go(tab); await settle();
+        if (tab === 'report') {
+          for (const c of [...document.querySelectorAll('#app .report-tabs .chip')]) {
+            c.click(); await wait(250);
+            const l = visibleTurkish();
+            if (l.length) bad[`report:${c.dataset.tab}`] = l.slice(0, 3);
+          }
+          [...document.querySelectorAll('#app .report-tabs .chip')].find((c) => c.dataset.tab === 'gun')?.click();
+        } else {
+          if (tab === 'settings') { document.querySelectorAll('#app details').forEach((d) => { d.open = true; }); await wait(300); }
+          const l = visibleTurkish();
+          if (l.length) bad[tab] = l.slice(0, 3);
+        }
+        if (state.tab !== tab || /something went wrong|bir şey ters gitti/i.test(pageText())) bad[tab] = [...(bad[tab] || []), 'sayfa açılmadı'];
+      }
+      check('ABD hesabı: hiçbir sayfada Türkçe yazı yok', !Object.keys(bad).length,
+        Object.entries(bad).map(([k, v]) => `${k}: ${v.join(' / ').slice(0, 120)}`).join(' | ') || `${allowedTabs().length} sayfa`);
+      go('topics'); await settle();
+      const subjects = studentSubjects(state.student);
+      check('ABD: dersler yalnız Matematik, konular Pennsylvania müfredatından', subjects.join() === 'matematik' && pageText().includes('math')
+        && !/turkish|science|lgs/.test(pageText()), subjects.join());
+      check('ABD: İngilizce kelime kartları yok', !allowedTabs().includes('words') && wordsPerDay(state.student) === 0);
+      let cardTr = null;
+      // Kart sayfaya eklenince çevrilir (docs/i18n.js sayfadaki yazıyı çevirir); bu yüzden önce eklenir, sonra okunur.
+      try {
+        for (let i = 0; i < 40 && !cardTr; i++) {
+          const c = jokeCard();
+          document.getElementById('app').append(c); await wait(0);
+          if (TR.test(c.textContent)) cardTr = c.textContent.slice(0, 60);
+          c.remove();
+        }
+      } catch (e) { cardTr = e.message; }
+      check('ABD: şakalar, bilmeceler, fabllar ve şiirler İngilizce', !cardTr, cardTr || '');
+      check('ABD: tarih İngilizce', LOCALE === 'en-US' && /monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december/i
+        .test(new Date().toLocaleDateString(LOCALE, { weekday: 'long', month: 'long' })));
+      go(rootTab()); await settle();
+      check('Sayfada yakalanmamış hata yok', !errors.length, errors.slice(0, 3).join(' | '));
+      return results.join('\n');
+    }
     const root = rootTab();
     const pages = role === 'student'
       ? { home: ['hata tekrarı', 'konu tekrarı'], upload: ['deneme çöz', 'karma deneme'], send: ['soru ekle', 'kâğıt deneme'],

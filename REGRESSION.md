@@ -48,6 +48,25 @@ Her maddenin yanında nasıl denendiği yazar:
   öğrenciye görünmez ve yıllık plana göre açılmaz. LGS'ye özgü dersler, günlük plan ağırlıkları, sayaç ve denemeler
   yalnızca Türkiye müfredatındaki 8. sınıfta. Müfredatı veli ayarlar, çocuk değiştiremez. Görünen bir şey değişmedi;
   müfredat seçme ekranı henüz yok. [O] (`test-country-curriculum.sql`, `tools/test-schedule.mjs`), [A]
+- **ABD hesapları** (velinin isteği, 2026-11-10: "ABD öğrencilerine Türkçe hiçbir şey gösteremeyiz"):
+  - Müfredatı `us` ile başlayan hesap (öğrenci, veli, öğretmen) her şeyi İngilizce görür. Uygulama Türkçe yazılır;
+    `docs/i18n.js` ekrana giren her yazıyı (metin, düğme etiketi, yer tutucu, onay pencereleri) `docs/i18n-en.js`
+    sözlüğüyle çevirir. Sözlük yalnızca İngilizce gerekince yüklenir; Türk aileleri için hiçbir şey değişmez. Tarih ve saat
+    ABD biçiminde, net ondalık noktayla. [A] (ui-smoke: ABD hesabıyla "hiçbir sayfada Türkçe yazı yok")
+  - Kodda yeni bir Türkçe yazı yazılırsa çevirisi de eklenmeli: `node tools/i18n-extract.mjs --missing` eksikleri listeler,
+    çeviriler `tools/i18n/en.json`'a girer, `node tools/i18n-build.mjs` dosyayı üretir. regression.mjs eksik çeviriyi,
+    yer tutucu uyuşmazlığını ve İngilizcede Türkçe harfi yakalar. [O]
+  - Şakalar, bilmeceler, fabllar, şiirler (kamu malı), velinin tatlı söz önerileri ve şakacı selamlar ABD'de İngilizce
+    içerikten gelir (`tools/i18n/content-en.json`). [A]
+  - Dersler yalnız Matematik ("Math"); konular Pennsylvania matematiği, 2., 4. ve 7. sınıf, Common Core standartlarına göre
+    (`supabase/topics-us-pa-math.sql`, CC BY 4.0), 2026-27 okul yılına yayılmış haftalarla; haftası gelen konu kendiliğinden
+    açılır. Türk öğrenciye ABD konusu, ABD öğrencisine Türk konusu hiç gelmez. [O] (`test-country-curriculum.sql`), [A]
+  - ABD'de İngilizce kelime kartları (sekme, ayar satırı) ve LGS yok. Klavye dersleri ABD klavyesiyle ve İngilizce kelimelerle
+    (Klavye bölümüne bakın). [A]
+  - Saatlik görev ABD öğrencisi için yalnız ABD konularını kullanır ve öğrencinin ya da velinin göreceği her şeyi İngilizce
+    yazar; Matematik dışı ABD yüklemelerini nazikçe atlar (`job/INSTRUCTIONS.md`, "US students"). [E]
+  - Yeni hesaplar ekleyen velinin müfredatını alır (ABD velisinin çocuğu ABD konularıyla başlar;
+    `supabase/functions/family`). [A]
 - Büyük okumalar eksiksiz gelir. Supabase bir istekte en çok 1000 satır verir; uygulamanın ortak okuma yardımcısı (`q`) sonuç
   tam 1000 satırsa sorguyu birincil anahtara göre sıralayıp bütün sayfaları okur (2026-11-09: 1000 cevabı geçen öğrencide
   çözdüğü sorular görülmemiş sayılacak, altın ve güç yanlış hesaplanacaktı). Yazma sorguları ve kendi sınırı olanlar

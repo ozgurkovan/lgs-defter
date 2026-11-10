@@ -30,7 +30,9 @@ Deno.serve(async (req) => {
   const { data: who, error: whoErr } = await admin.auth.getUser(jwt);
   if (whoErr || !who?.user) return reply(401, { error: 'Giriş yapmalısın.' });
   const me = who.user.id;
-  const { data: myProfile } = await admin.from('profiles').select('role').eq('id', me).maybeSingle();
+  const { data: myProfile } = await admin.from('profiles').select('role, curriculum').eq('id', me).maybeSingle();
+  // Yeni hesaplar ekleyen velinin müfredatını (ve dilini) alır: ABD velisinin çocuğu ABD konularıyla, İngilizce başlar.
+  const curriculum = (myProfile?.curriculum as string) || 'tr';
   if (myProfile?.role !== 'parent') return reply(403, { error: 'Bu işlemi sadece veli yapabilir.' });
 
   // Ailem: velisi olduğum çocuklar, o çocukların bütün velileri ve öğretmenleri.
@@ -86,7 +88,7 @@ Deno.serve(async (req) => {
         if (!Number.isInteger(grade) || grade < 1 || grade > 8) throw new Error('Sınıf 1 ile 8 arasında olmalı.');
         const id = await createAccount();
         // İlkokulda günlük hedef daha hafif başlar; veli Günlük plan'dan değiştirir.
-        const { error: pErr } = await admin.from('profiles').insert({ id, role: 'student', display_name: name, grade, daily_questions: grade <= 4 ? 20 : 40 });
+        const { error: pErr } = await admin.from('profiles').insert({ id, role: 'student', display_name: name, grade, daily_questions: grade <= 4 ? 20 : 40, curriculum });
         if (pErr) { await admin.auth.admin.deleteUser(id); throw new Error('Profil oluşturulamadı.'); }
         await admin.from('family_links').insert(familyParents.map((parent_id) => ({ parent_id, student_id: id, relation: 'parent' })));
         // Yıllık plana göre haftası gelmiş konular hemen takibe girsin.
@@ -96,7 +98,7 @@ Deno.serve(async (req) => {
       case 'add_parent': {
         if (!myChildren.length) throw new Error('Önce bir çocuk ekleyin.');
         const id = await createAccount();
-        const { error: pErr } = await admin.from('profiles').insert({ id, role: 'parent', display_name: name });
+        const { error: pErr } = await admin.from('profiles').insert({ id, role: 'parent', display_name: name, curriculum });
         if (pErr) { await admin.auth.admin.deleteUser(id); throw new Error('Profil oluşturulamadı.'); }
         await admin.from('family_links').insert(myChildren.map((student_id) => ({ parent_id: id, student_id, relation: 'parent' })));
         return reply(200, { ok: true, id });
@@ -112,10 +114,10 @@ Deno.serve(async (req) => {
           const { data: p } = await admin.from('profiles').select('role').eq('id', existing.id).maybeSingle();
           if (p && p.role !== 'teacher') throw new Error('Bu e-posta öğretmen olmayan bir hesaba ait.');
           id = existing.id;
-          if (!p) await admin.from('profiles').insert({ id, role: 'teacher', display_name: name || email });
+          if (!p) await admin.from('profiles').insert({ id, role: 'teacher', display_name: name || email, curriculum });
         } else {
           id = await createAccount();
-          const { error: pErr } = await admin.from('profiles').insert({ id, role: 'teacher', display_name: name });
+          const { error: pErr } = await admin.from('profiles').insert({ id, role: 'teacher', display_name: name, curriculum });
           if (pErr) { await admin.auth.admin.deleteUser(id); throw new Error('Profil oluşturulamadı.'); }
         }
         await admin.from('family_links').upsert(students.map((student_id) => ({ parent_id: id, student_id, relation: 'teacher', subjects })));

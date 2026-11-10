@@ -25,12 +25,13 @@ const node = (args) => {
 };
 
 // 1
-const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']) + node(['--check', 'docs/feed.js']);
-report(!checked.trim(), 'app.js, typing.js ve feed.js sözdizimi', checked.trim().split('\n')[0]);
+const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']) + node(['--check', 'docs/feed.js'])
+  + node(['--check', 'docs/i18n.js']) + node(['--check', 'docs/i18n-en.js']);
+report(!checked.trim(), 'app.js, typing.js, feed.js ve dil dosyaları sözdizimi', checked.trim().split('\n')[0]);
 const html = readFileSync('docs/index.html', 'utf8');
 const v = JSON.parse(readFileSync('docs/version.json', 'utf8')).v;
-const inHtml = [...html.matchAll(/(?:app\.js|style\.css|typing\.js|typing\.css|feed\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
-report(inHtml.length === 5 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
+const inHtml = [...html.matchAll(/(?:app\.js|style\.css|typing\.js|typing\.css|feed\.js|i18n\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
+report(inHtml.length === 6 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
 // Başka bir adres reddedilmeli. Deneme kapalı bir porta gider: koruma bozulsa bile Supabase'e ulaşmaz, hesap açılmaz.
 // Giriş bağlantısı üreten her araç adresi test-accounts.mjs'ten almalı.
 const refused = await testAccountEmail('velitest@hotmail.com', 'http://127.0.0.1:9', {}).then(() => 'kabul edildi', (e) => e.message);
@@ -71,6 +72,14 @@ report(pagingOut.length > 0 && !pagingBad.length, 'Sayfalı okuma', pagingBad.le
 const feedOut = node(['tools/test-feed.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const feedBad = feedOut.filter((l) => !l.startsWith('OK'));
 report(feedOut.length > 0 && !feedBad.length, 'Kahramanı besleme', feedBad.length ? feedBad.join(' | ') : `${feedOut.length} kontrol`);
+// İngilizce katman (2026-11-10): kodda yeni bir Türkçe yazı varsa çevirisi de olmalı; çeviriler yer tutucuları korur,
+// Türkçe harf taşımaz; docs/i18n-en.js en.json'dan üretilmiş ve güncel (tools/i18n-build.mjs).
+const i18nOut = node(['tools/i18n-build.mjs', '--check']).trim();
+const enJs = readFileSync('docs/i18n-en.js', 'utf8');
+const enSrc = JSON.parse(readFileSync('tools/i18n/en.json', 'utf8'));
+const enFresh = enJs.includes(JSON.stringify(enSrc).slice(0, 2000)) && Object.keys(enSrc).length === Object.keys(JSON.parse(enJs.split('window.I18N_EN = ')[1].split(';\nwindow.I18N_CONTENT')[0])).length;
+report(/sorun yok/.test(i18nOut) && enFresh, 'İngilizce katman: her Türkçe yazının çevirisi var, i18n-en.js güncel',
+  /sorun yok/.test(i18nOut) ? (enFresh ? '' : 'node tools/i18n-build.mjs çalıştırılmalı') : i18nOut.split('\n').slice(0, 3).join(' | '));
 
 // 3
 const fits = (want, got) => {

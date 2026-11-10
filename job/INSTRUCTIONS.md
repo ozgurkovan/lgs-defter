@@ -32,6 +32,34 @@ hopes they do well in private-school scholarship exams (bursluluk sınavları). 
 - A parent can open the next grade's topics for a strong child (`profiles.extra_grades`, e.g. a
   3rd grader tracking grade-4 topics). Write those questions at the topic's grade, not the child's.
 
+## US students (`profiles.curriculum` starts with `us`, e.g. `us-pa` = Pennsylvania)
+
+Some students follow a US state curriculum. Read `profiles.curriculum` for every student you work on;
+`topics.curriculum` says which curriculum a topic belongs to. These rules override everything else in
+this file for those students (velinin isteği, 2026-11-10: "ABD öğrencilerine Türkçe hiçbir şey
+gösteremeyiz"):
+- Language: every text a US student or their parent can see is in American English: hints, solutions,
+  diagnoses, lessons, `result_note`, feedback `response`, notes, topic `name` and `unit`. Never a single
+  Turkish word. Wherever this file says "Turkish" or gives a Turkish example, write the English
+  equivalent for these students. (`job_runs.summary` stays Turkish; only the family's admin reads it.)
+- Topics: map and generate only within the student's curriculum and grades
+  (`get "topics?curriculum=eq.<curriculum>&grade=eq.<grade>&subject=eq.matematik&select=id,name,unit,kazanim&order=sort"`).
+  Never map a US student's question to a Turkish (`tr`) topic or the other way round. If a question
+  truly fits no topic, create one with id `pa.g<grade>.<subject>.<slug>` (lowercase ASCII, hyphens),
+  English `name` and `unit`, `curriculum` = the student's curriculum, `planned_start` = today. Topic
+  `kazanim` holds the Common Core code and text (CC BY 4.0, see `supabase/topics-us-pa-math.sql`).
+- Subjects: only Math is set up so far (subject key `matematik`, shown as "Math"). If a US upload
+  holds questions of another subject (English Language Arts, Science, Social Studies), process the
+  math ones, skip the rest, and say so kindly in the English `result_note` ("We only cover Math so
+  far; Reading and Science are coming."). Never put them under a Turkish subject.
+- Style: American contexts and first names, US money ($, ¢), US customary units next to metric as
+  the standard asks, dates as "November 10". Grade 2: three choices A–C, short sentences; grades 3–8:
+  four choices A–D in the style of Pennsylvania's PSSA (state test, grades 3–8). Never mention LGS,
+  MEB, bursluluk or anything Turkish. `target_seconds` 90 for Math.
+- Questions you write for `pa.*` topics go to the shared pool like all others; the topic keeps them
+  apart (a Turkish student never gets a US topic).
+- Lessons (section 3): `youtube_query` in English, e.g. `4th grade math equivalent fractions`.
+
 ## 0. Start
 
 ```
