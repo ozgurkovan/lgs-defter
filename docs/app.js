@@ -4504,11 +4504,66 @@ async function viewReport() {
   const today = localDate();
   const reviewedToday = reviews.filter((r) => localDate(new Date(r.answered_at)) === today).length;
 
-  const tiles = h('div', { class: 'tiles' },
-    tile('Son deneme neti', last ? net(lastRes).toFixed(2).replace('.', ',') : '–', last ? last.name : 'Henüz deneme yok'),
-    tile('Son denemede yanlış + boş', last ? lastRes.reduce((s, r) => s + r.wrong + r.blank, 0) : '–', 'Hedef: 0'),
-    tile('Eksik konu', gaps.length, gaps.length ? 'Aşağıda özel ders notları var' : 'Şu an yok'),
-    tile('Bugün çözülen tekrar', reviewedToday, `${settled} konu oturdu`));
+  // Deneme kutusu (velinin isteği, 2026-11-10: özet kutuları kullanışlı değildi): en son deneme açık gelir, açılır listeden
+  // öbür denemelere geçilir. Derse göre doğru, yanlış, boş ve net; yanlış ya da boş sayısına dokununca o dersin o denemedeki
+  // soruları açılır (soru, cevabı ve doğrusu, çözüm, "Benzer sorularla dene"). Eksik konu ve bugünkü tekrar sayıları altta
+  // tek satırda kaldı.
+  const examPicker = () => {
+    if (!exams.length) return h('section', { class: 'card stack', style: 'gap: 8px' }, h('h2', {}, 'Deneme'), h('p', { class: 'muted small' }, 'Henüz deneme yok.'));
+    const list = [...exams].reverse();
+    const sel = h('select', { 'aria-label': 'Hangi deneme' }, list.map((e) => h('option', { value: e.id }, e.name.includes(fmtDate(e.exam_date)) ? e.name : `${e.name} · ${fmtDate(e.exam_date)}`)));
+    const body = h('div', { class: 'stack', style: 'gap: 8px' });
+    const draw = () => {
+      const ex = exams.find((e) => e.id === sel.value) || list[0];
+      const rs = results.filter((r) => r.exam_id === ex.id).sort((a, b) => studentSubjects(state.student).indexOf(a.subject) - studentSubjects(state.student).indexOf(b.subject));
+      const slot = h('div', { class: 'exam-wrongs stack', style: 'gap: 10px', hidden: true });
+      let open = null;
+      const cell = (r, kind) => {
+        const n = kind === 'yanlis' ? r.wrong : r.blank;
+        if (!n) return h('td', {}, 0);
+        const btn = h('button', { class: 'num-link', 'aria-expanded': 'false', 'aria-label': `${SUBJECTS[r.subject]?.name || r.subject}: ${kind === 'yanlis' ? 'yanlış' : 'boş'} soruları göster`, onclick: async () => {
+          const key = r.subject + kind;
+          body.querySelectorAll('.num-link[aria-expanded="true"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+          if (open === key) { open = null; slot.hidden = true; return; }
+          open = key;
+          btn.setAttribute('aria-expanded', 'true');
+          slot.hidden = false;
+          fill(slot, h('p', { class: 'small muted' }, 'Yükleniyor…'));
+          try {
+            const rows = await q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, topic_id, topics(name), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
+              .eq('student_id', s).eq('exam_id', ex.id).eq('subject', r.subject).eq('outcome', kind).order('q_no'));
+            fill(slot, h('div', { class: 'spread' }, h('b', {}, `${SUBJECTS[r.subject]?.name || r.subject} · ${kind === 'yanlis' ? 'yanlış' : 'boş'} (${rows.length})`),
+                h('button', { class: 'ghost small', onclick: () => { open = null; slot.hidden = true; btn.setAttribute('aria-expanded', 'false'); } }, 'Kapat')),
+              rows.length ? rows.map((e) => h('div', { class: 'stack', style: 'gap: 6px; padding-top: 8px; border-top: 1px solid var(--rule)' },
+                h('p', { class: 'small muted' }, `${e.q_no}. soru · ${e.topics?.name || topicName[e.topic_id]?.name || ''}`),
+                examQuestionContent(e),
+                h('p', { class: 'small' }, kind === 'bos' ? `Boş bıraktı. Doğru cevap ${e.correct_answer || '?'}.` : `Cevabı ${e.student_answer || '?'} · doğrusu ${e.correct_answer || '?'}`),
+                e.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, e.solution)) : null,
+                checkButton({ examQuestionId: e.id, questionId: e.question_id || null, topicId: e.topic_id, styles: e.styles })))
+                : h('p', { class: 'small muted' }, 'Soru bulunamadı; deneme henüz işlenmemiş olabilir.'));
+          } catch (e) { fill(slot, h('p', { class: 'small error' }, 'Sorular yüklenemedi, tekrar dene.')); }
+        } }, n);
+        return h('td', { style: kind === 'yanlis' ? 'color: var(--red); font-weight: 600' : 'color: var(--amber); font-weight: 600' }, btn);
+      };
+      const tot = rs.reduce((a, r) => ({ c: a.c + r.correct, w: a.w + r.wrong, b: a.b + r.blank }), { c: 0, w: 0, b: 0 });
+      fill(body,
+        h('p', {}, h('b', { class: 'num' }, `Net ${fmtNet(net(rs))}`), h('span', { class: 'muted small' }, ` · ${tot.c} doğru · ${tot.w} yanlış · ${tot.b} boş` + (ex.time_note ? ` · süre: ${ex.time_note}` : ''))),
+        rs.length ? h('div', { class: 'scroll-x' }, h('table', {},
+          h('thead', {}, h('tr', {}, h('th', {}, 'Ders'), h('th', {}, 'Doğru'), h('th', {}, 'Yanlış'), h('th', {}, 'Boş'), h('th', {}, 'Net'))),
+          h('tbody', {}, rs.map((r) => h('tr', {}, h('td', {}, SUBJECTS[r.subject]?.name || r.subject), h('td', {}, r.correct), cell(r, 'yanlis'), cell(r, 'bos'),
+            h('td', { class: 'num' }, fmtNet(r.correct - r.wrong / 3)))))))
+          : h('p', { class: 'small muted' }, 'Bu denemenin sonuçları henüz işlenmedi.'),
+        h('p', { class: 'small muted' }, 'Yanlış ya da boş sayısına dokununca o sorular açılır.'),
+        slot);
+    };
+    sel.addEventListener('change', draw);
+    draw();
+    return h('section', { class: 'card stack', style: 'gap: 10px' },
+      h('div', { class: 'spread' }, h('h2', {}, 'Deneme'), sel),
+      body,
+      h('p', { class: 'small muted' }, `Eksik konu: ${gaps.length} · bugün çözülen tekrar: ${reviewedToday} · ${settled} konu oturdu`));
+  };
+  const tiles = examPicker();
 
   // Denemeler tablosu
   const examTable = exams.length ? h('div', { class: 'scroll-x' }, h('table', {},

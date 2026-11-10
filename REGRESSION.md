@@ -381,7 +381,11 @@ Her maddenin yanında nasıl denendiği yazar:
 ## Veli
 
 **Rapor** [A], içindekiler [E]
-- Üstte her zaman: özet kutuları, mesaj kutusu, birlikte bakılacaklar. Altı yedi sekmeye ayrılmıştır (velinin isteği,
+- Üstte her zaman: deneme kutusu, mesaj kutusu, birlikte bakılacaklar.
+  - Deneme kutusu (velinin isteği, 2026-11-10; dört özet kutusunun yerine): en son deneme açık gelir, açılır listeden öbür
+    denemelere geçilir. Net, toplam doğru/yanlış/boş ve derse göre tablo; yanlış ya da boş sayısına dokununca o dersin o
+    denemedeki soruları açılır (soru, cevabı ve doğrusu, çözüm, "Benzer sorularla dene"), yeniden dokununca kapanır.
+    Eksik konu, bugün çözülen tekrar ve oturan konu sayısı altta tek satırda. [A] Altı yedi sekmeye ayrılmıştır (velinin isteği,
   2026-11-10; sayfa çok uzamıştı): Gün gün çalışma · Bildirdiği sorular (ve tamamladığı şiirler) · Denemeler (tablo,
   derslere ve soru tipine göre, kavram yanılgıları) · Zayıf konular (özel derste çalışılacaklar, derse göre gruplu zayıf
   konular ve "Yanlışlar nereden geliyor?") · Son 14 gün (ve önümüzdeki 7 gün) · Yüklemeler (ve saatlik görevin son çalışması) · Kelime, Klavye,

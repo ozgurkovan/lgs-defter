@@ -470,6 +470,30 @@
     const d = navDepth(); go(a); await settle();
     check('Aynı sayfayı yeniden açmak geçmişe kayıt eklemez', navDepth() === d, `derinlik ${d} → ${navDepth()}`);
 
+    // Deneme kutusu (2026-11-10): en son deneme açık, açılır listeden öbür denemeler; yanlış ya da boş sayısına dokununca o
+    // dersin soruları açılır, yeniden dokununca kapanır. Salt okunur.
+    if (role !== 'student') {
+      go('report'); await settle();
+      const sel = document.querySelector('#app select[aria-label="Hangi deneme"]');
+      if (sel) {
+        const card = sel.closest('section');
+        const first = card.querySelector('tbody .num-link');
+        let shown = 'sayı yok', hidden = true;
+        if (first) {
+          first.click();
+          const slot = card.querySelector('.exam-wrongs');
+          for (let i = 0; i < 40 && /Yükleniyor/.test(slot.textContent); i++) await wait(150);
+          shown = !slot.hidden && (slot.querySelectorAll('.opt, img, .stem').length >= 1 || /bulunamadı/.test(slot.textContent)) ? 'ok' : slot.textContent.slice(0, 60);
+          first.click(); await wait(100); hidden = slot.hidden;
+        }
+        const options = sel.options.length;
+        if (options > 1) { sel.value = sel.options[1].value; sel.dispatchEvent(new Event('change')); await wait(200); }
+        const switched = options < 2 || /Net \d/.test(card.textContent);
+        check('Rapor: deneme kutusu; yanlış ya da boş sayısına dokununca sorular açılır, listeden başka deneme seçilir', (shown === 'ok' || shown === 'sayı yok') && hidden && switched,
+          `${options} deneme, ${shown}`);
+      } else check('Rapor: deneme kutusu', pageText().includes('henüz deneme yok'), 'deneme yok');
+    }
+
     // Rapor sekmeleri (2026-11-10): yedi sekme; yalnızca seçili sekmenin bölümleri görünür, seçim hatırlanır. Salt okunur.
     if (role !== 'student') {
       go('report'); await settle();
