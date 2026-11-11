@@ -452,6 +452,12 @@ Her maddenin yanında nasıl denendiği yazar:
   "Yeter" (velinin sorusu, 2026-11-10).
   Yeniden çözüm havuzdaki soruysa 'check' tarzıyla kaydedilir (doğruysa bronz), hata tekrarına yeniden girmez. Kâğıt
   denemenin fotoğrafında yalnız A–D harfleri. Öğrencide yok. [A]
+  Deneme sorusunun yorumu (nerede takıldığı, "Dikkat:" yanılgısı) cevap açılınca kartta "Yorum" olarak görünür (velinin
+  isteği, 2026-11-11); Sorular listesinde yorum kartın üstünde zaten olduğu için kartta tekrar çıkmaz. [A]
+- **Özel ders notları kaybolmaz** (velinin isteği, 2026-11-11: "bu güzel notu kaldırmış olabilir miyiz?"). Eksik konu
+  tekrarlarda düzelip "Özel derste çalışılacaklar"dan çıkınca not ve konu anlatımı silinmez: Rapor → Zayıf konular'da
+  "Önceki özel ders notları" bölümünde (açılır kutular, ne zaman eksik konu olduğu), zayıf konu kartında ve velinin konu
+  sayfasında ("📝 Özel ders notu") durur. Öğrencinin "Anlamadım"ında konu anlatımı kapanan konuda da açılır. [A]
 - **Benzer sorularla dene** (velinin isteği, 2026-11-09; artık Birlikte çöz kartının içinde "Anladım" deyince açılır): çocuk yanlış yaptığı soruyu "anladım" deyince veli birkaç benzer
   soruyla dener. Sorular sekmesinde kaçırdığı her sorunun, Birlikte bakılacaklar'daki her sorunun ve raporda zayıf konunun
   yanlış sorularının altında düğme. Veli ve öğretmen (öğretmen kendi dersinde; velinin isteği, 2026-11-09: öğrenci öğretmen

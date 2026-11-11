@@ -1119,7 +1119,7 @@ function statusTag(status) {
 let gapLessons = new Map();
 function loadGapLessons() {
   const id = sid();
-  sb.from('topic_status').select('topic_id, lesson').eq('student_id', id).eq('status', 'gap').not('lesson', 'is', null)
+  sb.from('topic_status').select('topic_id, lesson').eq('student_id', id).in('status', ['gap', 'active']).not('lesson', 'is', null)
     .then(({ data }) => { if (sid() === id) gapLessons = new Map((data || []).map((r) => [r.topic_id, r.lesson])); });
 }
 
@@ -2779,7 +2779,7 @@ async function viewTopicPractice() {
   loading();
   const [topic, status, items] = await Promise.all([
     q(sb.from('topics').select('id, subject, grade, name, sort, lgs_avg').eq('id', id).maybeSingle()),
-    q(sb.from('topic_status').select('status, lesson, youtube_query').eq('student_id', sid()).eq('topic_id', id).maybeSingle()),
+    q(sb.from('topic_status').select('status, lesson, tutor_note, youtube_query').eq('student_id', sid()).eq('topic_id', id).maybeSingle()),
     q(sb.from('items').select('topic_id, track, step, state, due_date').eq('student_id', sid()).eq('topic_id', id)),
   ]);
   if (!topic) return go('topics', 'replace');
@@ -2804,6 +2804,8 @@ async function viewTopicPractice() {
                + 'Yalnızca bu konudan sorular gelir; yanlış yaptıkların hata tekrarına girer.'),
              h('button', { class: 'primary block', onclick: () => runSession('practice', practice, 'konu') }, `Bu konudan ${n} soru çöz`)]
           : h('p', { class: 'muted' }, 'Bu konunun soruları şimdilik günlük tekrarların için ayrıldı. Yeni sorular hazırlanıyor; birkaç saat sonra tekrar bak.')),
+    // Özel ders notu veli ve öğretmene (velinin isteği, 2026-11-11): eksik konu kapansa da durur.
+    status?.tutor_note && isParentView() ? h('details', { class: 'card' }, h('summary', {}, '📝 Özel ders notu'), h('div', { class: 'note teacher', style: 'margin-top: 8px' }, status.tutor_note)) : null,
     covered && status?.lesson ? h('details', { class: 'card' }, h('summary', {}, '📖 Bu konunun kısa anlatımı'), h('div', { class: 'note teacher', style: 'margin-top: 8px' }, status.lesson)) : null,
     covered ? h('a', { class: 'btn block', href: status?.youtube_query ? 'https://www.youtube.com/results?search_query=' + encodeURIComponent(status.youtube_query) : youtubeSearch(topic.name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı') : null);
 }
@@ -4419,6 +4421,11 @@ function studyCard(data, src, onDone) {
       h('p', { class: 'study-result' }, h('b', { style: `color: var(--${correct ? 'green' : 'red'})` },
         k ? (correct ? 'Doğru.' : `Yanlış. Doğru cevap ${data.answer || '?'}.`) : `Doğru cevap ${data.answer || '?'}.`),
       first ? h('span', { class: 'small muted' }, ` ${first}`) : null),
+      // Denemedeki sorunun yorumu (nerede takıldığı), cevap açılınca (velinin isteği, 2026-11-11: eski yanlışlara bakarken görünsün).
+      data.comment || data.misconception ? h('div', { class: 'note teacher small' },
+        h('p', { class: 'label' }, 'Yorum'),
+        data.comment ? h('p', {}, data.comment) : null,
+        data.misconception ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Dikkat: '), data.misconception) : null) : null,
       // Çözüm kapalı durur (velinin isteği, 2026-11-10): önce birlikte konuşsunlar, gerekirse açsınlar.
       data.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, data.solution))
         : h('p', { class: 'small muted' }, 'Bu sorunun yazılı çözümü yok; birlikte çözün.'),
@@ -4451,13 +4458,21 @@ const questionBody = (qn) => [qn?.image_path ? lazyImg('questions', qn.image_pat
 function examStudy(e, topicId) {
   const qn = e.image_path ? null : e.questions;
   return [{ content: e.image_path ? lazyImg('photos', e.image_path) : questionBody(qn), choices: qn?.choices || null, answer: e.correct_answer,
-    chosen: e.student_answer, blank: e.outcome === 'bos', solution: e.solution, questionId: e.question_id || null },
+    chosen: e.student_answer, blank: e.outcome === 'bos', solution: e.solution, questionId: e.question_id || null,
+    comment: e.diagnosis_text || null, misconception: e.misconception || null },
   { examQuestionId: e.id, questionId: e.question_id || null, topicId: topicId ?? e.topic_id, styles: e.styles }];
 }
 function reviewStudy(r, qn, topicId) {
   const qid = r.question_id || qn.id;
   return [{ content: questionBody(qn), choices: qn.choices, answer: qn.answer, chosen: r.answer, blank: !!r.needs_help, solution: qn.solution, questionId: qid },
     { questionId: qid, topicId: topicId ?? qn.topic_id, styles: qn.styles, variantOf: qn.variant_of }];
+}
+// Bir konunun özel ders notu ve öğrenciye yazılan konu anlatımı, kapalı açılır kutularda (topic_status satırı).
+function tutorNoteDetails(s) {
+  return [
+    s.tutor_note ? h('details', {}, h('summary', { class: 'small' }, '📝 Özel ders notu'), h('div', { class: 'note teacher small', style: 'margin-top: 6px' }, s.tutor_note)) : null,
+    s.lesson ? h('details', {}, h('summary', { class: 'small' }, '📖 Öğrenciye yazılan konu anlatımı'), h('div', { class: 'note small', style: 'margin-top: 6px' }, s.lesson)) : null,
+  ];
 }
 // "Birlikte çöz" düğmesi (listelerde): basınca kart açılır. make: [data, src] ya da bunu veren (async olabilir) işlev.
 function togetherButton(make) {
@@ -4524,7 +4539,7 @@ async function viewQuestions() {
       r.misconception ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Kavram yanılgısı: '), r.misconception) : null,
       r.scratch_note ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Karalamasında: '), r.scratch_note) : null) : null,
     r.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, r.solution)) : null,
-    r.outcome !== 'dogru' && ['parent', 'teacher'].includes(state.profile?.role) ? togetherButton(examStudy(r)) : null);
+    r.outcome !== 'dogru' && ['parent', 'teacher'].includes(state.profile?.role) ? togetherButton(() => { const [d, src] = examStudy(r); return [{ ...d, comment: null, misconception: null }, src]; }) : null); // yorum kartın üstünde zaten var
 
   const reviewCard = (r) => {
     const qn = r.questions || {};
@@ -4638,7 +4653,7 @@ async function viewReport() {
           slot.hidden = false;
           fill(slot, h('p', { class: 'small muted' }, 'Yükleniyor…'));
           try {
-            const rows = await q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, topic_id, topics(name), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
+            const rows = await q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, diagnosis_text, misconception, topic_id, topics(name), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
               .eq('student_id', s).eq('exam_id', ex.id).eq('subject', r.subject).eq('outcome', kind).order('q_no'));
             fill(slot, h('div', { class: 'spread' }, h('b', {}, `${SUBJECTS[r.subject]?.name || r.subject} · ${kind === 'yanlis' ? 'yanlış' : 'boş'} (${rows.length})`),
                 h('button', { class: 'ghost small', onclick: () => { open = null; slot.hidden = true; btn.setAttribute('aria-expanded', 'false'); } }, 'Kapat')),
@@ -4714,7 +4729,7 @@ async function viewReport() {
       loaded = true;
       fill(slot, h('p', { class: 'small muted' }, 'Yükleniyor…'));
       try {
-        const rows = await q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, topic_id, created_at, exams(name, exam_date), topics(name), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
+        const rows = await q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, diagnosis_text, misconception, topic_id, created_at, exams(name, exam_date), topics(name), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
           .eq('student_id', s).eq('subject', subj).neq('outcome', 'dogru').order('created_at', { ascending: false }));
         const groups = [];
         for (const e of rows) {
@@ -4776,6 +4791,19 @@ async function viewReport() {
         : youtubeSearch(topicName[g.topic_id]?.name),
         target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı')))) : null;
 
+  // Kapanan eksik konuların notları (velinin isteği, 2026-11-11): konu tekrarlarda düzelince "Özel derste çalışılacaklar"dan
+  // çıkar ama özel ders notu ve konu anlatımı kaybolmaz; burada saklanır, eski yanlışlara bakarken de açılır.
+  const noteOf = Object.fromEntries(statuses.filter((s) => s.tutor_note || s.lesson).map((s) => [s.topic_id, s]));
+  const pastNotes = statuses.filter((s) => s.status !== 'gap' && (s.tutor_note || s.lesson) && topicName[s.topic_id])
+    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+  const pastNoteCards = pastNotes.length ? h('section', { class: 'stack' },
+    h('h2', {}, 'Önceki özel ders notları'),
+    h('p', { class: 'small muted' }, 'Bu konular tekrarlarda düzeldi; o zaman yazılan notlar burada duruyor.'),
+    pastNotes.map((g) => h('div', { class: 'card' },
+      h('div', { class: 'row' }, subjTag(topicName[g.topic_id].subject), h('b', {}, topicName[g.topic_id].name)),
+      g.gap_since ? h('p', { class: 'small muted' }, `${fmtDate(g.gap_since)} tarihinde eksik konu olarak açılmıştı.`) : null,
+      tutorNoteDetails(g)))) : null;
+
   // Zayıf konular: son 30 günün tekrarları ve bütün denemeler birlikte; her konuya YouTube konu anlatımı.
   const topicStats = {};
   const ts = (id) => (topicStats[id] ||= { n: 0, ok: 0, sureWrong: 0, lucky: 0, examMiss: 0, misconceptions: [] });
@@ -4816,7 +4844,7 @@ async function viewReport() {
         const wrongRevs = reviews30.filter((r) => r.questions?.topic_id === id && !r.correct).sort((a, b) => (a.answered_at < b.answered_at ? 1 : -1));
         const [qs, exs] = await Promise.all([
           wrongRevs.length ? q(sb.from('questions').select('id, stem, choices, answer, solution, image_path, styles, variant_of').in('id', [...new Set(wrongRevs.map((r) => r.question_id))])) : [],
-          t.examMiss ? q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, exams(name, exam_date), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
+          t.examMiss ? q(sb.from('exam_questions').select('id, q_no, outcome, student_answer, correct_answer, image_path, solution, styles, question_id, diagnosis_text, misconception, exams(name, exam_date), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
             .eq('student_id', s).eq('topic_id', id).neq('outcome', 'dogru').order('created_at', { ascending: false })) : [],
         ]);
         const byId = Object.fromEntries(qs.map((x) => [x.id, x]));
@@ -4858,6 +4886,8 @@ async function viewReport() {
         (t.sureWrong ? ` · ${t.sureWrong} kez emin ama yanlış` : '') +
         (t.lucky ? ` · ${t.lucky} kez tahminle doğru` : '')),
       t.misconceptions.length ? h('div', { class: 'note teacher small' }, h('b', {}, 'Görülen yanılgı: '), t.misconceptions[t.misconceptions.length - 1]) : null,
+      // Konunun özel ders notu, eksik konu kapandıktan sonra da (velinin isteği, 2026-11-11: "bu güzel notu kaldırmış olabilir miyiz?").
+      noteOf[id] && !gaps.some((g) => g.topic_id === id) ? tutorNoteDetails(noteOf[id]) : null,
       topicName[id].kazanim ? h('p', { class: 'small muted' }, 'Kapsam: ' + topicName[id].kazanim) : null,
       t.n - t.ok > 0 ? topicWrongs(id, t) : null,
       h('a', { class: 'btn', href: youtube(topicName[id].name), target: '_blank', rel: 'noopener' }, 'YouTube’da konu anlatımı'))])
@@ -4924,7 +4954,7 @@ async function viewReport() {
       ['gun', 'Gün gün çalışma', () => [dayReport(reviews30, items, topicName)]],
       ['bildirdikleri', 'Bildirdiği sorular', () => [reportedBox(), poemBox()]],
       ['denemeler', 'Denemeler', () => [h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable), subjects, styles, misconceptions]],
-      ['zayif', 'Zayıf konular', () => [gapCards, weakCards, causes]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
+      ['zayif', 'Zayıf konular', () => [gapCards, weakCards, causes, pastNoteCards]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
       ['son14', 'Son 14 gün', () => [perf, load]],
       ['yuklemeler', 'Yüklemeler', () => [job]],
       ['diger', 'Kelime · Klavye · Kitap', () => [wordBox(), typingBox(), booksBox()]],
