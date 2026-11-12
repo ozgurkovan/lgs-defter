@@ -84,6 +84,29 @@ function dailyPlan(p) {
   return plan;
 }
 const planTotal = (plan) => Object.values(plan).reduce((n, v) => n + (v || 0), 0);
+// Toplamı derslere oranla dağıtır (en büyük kalan yöntemi; ders başına en fazla 60). base hep sıfırsa eşit dağıtır.
+function planSplit(base, subjects, total) {
+  const cap = 60;
+  let left = Math.max(0, Math.min(Math.round(+total || 0), subjects.length * cap));
+  const w = Object.fromEntries(subjects.map((s) => [s, Math.max(0, +base[s] || 0)]));
+  const out = Object.fromEntries(subjects.map((s) => [s, 0]));
+  let free = subjects.slice();
+  const weightOf = () => { const ws = free.reduce((a, s) => a + w[s], 0); return ws ? (s) => w[s] / ws : () => 1 / free.length; };
+  // Payı sınırı aşan dersler 60'ta durur, kalan diğerlerine aynı oranla dağılır.
+  for (let changed = true; changed && free.length;) {
+    changed = false;
+    const share = weightOf();
+    for (const s of free) if (left * share(s) >= cap) { out[s] = cap; left -= cap; changed = true; }
+    free = free.filter((s) => out[s] < cap);
+  }
+  if (!free.length) return out;
+  const share = weightOf();
+  const raw = free.map((s) => ({ s, x: left * share(s) }));
+  raw.forEach((r) => { out[r.s] = Math.floor(r.x); left -= out[r.s]; });
+  raw.sort((x, y) => (y.x - Math.floor(y.x)) - (x.x - Math.floor(x.x)) || w[y.s] - w[x.s]);
+  for (const r of raw) { if (left <= 0) break; out[r.s]++; left--; }
+  return out;
+}
 
 // Hata takibi: 1 → 2 → 4 → 14 → 30 gün. Konu tekrarı: Fibonacci, 55'te sabitlenir.
 const MISTAKE_LADDER = [1, 2, 4, 14, 30];
@@ -4009,9 +4032,22 @@ function planSection(p) {
 
     const inputs = {}, checks = [];
     const totalLine = h('p', { class: 'small muted num' });
-    const update = () => {
+    // Toplam kutusu (velinin isteği, 2026-11-12: "10 soru eklemek için her ders için oran hesaplamam gerekiyor"): toplam
+    // değişince dersler aynı oranla dağılır (planSplit). Oran, derslere en son elle girilen sayılardan alınır; toplamı
+    // 1'er 1'er yazarken yuvarlama birikmesin. Bir dersi elle değiştirince toplam kendiliğinden güncellenir.
+    const totalInput = h('input', { type: 'number', min: 0, max: subjects.length * 60, inputmode: 'numeric',
+      'aria-label': 'Günlük toplam soru sayısı', style: 'width: 76px' });
+    let base = Object.fromEntries(subjects.map((s) => [s, +plan[s] || 0]));
+    totalInput.addEventListener('input', () => {
+      if (totalInput.value === '') return;
+      const by = planSplit(base, subjects, +totalInput.value || 0);
+      subjects.forEach((s) => { inputs[s].value = by[s]; });
+      update(true);
+    });
+    const update = (fromTotal) => {
       checks.forEach((c) => c());
       const total = subjects.reduce((a, s) => a + (+inputs[s].value || 0), 0);
+      if (!fromTotal) { totalInput.value = total; base = Object.fromEntries(subjects.map((s) => [s, +inputs[s].value || 0])); }
       const maxSec = subjects.reduce((a, s) => a + (+inputs[s].value || 0) * maxSeconds(s), 0);
       totalLine.textContent = `Toplam günde ${total} soru · soru sürelerine göre en fazla ${fmtMinutes(maxSec)}`;
     };
@@ -4019,7 +4055,7 @@ function planSection(p) {
       const st = stat[s];
       const input = inputs[s] = h('input', { type: 'number', min: 0, max: 60, value: plan[s], inputmode: 'numeric',
         'aria-label': `${SUBJECTS[s].name} günlük soru sayısı`, style: 'width: 76px' });
-      input.addEventListener('input', update);
+      input.addEventListener('input', () => update());
       const warn = h('p', { class: 'small', style: 'color: var(--red)' });
       // Yoğun günde destek soruları atlanır: sınırı aşan, madde başına bir soruyla bile sığmayan hata tekrarıdır.
       checks.push(() => {
@@ -4080,6 +4116,7 @@ function planSection(p) {
       h('p', {}, `Bugün ${sum('n')} soru çözdü, ${fmtMinutes(sum('sec'))}. Son 7 günde ${fmtMinutes(sum('week'))}`
         + (days ? `, çalıştığı ${days} günde ortalama ${fmtMinutes(sum('week') / days)}.` : '.')),
       h('p', { class: 'small muted' }, 'Her dersten günde en fazla kaç soru gelsin? Önce hata tekrarları, sonra konu tekrarları gelir; kalan sayı en zayıf konulardan ek çalışmayla dolar. Süre, soruyu açtığı andan şıkkı seçtiği ana kadar ölçülür.'),
+      h('div', { class: 'spread', style: 'padding: 8px 0' }, h('label', {}, h('b', {}, 'Günde toplam'), h('span', { class: 'small muted' }, ' · değiştirince derslere aynı oranla dağılır')), totalInput),
       rowsEl, totalLine, wordsRow, typingRow, feedRow, save);
   })().catch(() => fill(box, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yüklenemedi, sayfayı yenile.')));
   return box;

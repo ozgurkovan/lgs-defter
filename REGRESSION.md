@@ -97,6 +97,9 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Günlük plan ve takvim** [O]
 - Velinin ders ders günlük soru sayısı. Önce hata tekrarı, sonra konu tekrarı, kalan hak ek çalışmaya gider.
+- Ders kutularının üstünde "Günde toplam" kutusu (velinin isteği, 2026-11-12): toplam değişince dersler en son elle girilen
+  oranla dağılır (yuvarlama en büyük kalanla, toplam tam tutar; ders başına en fazla 60). Bir dersi elle değiştirince toplam
+  kendiliğinden güncellenir. Kaydet'e basmadan hiçbir şey kaydedilmez. [A]
 - Bir dersin hakkı bir konu tekrarından küçükse o dersin günün ilk tekrarı yine tam yapılır.
 - Hata tekrarı 1, 2, 4, 14 ve 30 gün sonra gelir; her yanlışa üç benzer soru yazılır, sorunun kendisi değil.
 - Aralık, "tamamen eminim" ya da "büyük ölçüde eminim" ile ipucusuz ve süresinde doğru bilinince uzar; büyük ölçüde emin
