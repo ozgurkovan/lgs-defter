@@ -104,7 +104,7 @@
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
-            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı', 'kahramanı besleme', 'açlığı dondur'], together: ['birlikte bakılacaklar'] }
+            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı', 'kahramanı besleme', 'açlığı dondur', 'asker kahraman'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
     if (role === 'student' && wordsPerDay(state.student) > 0) {
       pages.words = ['kelime kartları', 'güç', 'mağaza'];
@@ -190,11 +190,30 @@
           check('Kahramanı besleme: İngilizce sayfasında kahramanın altında tokluk ve "Besle"',
             !!document.querySelector('.feed-strip .feed-bar') && [...document.querySelectorAll('.feed-strip button')].some((x) => x.textContent === 'Besle'));
         }
-      } else {
+      } else if (!armyOn(state.student)) {
         go('hero'); await settle();
         check('Kahramanı besleme kapalıyken ana sayfada kart yok, kahramanın sayfası "kapalı" der',
           (!card || card.hidden) && pageText().includes('kahramanı besleme kapalı') && !document.querySelector('.feed-shelf'));
       }
+    }
+    // Asker kahraman (velinin isteği, 2026-11-13). Açıkken: kahramanın kartında numara ya da rütbe satırı, kahraman
+    // numarasıyla ya da üniformasıyla çizilir; kahramanın sayfasında asker kartı. Kol seçilmez: hiçbir şey yazılmaz.
+    if (role === 'student' && armyOn(state.student)) {
+      go('home'); await settle();
+      for (let i = 0; i < 40 && document.querySelector('.feed-home')?.hidden; i++) await wait(150);
+      const card = document.querySelector('.feed-home');
+      const line = !!card && !card.hidden && !!card.querySelector('.army-line') && /numara|Forma|100/i.test(card.querySelector('.army-line').textContent)
+        && /numara \d+/.test(card.querySelector('.feed-face svg.hero')?.getAttribute('aria-label') || '');
+      document.querySelector('.party button')?.click(); // kutlama açıldıysa kapat (yalnızca bu cihazdaki kayıt değişir)
+      go('hero'); await settle();
+      const ac = document.querySelector('.army-card');
+      check('Asker kahraman: kartta numara satırı, kahraman numarasıyla çizili; kahramanın sayfasında asker kartı',
+        line && !!ac && /Asker kahraman|Askerlik töreni|Numara \d+/.test(ac.textContent) && !!ac.querySelector('.feed-bar, .army-corps, .army-badge'),
+        [!line && 'kart satırı ya da numara eksik', !ac && 'asker kartı yok'].filter(Boolean).join('; '));
+      document.querySelector('.party button')?.click();
+    } else if (role === 'student') {
+      go('hero'); await settle();
+      check('Asker kahraman kapalıyken asker kartı yok', !document.querySelector('.army-card, .army-line'));
     }
     // Veli: Günlük planda "Kahramanı besleme" ve "Açlığı dondur" kutuları (kaydedilmez).
     if (role === 'parent' && state.student) {
@@ -203,6 +222,8 @@
       const on = document.querySelector('#app input[aria-label="Kahramanı besleme açık"]'), pause = document.querySelector('#app input[aria-label="Açlığı dondur"]');
       check('Kahramanı besleme: velinin Günlük planında açma kutusu ve "Açlığı dondur"; kapalıyken dondurma seçilemez',
         !!on && !!pause && on.checked === feedOn(state.student) && pause.disabled === !on.checked);
+      const army = document.querySelector('#app input[aria-label="Asker kahraman açık"]');
+      check('Asker kahraman: velinin Günlük planında açma kutusu (çocuğun şimdiki ayarıyla)', !!army && army.checked === armyOn(state.student));
     }
 
     // Klavye sekmesi yalnızca dersleri açık öğrencide (ilkokulda varsayılan açık, sonrasında veli açar).

@@ -118,21 +118,27 @@ function feedBar(sat) {
 }
 
 // Kahramanın kartı: küçük kahraman, sözü, tokluk, bronz ve besleme düğmesi. Ana sayfada (selamın altında) ve oturum
-// sonlarında durur; besleme kapalıysa ya da okunamazsa görünmez.
+// sonlarında durur. Asker kahraman açıksa (army.js) kahraman numarasıyla ya da üniformasıyla çizilir, altında numara ya
+// da rütbe satırı olur; 100'e ulaşınca ya da terfi edince kutlama açılır. Besleme kapalı, asker kahraman açıksa kart
+// yalnızca kahramanı ve asker satırını gösterir. İkisi de kapalıysa ya da okunamazsa görünmez.
 function feedHomeCard() {
   const box = h('section', { class: 'card feed-home', hidden: true });
-  if (!feedOn(state.student)) return box;
-  loadFeed().then((fs) => {
-    if (!fs) return;
+  const feeding = feedOn(state.student), army = armyOn(state.student);
+  if (!feeding && !army) return box;
+  Promise.all([feeding ? loadFeed() : null, army ? loadArmy().catch(() => null) : null, !feeding ? typingHero() : null]).then(([fs, st, solo]) => {
+    if (!fs && !st) return;
+    const level = fs ? fs.hero.level : solo.level;
     const pic = h('div', { class: 'feed-face', 'aria-hidden': 'true' });
-    pic.innerHTML = heroSvg(fs.p.avatar, fs.hero.level, fs.p.hero_look, feedMood(fs.sat));
-    const can = fs.sat < 70 && !!feedPick(fs.balance, fs.unit); // tokken düğme öne çıkmaz
+    pic.innerHTML = heroSvg(state.student.avatar, level, state.student.hero_look, fs ? feedMood(fs.sat) : undefined, armyView(state.student, st));
+    const can = fs && fs.sat < 70 && !!feedPick(fs.balance, fs.unit); // tokken düğme öne çıkmaz
     fill(box, pic, h('div', { class: 'stack feed-side' },
-      h('p', { class: 'feed-say' }, feedSay(fs)),
-      feedBar(fs.sat),
-      h('div', { class: 'spread' }, h('b', { class: 'num small' }, `🥉 ${fs.balance}`),
+      h('p', { class: 'feed-say' }, fs ? feedSay(fs) : armySay(st)),
+      fs ? feedBar(fs.sat) : null,
+      st ? armyLine(st) : null,
+      h('div', { class: 'spread' }, fs ? h('b', { class: 'num small' }, `🥉 ${fs.balance}`) : h('span'),
         h('button', { class: can ? 'primary small' : 'small', onclick: () => go('hero') }, can ? 'Kahramanı besle' : 'Kahramana git'))));
     box.hidden = false;
+    armyCheck(st, state.student, level);
   }).catch(() => {});
   return box;
 }
@@ -161,9 +167,12 @@ function feedFly(emoji, from, to) {
 
 /* Kahramanın sayfası (çocuk): ortada kahraman ve sözü, yanda yemek rafı, altında tokluk ve bronz. Rafta bir yemeğe
    dokununca bronzu yetiyorsa alınır ve kahramana yedirilir; karnı toksa yemez. */
+// Asker kahraman açıksa (army.js) yemek kartının altında asker kartı durur; besleme kapalıysa sayfa yalnızca kahramanı
+// ve asker kartını gösterir (viewArmyHero).
 async function viewHero() {
   loading();
-  const fs = await loadFeed();
+  const [fs, army] = await Promise.all([loadFeed(), loadArmy().catch(() => null)]);
+  if (!fs && army) return viewArmyHero(army);
   if (!fs) {
     return render(h('header', {}, h('h1', {}, 'Kahramanın')),
       h('p', { class: 'card' }, 'Kahramanı besleme kapalı; velin Ayarlar\'dan açabilir.'),
@@ -209,11 +218,15 @@ async function viewHero() {
   };
   paint();
   const p = fs.parts, typing = typingPerDay(fs.p) > 0;
+  const armyBox = h('div');
+  const paintArmy = () => { fill(armyBox, army ? armyCard(army, fs.p, fs.hero.level, () => { paint(); paintArmy(); }) : null); };
+  paintArmy();
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('h1', {}, 'Kahramanın'),
       h('p', { class: 'muted' }, 'Doğru cevapların bronz kazandırır. Bronzla raftan yemek al, kahramanına yedir: tok kahramanın kasları diri kalır.')),
     h('section', { class: 'card stack', style: 'gap: 12px' }, h('div', { class: 'feed-stage' }, stage, shelf), status),
+    armyBox,
     h('section', { class: 'card stack', style: 'gap: 6px' },
       h('p', { class: 'label' }, 'Bronz nasıl kazanılır?'),
       h('p', { class: 'small' }, `Her doğru cevap 1 bronz. Günlük planının yarısını çözünce ${p.half}, tamamını çözünce ${p.half} bronz daha.`
@@ -221,6 +234,7 @@ async function viewHero() {
         + (typing ? ` Günün her klavye dersi ${p.lesson} bronz; Kelime roketi de kazandırır (günde en çok ${p.gameCap}).` : '')),
       h('p', { class: 'small muted' }, `Bugün: ${fs.today?.correct || 0} doğru cevap. Kahraman çalışmadığın günlerde acıkır; seviyesi, araçları ve eşyaları hiç kaybolmaz.`)),
     h('button', { class: 'block', onclick: () => go('home') }, 'Ana sayfa'));
+  armyCheck(army, fs.p, fs.hero.level);
 }
 
 /* Besleme: veli */

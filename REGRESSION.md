@@ -83,7 +83,8 @@ Her maddenin yanında nasıl denendiği yazar:
 
 **Bugün (ana sayfa): sade**
 - Tarih ve selam. Selam bazen şakacı olur ("…ciğim, napıyon?"). 8. sınıfta LGS'ye kalan gün. [A]
-- Kahramanı besleme açıksa selamın altında kahramanın kartı (aşağıda "Kahramanı besleme"); kapalıysa görünmez. [A]
+- Kahramanı besleme ya da asker kahraman açıksa selamın altında kahramanın kartı (aşağıda "Kahramanı besleme" ve
+  "Asker kahraman"); ikisi de kapalıysa görünmez. [A]
 - Velinin okunmamış mesajları ("Okudum ❤" ile kapanır) ve bildirdiği sorulara gelen cevaplar ("Okudum"). [E]
 - Mesaj yoksa girişlerin yaklaşık %30'unda bir kart: şaka, bilmece, hafif bulmaca, fıkra ya da şiir. [A]
 - **Hata tekrarı** kartı:
@@ -242,6 +243,32 @@ Her maddenin yanında nasıl denendiği yazar:
   7. sınıfa kadar açık gelir, 8. sınıftan sonra kapalı (büyük çocuğa çocukça gelebilir). "Açlığı dondur" (hastalık,
   tatil): tokluk düşmez; açılınca kaldığı yerden devam eder. Altında kahramanın şimdiki hali, bronzu, bugün yedikleri.
   Kapatıp yeniden açınca bronz sıfırdan başlar. Kapalıyken çocukta kart, raf ve bronz görünmez; kahraman eskisi gibidir. [A], kaydetme [E]
+
+**Asker kahraman** (velinin isteği, 2026-11-13; `docs/army.js`, `supabase/hero-army.sql`) [O], ekran [A], kol seçimi [E]
+- Kahramanın göğsünde bir forma numarası var; çalıştıkça artar, hiç azalmaz. Hesap veritabanında (`hero_army_state`) [O]:
+  hata tekrarında her 10 doğru +1, öteki sorularda (konu tekrarı, ek çalışma, deneme, kitap, konu çalışması, kâğıt
+  deneme) her 20 doğru +1; ilk denemede doğru 8 kelime kartı ve yıldızlı her klavye dersi birer "öteki doğru". Sayım
+  2026-11-13'ten (yayın günü) başlar. Bugün kaç arttığı da görünür ("bugün +2").
+- Asker değilken numara göğsün ortasında (yıldızın ve "10"un yerinde); pelerinli seviyelerde amblem ya da madalya sola
+  kayar, numara sağda. Pelerin, taç, şapka yerinde kalır. Asker kahraman kapalıyken çizim eskisiyle birebir aynıdır. [O]
+- **100 olunca asker olur**: kahramanın kartında "Kolunu seç", bir kez kutlama ("100'e ulaştın!"). Kahramanın sayfasında
+  "Askerlik töreni": Türkiye'de Kara, Deniz, Hava; ABD'de Army, Navy, Air Force, Marines, Space Force. Her kolda kahraman
+  o kolun üniformasıyla görünür; çocuk birine dokunur, onaylar, "Artık askersin!" kutlaması. [A], seçim [E]
+  - Kolu yalnızca öğrenci, numarası 100 olunca, bir kez ve ülkesine uygun seçer (`set_hero_corps`). [O]
+- Askerken üniforma: kolunun gömleği (Kara, Army, Marines kamuflajlı; Deniz, Navy denizci yakalı), pantolon, bot, kolunun
+  şapkası (bere, denizci şapkası, kep); subay rütbesinde (Asteğmen ve üstü) siperlikli şapka. Göğsün solunda bayrak ve
+  rütbe işareti, sağında numara künyesi (10. seviyede üstünde madalya). Pelerin ve taç çıkar; yüz ve gülüş aynı, sevimli. [O]
+- **Rütbe**: Er 100, Onbaşı 115, Çavuş 135, Üstçavuş 160, Astsubay 190, Asteğmen 225, Teğmen 265, Üsteğmen 310,
+  Yüzbaşı 360, Binbaşı 415, Yarbay 475, Albay 540, General 620 (Deniz'de Amiral). ABD'de kolun kendi İngilizce
+  rütbeleri. Terfi edince bir kez kutlama ("Terfi! … oldun!"); ilk açılışta eski durum kutlanmaz. [O]
+- Kahramanın sayfasında asker kartı: asker değilken numara çubuğu ve 100'e kalan; askerken rütbe rozeti, sıradaki rütbeye
+  kalan, bütün rütbeler; "Numara nasıl artar?". Besleme kapalı, asker kahraman açıksa sayfa kahramanı ve asker kartını
+  gösterir (yemek rafı yok). Kahramanın kartında numara ya da rütbe satırı. İngilizce ve Klavye sayfalarındaki kahraman
+  da numarasıyla ya da üniformasıyla çizilir. [A]
+- Veli (Ayarlar → Günlük plan, besleme satırının altında): "Asker kahraman" çocuk başına açılır ya da kapanır; 7. sınıfa
+  kadar açık gelir. Kapatıp açmak numarayı silmez. Kol seçildiyse "Kolunu yeniden seçsin" (numara ve rütbe kalır).
+  Altında şimdiki numara, kol ve rütbe. [A], kaydetme [E]
+- Uzaylılarla savaş (ikinci aşama) henüz yok.
 
 **Klavye** (on parmak klavye, bilgisayarda) [A], ders [E]
 - Alt menüde "Klavye" sekmesi, İngilizce'nin solunda. Yalnızca klavyeli cihazda (fare ya da dokunmatik yüzey varsa) görünür,
@@ -574,6 +601,11 @@ Her maddenin yanında nasıl denendiği yazar:
   - çocuk kahramanına kendisi yedirir, kardeşi adına yediremez; besleme ayarını ve açlığı dondurmayı veli seçer, çocuk
     değiştiremez;
   - yemekleri ve bronz sayımını çocuk ve velisi görür; öğretmen ve kardeş göremez.
+- Asker kahraman (`test-hero-army.sql`):
+  - çocuk açma ayarını ve kolunu doğrudan değiştiremez; numarası 100 olmadan, kapalıyken, başka ülkenin kolunu ya da
+    ikinci kez kol seçemez; 100 olunca ülkesine uygun kolu bir kez seçer;
+  - numarayı çocuk ve velisi görür, öğretmen ve kardeş göremez; veli kolu yalnızca sıfırlar (bir kol yazamaz), açma
+    ayarını o değiştirir; öğretmen sıfırlayamaz; numaranın hesabı (800 hata tekrarı + 400 öteki doğru = 100).
 - Okuduğu kitap:
   - çocuk kendi kitabını ekler ve sayfalarını gönderir, kardeşi adına ekleyemez;
   - sınav tarihini sonradan yalnızca veli değiştirir;

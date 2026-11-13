@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const FILES = ['docs/app.js', 'docs/typing.js', 'docs/feed.js', 'supabase/functions/family/index.ts'];
+const FILES = ['docs/app.js', 'docs/typing.js', 'docs/feed.js', 'docs/army.js', 'supabase/functions/family/index.ts'];
 // İçerik dizileri çevrilmez, ABD için yerine İngilizce içerik gelir (docs/i18n.js, I18N_CONTENT): Türk fıkraları,
 // şiirler, Türkçe klavye dersleri ve sesli söylenen harf adları, LGS kitapçıkları.
 const SKIP_CONSTS = ['JOKES', 'FIKRALAR', 'POEMS', 'POEM_TIPS', 'BOOKLETS', 'SWEET_LINES', 'TYPING_LESSONS', 'KEY_SAY', 'KEY_TO',

@@ -537,7 +537,8 @@ async function typingHero() {
 
 async function viewTyping() {
   loading();
-  const [hero, feed] = await Promise.all([typingHero(), loadFeed(state.student, false).catch(() => null)]); // feed: kahramanı besleme (feed.js)
+  // feed: kahramanı besleme (feed.js); loadArmy: asker kahramanın numarası, kahramanın çizimi okur (army.js)
+  const [hero, feed] = await Promise.all([typingHero(), loadFeed(state.student, false).catch(() => null), loadArmy().catch(() => null)]);
   const { best } = hero.typing;
   const goal = typingPerDay(state.student);
   const lessons = typingLessons(); // dilin dersleri: Türkçe ya da ABD

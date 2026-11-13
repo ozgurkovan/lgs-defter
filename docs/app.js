@@ -3187,7 +3187,55 @@ const darken = (hex, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.sl
 // mood (kahramanı besleme, feed.js): { key: 'mutlu' | 'iyi' | 'ac' | 'cokac', form: pazıların dolgunluğu 0–1 }. Aç kahramanın
 // pazıları söner, kaşları kaygılı olur, karnı guruldar; çok açken kolları yana düşer, ağzı küçük bir "o" olur. Tokken gülüşü büyür, pazıları parlar.
 // Aç hali de sevimli kalır (iri gözler, pembe yanak; gözyaşı yok). mood verilmezse çizim eskisiyle birebir aynıdır.
-function heroSvg(gender, level, look, mood) {
+// army (asker kahraman, army.js): { num: forma numarası, corps: seçtiği kol ya da null, rank: rütbe sırası (askerse 0–12) }.
+// Asker değilse göğsünde numarası durur (yıldızın ve "10"un yerinde; pelerinli seviyelerde amblem ya da madalya sola
+// kayar, numara sağda). Askerse kolunun üniforması (kamuflaj, denizci yakası), pantolon ve bot, kolunun şapkası (subay
+// rütbesinde siperlikli şapka), göğsün solunda bayrak ve rütbe işareti, sağında madalya (10. seviyede) ve numara künyesi;
+// pelerin ve taç çıkar. Yüz, gülüş ve kaslar aynı kalır: kahraman askerken de sevimlidir. army verilmezse çizim aynıdır.
+// Üniformalar bizim çizimimiz: gerçek amblem yok. cap: şapka türü; camo: kamuflaj lekeleri; sailor: denizci yakası;
+// top: subay şapkasının üstü.
+const HERO_UNIFORM = {
+  kara: { shirt: '#5E6E3B', pants: '#55643A', boot: '#2E2A24', camo: ['#3F4D2A', '#7F8D50', '#2F3A20'], cap: 'bere', capColor: '#3F5A2B', top: '#4E5D34' },
+  deniz: { shirt: '#1F2F5C', pants: '#1F2F5C', boot: '#15171C', sailor: true, cap: 'denizci', capColor: '#FFFFFF', top: '#FFFFFF' },
+  hava: { shirt: '#5F80A6', pants: '#3F5A7A', boot: '#22262E', cap: 'kep', capColor: '#3F5A7A', top: '#4A6688' },
+  army: { shirt: '#9E9170', pants: '#8E8264', boot: '#7A6449', camo: ['#6E6248', '#BCB28E', '#5D6B48'], cap: 'bere', capColor: '#1F1F22', top: '#3B4A35' },
+  navy: { shirt: '#22365F', pants: '#22365F', boot: '#15171C', sailor: true, cap: 'denizci', capColor: '#FFFFFF', top: '#FFFFFF' },
+  airforce: { shirt: '#50709A', pants: '#33496A', boot: '#22262E', cap: 'kep', capColor: '#33496A', top: '#3B5378' },
+  marines: { shirt: '#6F7350', pants: '#666A49', boot: '#6B5A40', camo: ['#4D5336', '#94916A', '#3A3A2B'], cap: 'kep', capColor: '#5B6043', top: '#2B2B30' },
+  spaceforce: { shirt: '#3A4358', pants: '#2C3346', boot: '#1B1E26', cap: 'kep', capColor: '#2B3245', top: '#2B3245', star: true },
+};
+// Rütbe işareti (x, y: ortası; k: büyüklük): 0 işaretsiz; 1–4 sarı açılı şeritler (4'te altında çizgi); 5–8 gümüş
+// yıldızlar (1, 1, 2, 3; 5'te küçük); 9–11 altın yıldızlar (1–3) ve altında altın çizgi; 12 altın çelenk içinde yıldız.
+function heroInsignia(r, x, y, k = 1) {
+  if (!(r >= 1)) return '';
+  const o = [];
+  const star = (sx, sy, sz, c) => `<text x="${sx}" y="${sy + sz * 0.35}" text-anchor="middle" font-size="${sz}" fill="${c}" stroke="rgba(0,0,0,.35)" stroke-width=".4">★</text>`;
+  if (r <= 4) {
+    const n = Math.min(3, r), w = 5 * k, gap = 2.6 * k, top = y - ((n - 1) * gap) / 2 - (r === 4 ? 1.2 * k : 0);
+    for (let i = 0; i < n; i++) o.push(`<path d="M${x - w} ${top + i * gap - 1.6 * k} L${x} ${top + i * gap + 1.4 * k} L${x + w} ${top + i * gap - 1.6 * k}" stroke="#F4C430" stroke-width="${1.6 * k}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`);
+    if (r === 4) o.push(`<rect x="${x - w}" y="${top + n * gap - 0.4 * k}" width="${2 * w}" height="${1.5 * k}" rx="${0.7 * k}" fill="#F4C430"/>`);
+  } else if (r <= 11) {
+    const gold = r >= 9, n = gold ? r - 8 : [1, 1, 2, 3][r - 5], sz = (r === 5 ? 5 : 6.2) * k, c = gold ? '#F4C430' : '#E4E8EE';
+    for (let i = 0; i < n; i++) o.push(star(x + (i - (n - 1) / 2) * sz * 0.9, y - (gold ? 1 * k : 0), sz, c));
+    if (gold) o.push(`<rect x="${x - 5 * k}" y="${y + 2.6 * k}" width="${10 * k}" height="${1.4 * k}" rx="${0.7 * k}" fill="#F4C430"/>`);
+  } else {
+    o.push(`<path d="M${x - 5 * k} ${y + 1 * k} Q${x - 6.5 * k} ${y - 4 * k} ${x - 2.5 * k} ${y - 6 * k} M${x + 5 * k} ${y + 1 * k} Q${x + 6.5 * k} ${y - 4 * k} ${x + 2.5 * k} ${y - 6 * k}" stroke="#F4C430" stroke-width="${1.5 * k}" fill="none" stroke-linecap="round"/>`);
+    o.push(star(x, y - 1.6 * k, 6.4 * k, '#F4C430'));
+  }
+  return o.join('');
+}
+// Göğüste bayrak (x, y: sol üst köşe; w genişlik): Türkiye ya da ABD.
+function heroFlag(country, x, y, w) {
+  const hh = w * 0.66;
+  if (country === 'us') {
+    return `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="1" fill="#fff" stroke="rgba(0,0,0,.2)" stroke-width=".5"/>`
+      + [0, 2, 4].map((i) => `<rect x="${x}" y="${y + (i * hh) / 5}" width="${w}" height="${hh / 5}" fill="#C8372D"/>`).join('')
+      + `<rect x="${x}" y="${y}" width="${w * 0.45}" height="${hh * 0.6}" fill="#2B3F87"/>`;
+  }
+  return `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="1" fill="#E30A17"/><circle cx="${x + w * 0.4}" cy="${y + hh / 2}" r="${hh * 0.3}" fill="#fff"/>`
+    + `<circle cx="${x + w * 0.46}" cy="${y + hh / 2}" r="${hh * 0.24}" fill="#E30A17"/><text x="${x + w * 0.72}" y="${y + hh * 0.66}" text-anchor="middle" font-size="${hh * 0.48}" fill="#fff">★</text>`;
+}
+function heroSvg(gender, level, look, mood, army) {
   const L = Math.min(10, Math.max(0, level | 0));
   const form = mood ? Math.min(1, Math.max(0, mood.form ?? 1)) : 1;
   const tired = mood?.key === 'cokac', hungry = tired || mood?.key === 'ac', happy = mood?.key === 'mutlu';
@@ -3196,7 +3244,7 @@ function heroSvg(gender, level, look, mood) {
   const hair = HERO_LOOK.sac[lk.sac] || (gender === 'kiz' ? '#6B3E26' : '#4A2E1F');
   const style = HERO_LOOK.model.some(([k]) => k === lk.model) ? lk.model : gender === 'kiz' ? 'orgu' : gender === 'erkek' ? 'kisa' : 'kivircik';
   const tier = L >= 10 ? 5 : L >= 8 ? 4 : L >= 6 ? 3 : L >= 4 ? 2 : L >= 2 ? 1 : 0;
-  const o = [
+  const base = [
     { shirt: '#EDEBE6', shorts: '#8D99AE', shoe: '#A9AFB8' },
     { shirt: '#4C8DF6', shorts: '#2E3A59', shoe: '#FFFFFF', star: true },
     { shirt: '#F25C54', shorts: '#264653', shoe: '#2EC4B6', stripes: true, hat: true },
@@ -3204,21 +3252,54 @@ function heroSvg(gender, level, look, mood) {
     { shirt: '#E63946', shorts: '#1D3557', shoe: '#1D3557', cape: '#2F80ED', emblem: true },
     { shirt: '#E63946', shorts: '#1D3557', shoe: '#F4B400', cape: '#2F80ED', medal: true, crown: true },
   ][tier];
+  const num = army && Number.isFinite(army.num) ? Math.max(0, Math.floor(army.num)) : null;
+  const uni = army && HERO_UNIFORM[army.corps] || null, rank = uni ? Math.min(12, Math.max(0, army.rank | 0)) : -1;
+  // Askerken: üniforma; tişört süsleri, pelerin, şapka ve taç çıkar, madalya kalır.
+  const o = uni ? { shirt: uni.shirt, shorts: uni.pants, shoe: uni.boot, medal: base.medal } : base;
   const cx = 100, sy = 106;
   const tw = 34 + L * 2.2, arm = (7 + L * 1.3) * (0.85 + 0.15 * form), bic = (2 + L * 1.7) * (0.25 + 0.75 * form), ex = 28 + L * 1.3, legW = 11 + L * 0.5;
+  // Göğsün iki sütunu (bayrak ve rütbe solda; madalya ve numara sağda) ve numaranın yazısı
+  const colL = cx - tw * 0.25, colR = cx + tw * 0.25, k = Math.min(1.15, tw / 52);
+  const digits = num == null ? 0 : String(num).length;
+  const numText = (x, y, maxW, big) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="${Math.min(big, maxW / (0.62 * digits)).toFixed(1)}" font-weight="800" font-family="Arial, sans-serif" fill="#fff" stroke="${darken(o.shirt, 0.55)}" stroke-width="2.4" paint-order="stroke">${num}</text>`;
   const s = [];
   if (o.cape) s.push(`<path d="M${cx - tw / 2 + 4} ${sy - 8} L${cx - tw / 2 - 16} 190 Q${cx} 200 ${cx + tw / 2 + 16} 190 L${cx + tw / 2 - 4} ${sy - 8} Z" fill="${o.cape}"/>`);
   s.push(`<ellipse cx="${cx}" cy="207" rx="${44 + L * 1.6}" ry="7" fill="rgba(0,0,0,.12)"/>`);
   // Bacaklar, ayakkabılar, şort
-  for (const x of [cx - 4 - legW, cx + 4]) s.push(`<rect x="${x}" y="150" width="${legW}" height="48" rx="${legW / 2}" fill="${skin}"/>`);
+  // Askerken bacaklar pantolonlu (kamuflajlı kolda lekeli), ayakkabılar bot.
+  for (const x of [cx - 4 - legW, cx + 4]) {
+    s.push(`<rect x="${x}" y="150" width="${legW}" height="48" rx="${legW / 2}" fill="${uni ? uni.pants : skin}"/>`);
+    if (uni?.camo) for (const [fy, fx, c] of [[160, 0.3, 0], [174, 0.68, 1], [188, 0.35, 2]]) s.push(`<ellipse cx="${x + legW * fx}" cy="${fy}" rx="${legW * 0.24}" ry="3" fill="${uni.camo[c]}"/>`);
+  }
   for (const x of [cx - 4 - legW / 2 - 3, cx + 4 + legW / 2 + 3]) s.push(`<ellipse cx="${x}" cy="200" rx="${legW / 2 + 7}" ry="6.5" fill="${o.shoe}" stroke="rgba(0,0,0,.18)" stroke-width="1.2"/>`);
   s.push(`<rect x="${cx - tw / 2 + 1}" y="140" width="${tw - 2}" height="25" rx="9" fill="${o.shorts}"/>`);
   // Gövde ve tişört süsleri
   s.push(`<rect x="${cx - tw / 2}" y="${sy - 10}" width="${tw}" height="${154 - sy}" rx="15" fill="${o.shirt}"/>`);
+  if (uni?.camo) {
+    for (const [fx, y, rx, ry, c] of [[-0.3, 103, 0.13, 3.6, 0], [0.27, 109, 0.15, 4, 1], [-0.06, 117, 0.12, 3.2, 2], [0.3, 127, 0.11, 3.4, 0], [-0.28, 133, 0.14, 3.6, 1], [0.05, 146, 0.16, 3.4, 2]]) {
+      s.push(`<ellipse cx="${cx + fx * tw}" cy="${y}" rx="${rx * tw}" ry="${ry}" fill="${uni.camo[c]}"/>`);
+    }
+  }
+  if (uni?.sailor) s.push(`<path d="M${cx - tw / 2 + 5} ${sy - 9} L${cx} ${sy + 11} L${cx + tw / 2 - 5} ${sy - 9}" stroke="#fff" stroke-width="2.4" fill="none" stroke-linejoin="round"/>`
+    + `<path d="M${cx - 4} ${sy + 9} L${cx} ${sy + 15} L${cx + 4} ${sy + 9} Z" fill="#E63946"/>`);
   if (o.stripes) for (const y of [118, 130]) s.push(`<rect x="${cx - tw / 2 + 3}" y="${y}" width="${tw - 6}" height="5" rx="2" fill="#fff" opacity=".9"/>`);
-  if (o.star) s.push(`<text x="${cx}" y="127" text-anchor="middle" font-size="16" fill="#fff">★</text>`);
-  if (o.number) s.push(`<text x="${cx}" y="131" text-anchor="middle" font-size="19" font-weight="800" font-family="Arial, sans-serif" fill="#fff">10</text>`);
-  if (o.emblem) s.push(`<circle cx="${cx}" cy="122" r="11" fill="#FFD166"/><text x="${cx}" y="127.5" text-anchor="middle" font-size="15" font-weight="900" font-family="Arial, sans-serif" fill="#E63946">E</text>`);
+  // Asker değilken numara: düz, yıldızlı, çizgili ve formalı tişörtte göğsün ortasında (yıldızın ve "10"un yerinde);
+  // pelerinli seviyelerde amblem ya da madalya sola kayar, numara sağda.
+  const sideNum = num != null && !uni && (o.emblem || o.medal);
+  if (o.star && num == null) s.push(`<text x="${cx}" y="127" text-anchor="middle" font-size="16" fill="#fff">★</text>`);
+  if (o.number && num == null) s.push(`<text x="${cx}" y="131" text-anchor="middle" font-size="19" font-weight="800" font-family="Arial, sans-serif" fill="#fff">10</text>`);
+  if (num != null && !uni && !sideNum) s.push(numText(cx, 131, tw - 10, 19));
+  if (o.emblem && !sideNum) s.push(`<circle cx="${cx}" cy="122" r="11" fill="#FFD166"/><text x="${cx}" y="127.5" text-anchor="middle" font-size="15" font-weight="900" font-family="Arial, sans-serif" fill="#E63946">E</text>`);
+  if (o.emblem && sideNum) s.push(`<circle cx="${colL}" cy="122" r="8" fill="#FFD166"/><text x="${colL}" y="126" text-anchor="middle" font-size="11" font-weight="900" font-family="Arial, sans-serif" fill="#E63946">E</text>`);
+  if (sideNum) s.push(numText(colR, 131, tw * 0.46, 15));
+  // Askerken göğüs: solda bayrak ve rütbe işareti, sağda numara künyesi (madalya varsa üstünde).
+  if (uni) {
+    s.push(heroFlag(army.country, colL - 6 * k, sy - 4, 12 * k));
+    s.push(heroInsignia(rank, colL, sy + 15, k));
+    const tagW = Math.max(14, digits * 5.6 + 5) * k;
+    s.push(`<rect x="${colR - tagW / 2}" y="${126}" width="${tagW}" height="${9 * k}" rx="2" fill="#F4F1E6" stroke="rgba(0,0,0,.25)" stroke-width=".6"/>`
+      + `<text x="${colR}" y="${126 + 7 * k}" text-anchor="middle" font-size="${7.4 * k}" font-weight="800" font-family="Arial, sans-serif" fill="#22252B">${num ?? ''}</text>`);
+  }
   // Kollar: hep pazı gösterir. Üst kol omuzdan dirseğe, ön kol yukarı, yumruk; pazı seviyeyle şişer. Çok açken (halsiz)
   // kollar yana düşer, pazı görünmez; tokken pazıların yanında parıltı.
   for (const d of [-1, 1]) {
@@ -3328,9 +3409,37 @@ function heroSvg(gender, level, look, mood) {
   const longHair = ['orgu', 'uzun', 'atkuyrugu', 'kakul'].includes(style);
   if (o.hat && longHair) s.push(`<path d="M72 44 Q100 26 128 44" stroke="#2EC4B6" stroke-width="6" fill="none" stroke-linecap="round"/>`);
   else if (o.hat) s.push(`<path d="M70 46 C70 22 130 22 130 46 Z" fill="#2EC4B6"/><path d="M98 43 L142 46 Q140 51 98 49 Z" fill="#23A393"/>`);
-  if (o.medal) s.push(`<path d="M92 96 L100 114 L108 96" stroke="#2F80ED" stroke-width="4" fill="none"/><circle cx="100" cy="121" r="9" fill="#F4C430" stroke="#D4A017" stroke-width="1.5"/><text x="100" y="125.5" text-anchor="middle" font-size="11" font-weight="900" font-family="Arial, sans-serif" fill="#B8860B">1</text>`);
+  // Madalya: ortada; numara göğüsteyken solda, askerken sağda künyenin üstünde, küçük.
+  if (o.medal && !uni && !sideNum) s.push(`<path d="M92 96 L100 114 L108 96" stroke="#2F80ED" stroke-width="4" fill="none"/><circle cx="100" cy="121" r="9" fill="#F4C430" stroke="#D4A017" stroke-width="1.5"/><text x="100" y="125.5" text-anchor="middle" font-size="11" font-weight="900" font-family="Arial, sans-serif" fill="#B8860B">1</text>`);
+  else if (o.medal) {
+    const [mx, top, my, mr] = uni ? [colR, 98, 113, 5.5] : [colL, 97, 116, 7];
+    s.push(`<path d="M${mx - mr * 0.9} ${top} L${mx} ${my - mr * 0.8} L${mx + mr * 0.9} ${top}" stroke="#2F80ED" stroke-width="${mr * 0.45}" fill="none"/><circle cx="${mx}" cy="${my}" r="${mr}" fill="#F4C430" stroke="#D4A017" stroke-width="1.5"/>`
+      + `<text x="${mx}" y="${my + mr * 0.5}" text-anchor="middle" font-size="${mr * 1.22}" font-weight="900" font-family="Arial, sans-serif" fill="#B8860B">1</text>`);
+  }
   if (o.crown) s.push(`<path d="M80 31 L84 14 L93 25 L100 10 L107 25 L116 14 L120 31 Z" fill="#F4C430" stroke="#D4A017" stroke-width="1.5"/><circle cx="100" cy="22" r="2.4" fill="#E63946"/>`);
-  return `<svg class="hero" viewBox="0 0 200 220" role="img" aria-label="Kelime kahramanı, güç ${L}">${s.join('')}</svg>`;
+  // Askerin şapkası: er ve çavuşlar kolunun şapkasını (bere, denizci şapkası, kep), subaylar (rütbe 5 ve üstü)
+  // siperlikli şapka giyer; albay ve generalde siperlikte altın kordon. Şapkada küçük bir altın rozet.
+  if (uni) {
+    const cc = uni.capColor, dk = darken(cc === '#FFFFFF' ? '#D8DEE8' : cc, 0.8);
+    if (rank >= 5) {
+      s.push(`<path d="M64 36 Q100 12 136 36 L129 45 L71 45 Z" fill="${uni.top}" stroke="rgba(0,0,0,.18)" stroke-width="1"/>`
+        + `<rect x="71" y="39.5" width="58" height="6.5" rx="2.5" fill="${uni.top === '#FFFFFF' ? '#1E2433' : darken(uni.top, 0.72)}"/>`
+        + `<path d="M75 45.5 Q100 54 125 45.5 L125 47.5 Q100 57.5 75 47.5 Z" fill="#1E1E24"/>`
+        + `<circle cx="100" cy="35" r="4.2" fill="#F4C430" stroke="#C99A1C" stroke-width="1"/>`);
+      if (rank >= 11) s.push(`<path d="M76 46 Q100 53 124 46" stroke="#F4C430" stroke-width="1.6" fill="none"/>`);
+    } else if (uni.cap === 'bere') {
+      s.push(`<path d="M68 45 C62 27 90 17 117 21 C136 24 141 36 133 45 Z" fill="${cc}"/><path d="M69 44.5 Q100 38.5 132 44.5" stroke="${dk}" stroke-width="3" fill="none" stroke-linecap="round"/>`
+        + `<circle cx="81" cy="38" r="3.4" fill="#F4C430" stroke="#C99A1C" stroke-width=".8"/>`);
+    } else if (uni.cap === 'denizci') {
+      s.push(`<path d="M69 39 C68 9 132 9 131 39 Z" fill="#fff" stroke="#C9D2DE" stroke-width="1"/><ellipse cx="100" cy="39.5" rx="34" ry="5.4" fill="#fff" stroke="#C9D2DE" stroke-width="1"/>`
+        + `<path d="M71 35.5 Q100 31 129 35.5" stroke="#1F2F5C" stroke-width="2.2" fill="none"/>`);
+    } else {
+      s.push(`<path d="M71 45 L73 25 Q100 19 127 25 L129 45 Z" fill="${cc}"/><path d="M74 44 Q100 52.5 126 44 L126 46.5 Q100 56 74 46.5 Z" fill="${dk}"/>`
+        + (uni.star ? `<text x="100" y="38.5" text-anchor="middle" font-size="9" fill="#D9DEE7">★</text>` : `<circle cx="100" cy="35" r="3.2" fill="#F4C430" stroke="#C99A1C" stroke-width=".8"/>`));
+    }
+  }
+  const label = num == null ? '' : uni ? `, asker, numara ${num}` : `, numara ${num}`;
+  return `<svg class="hero" viewBox="0 0 200 220" role="img" aria-label="Kelime kahramanı, güç ${L}${label}">${s.join('')}</svg>`;
 }
 
 // Yolculuğun yerleri: her güç bir yer. kind: manzaranın türü (kara, deniz altı, buzul, gökyüzü, uzay); sky: gökyüzünün
@@ -3356,11 +3465,11 @@ function rideTo(it) {
   return HERO_PLACES.slice(HERO_RIDES[i][1], end).map((p) => p.to).join(' ve ');
 }
 // Kahraman ve aldığı eşyalar, bulunduğu yerin göğü ve zemininde (deniz altında kum, uzayda ay toprağı). mood: besleme
-// açıksa kahramanın hali (feed.js).
+// açıksa kahramanın hali (feed.js). Asker kahraman açıksa numarası ya da üniforması (army.js; son okunan numara).
 function heroScene(student, level, owned, mood) {
   const pl = HERO_PLACES[Math.min(10, Math.max(0, level | 0))];
   const box = h('div', { class: 'hero-scene', style: `--s1: ${pl.sky[0]}; --s2: ${pl.sky[1]}; --g1: ${pl.floor}; --g2: ${darken(pl.floor, 0.9)}` });
-  box.innerHTML = heroSvg(student?.avatar, level, student?.hero_look, mood);
+  box.innerHTML = heroSvg(student?.avatar, level, student?.hero_look, mood, typeof armyFor === 'function' ? armyFor(student) : undefined);
   for (const it of HERO_SHOP.filter((x) => x.pos && owned.has(x.id))) {
     box.append(h('span', { class: 'hero-item', title: it.name, style: `${it.pos}; font-size: ${it.size}px` }, it.emoji));
   }
@@ -3513,6 +3622,7 @@ async function viewWords() {
     q(sb.from('purchases').select('item, price').eq('student_id', sid())),
     q(sb.from('typing_results').select('lesson, stars, created_at').eq('student_id', sid())),
     loadFeed(state.student, false).catch(() => null), // kahramanı besleme açıksa tokluk ve bronz (feed.js)
+    loadArmy().catch(() => null), // asker kahraman açıksa numarası (army.js; kahramanın çizimi okur)
   ]);
   const start = dayStart();
   const answered = new Set(answers.filter((r) => r.answered_at >= start && !r.again).map((r) => r.word));
@@ -4095,10 +4205,12 @@ function planSection(p) {
         + 'Bilgisayarda yapılır, telefonda sekme görünmez. Açıkken günde kaç ders? Kazandığı yıldızlar kelime kahramanını güçlendirir.', '1px');
     // Kahramanı besleme (velinin isteği): çocuk başına açılır, hastalıkta ve tatilde açlık dondurulur (feed.js).
     const feedRow = feedSetting(p);
+    // Asker kahraman (velinin isteği, 2026-11-13): çocuk başına açılır; seçtiği kol sıfırlanabilir (army.js).
+    const armyRow = armySetting(p);
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
-      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value(), ...feedRow.value() };
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value(), ...feedRow.value(), ...armyRow.value() };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;
@@ -4107,6 +4219,7 @@ function planSection(p) {
       wordsRow.show(upd.daily_words);
       typingRow.show(upd.daily_typing);
       feedRow.show();
+      armyRow.show();
       update();
       toast('Kaydedildi. Yeni sayılar bugünden geçerli.');
     } }, 'Kaydet');
@@ -4117,7 +4230,7 @@ function planSection(p) {
         + (days ? `, çalıştığı ${days} günde ortalama ${fmtMinutes(sum('week') / days)}.` : '.')),
       h('p', { class: 'small muted' }, 'Her dersten günde en fazla kaç soru gelsin? Önce hata tekrarları, sonra konu tekrarları gelir; kalan sayı en zayıf konulardan ek çalışmayla dolar. Süre, soruyu açtığı andan şıkkı seçtiği ana kadar ölçülür.'),
       h('div', { class: 'spread', style: 'padding: 8px 0' }, h('label', {}, h('b', {}, 'Günde toplam'), h('span', { class: 'small muted' }, ' · değiştirince derslere aynı oranla dağılır')), totalInput),
-      rowsEl, totalLine, wordsRow, typingRow, feedRow, save);
+      rowsEl, totalLine, wordsRow, typingRow, feedRow, armyRow, save);
   })().catch(() => fill(box, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yüklenemedi, sayfayı yenile.')));
   return box;
 }
