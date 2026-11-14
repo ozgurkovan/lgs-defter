@@ -881,7 +881,7 @@ async function buildExtra(remaining, exclude) {
     .eq('student_id', sid()).eq('track', 'topic').eq('state', 'active').gt('due_date', today));
   if (!items.length) return { entries: [], seconds: 0 };
   const [pool, seenRows, reserved] = await Promise.all([
-    q(sb.from('questions').select('id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
+    q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
       .in('topic_id', [...new Set(items.map((i) => i.topic_id))]).eq('active', true).eq('exam_only', false)),
     q(sb.from('reviews').select('question_id').eq('student_id', sid())),
     reservedVariants(),
@@ -980,7 +980,7 @@ async function loadBookWork() {
     .filter((b) => !b.exam_date || b.exam_date >= today);
   if (!books.length) return [];
   const [qs, done] = await Promise.all([
-    q(sb.from('questions').select('id, book_id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution, created_at')
+    q(sb.from('questions').select('id, book_id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution, created_at')
       .in('book_id', books.map((b) => b.id)).eq('active', true).is('variant_of', null).order('created_at')),
     q(sb.from('reviews').select('question_id, answered_at').eq('student_id', sid()).eq('track', 'book')),
   ]);
@@ -1246,7 +1246,8 @@ function showQuestion() {
     });
     ss.stats.total++; if (correct) ss.stats.correct++;
     const list = ss.results.get(item.id) || [];
-    myResult = { correct, strong, confidence, hint: !!hintUsed, slow: overTime };
+    // track ve target: oturum sonundaki uzaylı savaşında zor soru (el bombası) için (army.js, battleHard).
+    myResult = { correct, strong, confidence, hint: !!hintUsed, slow: overTime, track: entry.extra ? 'extra' : item.track, target: question.target_seconds };
     list.push(myResult);
     ss.results.set(item.id, list);
     // Birlikte bakılacaklar: boş geçtiği ya da tahmin ettiği soru (yanlıştan sonra "anlamadım" da eklenir).
@@ -1486,8 +1487,10 @@ async function saveItemGrade(item, results) {
 }
 
 function showSessionEnd() {
-  const { stats, track, together, returnTo } = state.session;
+  const { stats, track, together, returnTo, results } = state.session;
   state.session = null;
+  // Asker olmuş çocukta uzaylı savaşı: doğrular mermi, zor doğrular el bombası, yanlışlar uzaylı (army.js).
+  const hard = [...results.values()].flat().filter((r) => r.correct && battleHard(r.track, r.target, state.student?.grade)).length;
   render(
     h('section', { class: 'card', style: `margin-top: ${together.length ? 16 : 80}px; text-align: center` },
       h('p', { class: 'label' }, { mistake: 'Hata tekrarı bitti', topic: 'Konu tekrarı bitti', extra: 'Ek çalışma bitti', book: 'Kitap soruları bitti', practice: 'Konu çalışması bitti' }[track]),
@@ -1495,6 +1498,7 @@ function showSessionEnd() {
       h('p', { class: 'muted' }, stats.correct === stats.total ? (track === 'practice' ? 'Hepsi doğru. Bu konuyu iyi biliyorsun.' : 'Hepsi doğru. Bu konular bir süre rahat.') :
         'Yanlış yaptıkların yakında farklı sorularla tekrar gelecek.'),
       h('button', { class: 'primary block', onclick: () => go(returnTo || 'home') }, track === 'practice' ? 'Konuya dön' : 'Ana sayfa')),
+    battleCard(stats.correct, stats.total - stats.correct, hard, 'session', track === 'mistake'),
     // Besleme açıksa kahraman: doğru cevaplar bronz oldu, şimdi yedirebilir.
     feedHomeCard(),
     // Oturum bitince çoğu zaman ödül gibi bir fıkra, bilmece ya da şiir.
@@ -2487,7 +2491,7 @@ async function viewSend() {
 
 async function startBookletExam(id, title, section) {
   if (savedExam() && !confirm('Yarım kalan bir denemen var; yenisine başlarsan o silinir. Başlansın mı?')) return;
-  const qs = await q(sb.from('questions').select('id, subject, topic_id, styles, stem, image_path, choices, answer, hint, solution, booklet_no')
+  const qs = await q(sb.from('questions').select('id, subject, topic_id, styles, target_seconds, stem, image_path, choices, answer, hint, solution, booklet_no')
     .eq('booklet', id).eq('active', true).order('booklet_no'));
   beginExam({ id, booklet: id, title, section, questions: qs });
 }
@@ -2503,7 +2507,7 @@ async function startMixedExam(section) {
   const topicIds = statuses.map((s) => s.topic_id);
   const [topics, pool, seenRows, reserved] = await Promise.all([
     q(sb.from('topics').select('id, subject, sort, lgs_avg').in('id', topicIds.length ? topicIds : ['-'])),
-    q(sb.from('questions').select('id, subject, topic_id, styles, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
+    q(sb.from('questions').select('id, subject, topic_id, styles, target_seconds, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam')
       .in('topic_id', topicIds.length ? topicIds : ['-']).eq('active', true).eq('exam_only', false)),
     q(sb.from('reviews').select('question_id').eq('student_id', sid())),
     reservedVariants(),
@@ -2690,6 +2694,9 @@ function showExamResult(exam, rows, results, reason, saved) {
       h('p', { class: 'label' }, 'Net'),
       h('p', { class: 'task' }, h('span', { class: 'big num' }, fmtNet(total))),
       isLgsStudent(state.student) ? h('p', { class: 'small muted' }, `Katsayılı net ${fmtNet(weighted)} (Türkçe, Matematik, Fen ×4). 3 yanlış 1 doğruyu götürür.`) : null),
+    // Asker olmuş çocukta büyük uzaylı savaşı (ana gemiyle; yüzde 80 ve üstü doğruda süper bomba).
+    saved ? battleCard(rows.length - missed.length, missed.length,
+      rows.filter((r) => r.outcome === 'dogru' && battleHard('deneme', r.qn.target_seconds, state.student?.grade)).length, 'exam') : null,
     h('div', { class: 'scroll-x' }, h('table', {},
       h('thead', {}, h('tr', {}, h('th', {}, 'Ders'), h('th', {}, 'D'), h('th', {}, 'Y'), h('th', {}, 'B'), h('th', {}, 'Net'))),
       h('tbody', {}, results.map((r) => h('tr', {},
@@ -2773,7 +2780,7 @@ async function viewMyTopics() {
    madde yoktur (item.id boş, track 'practice'): konu tekrarının takvimi değişmez, yanlış yapılan soru hata tekrarına
    girer, cevaplar günlük plana sayılmaz. */
 async function buildPractice(topic) {
-  const pool = await q(sb.from('questions').select('id, topic_id, subject, styles, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam, book_id')
+  const pool = await q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, hint, solution, variant_of, variant_of_exam, book_id')
     .eq('topic_id', topic.id).eq('active', true).eq('exam_only', false)); // gerçek LGS soruları denemeye saklı
   const [rows, reserved] = await Promise.all([
     pool.length ? q(sb.from('reviews').select('question_id, correct, answered_at').eq('student_id', sid()).eq('voided', false).in('question_id', pool.map((p) => p.id))) : [],
@@ -4488,7 +4495,7 @@ function checkPanel(src, onDone) {
   const box = h('div', { class: 'check-panel stack' }, h('p', { class: 'small muted' }, 'Benzer sorular aranıyor…'));
   (async () => {
     const s = sid();
-    const pool = await q(sb.from('questions').select('id, topic_id, subject, styles, stem, image_path, choices, answer, solution, variant_of, variant_of_exam, book_id')
+    const pool = await q(sb.from('questions').select('id, topic_id, subject, styles, target_seconds, stem, image_path, choices, answer, solution, variant_of, variant_of_exam, book_id')
       .eq('topic_id', src.topicId).eq('active', true));
     const seenRows = pool.length ? await q(sb.from('reviews').select('question_id').eq('student_id', s).in('question_id', pool.map((p) => p.id))) : [];
     const picks = similarPick(src, pool, new Set(seenRows.map((r) => r.question_id)));

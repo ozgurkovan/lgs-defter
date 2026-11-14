@@ -268,7 +268,24 @@ Her maddenin yanında nasıl denendiği yazar:
 - Veli (Ayarlar → Günlük plan, besleme satırının altında): "Asker kahraman" çocuk başına açılır ya da kapanır; 7. sınıfa
   kadar açık gelir. Kapatıp açmak numarayı silmez. Kol seçildiyse "Kolunu yeniden seçsin" (numara ve rütbe kalır).
   Altında şimdiki numara, kol ve rütbe. [A], kaydetme [E]
-- Uzaylılarla savaş (ikinci aşama) henüz yok.
+- **Uzaylı savaşı** (ikinci aşama, 2026-11-14): yalnızca asker olmuş (kolunu seçmiş) çocukta, oturum sonunda (konu ve
+  hata tekrarı, ek çalışma, kitap, konu çalışması) sonuç kartının altında; uygulamadaki deneme bitince Net kartının altında.
+  Asker değilken kart görünmez. Hiçbir şey kaydedilmez. [O] hesap, [A] oyun, oynamak [E]
+  - Cephane: her doğru bir mermi; zor sorunun doğrusu el bombası (oturumda en çok 3, denemede 5). Zor soru: hata
+    tekrarındaki soru ya da uzun soru (hedef süresi 2 dk ve üstü; 4. sınıfa kadar 1,5 dk ve üstü). 3 uzaylı ve her yanlış
+    (boş dahil) için bir uzaylı daha (oturumda en çok 10, denemede 12). Başlangıç kartında sayılar ve "Savaşa başla!". [O]
+  - Uzaylılar kolun yerine göre sandık ve kaya (kara), buzdağı (deniz), bulut (hava), asteroit (uzay) arkasına saklanır,
+    yalnızca antenleri görünür. Başını çıkarınca dokunulursa vurulur: "POF!", gözü fırıldak, kaçış kapsülüyle uçar ("Pardon!").
+    Saklanmışken atılan mermi boşa gider. El bombası düğmesi, sonra saklanma yerine dokunmak: orası patlar, arkasındakilerin
+    hepsi kaçar. Uzaylılar ara ara jöle atar; çarparsa kahraman bir an sersemler (ölmez, yaralanmaz). 4. sınıfa kadar
+    uzaylı daha uzun bakar, tek tek çıkar. [A], oyun [E]
+  - Son: hepsi kovalanınca "Kovaladık, kaçtılar!" (artan mermi ve bomba yazar); mermi bitince kahraman geri çekilir,
+    kalanlar kapsüllerle radara kaçar ("Daha çok doğru, daha çok mermi!"); 20 saniye dokunulmazsa ya da süre (oturum 1 dk,
+    deneme 100 sn) bitince uzaylılar sıkılıp kaçar; "Atla" sonu yazar. Yeniden oynanmaz (cephane yalnızca sorulardan). [O]
+  - Denemede ana gemi: küçük uzaylılar bitince kalkanı iner, 6 can (mermi 1, el bombası 3); yüzde 80 ve üstü doğruda
+    "Süper bomba" tek seferde patlatır ("KABUM!"). Mermi biterse ana gemi kaçar. [O], oyun [E]
+  - Radarda hata tekrarında bekleyen soru sayısı; hata tekrarı oturumunda "Radardaki uzaylılar geldi!". ABD'de hepsi
+    İngilizce. [A]
 
 **Klavye** (on parmak klavye, bilgisayarda) [A], ders [E]
 - Alt menüde "Klavye" sekmesi, İngilizce'nin solunda. Yalnızca klavyeli cihazda (fare ya da dokunmatik yüzey varsa) görünür,

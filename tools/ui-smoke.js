@@ -211,6 +211,35 @@
         line && !!ac && /Asker kahraman|Askerlik töreni|Numara \d+/.test(ac.textContent) && !!ac.querySelector('.feed-bar, .army-corps, .army-badge'),
         [!line && 'kart satırı ya da numara eksik', !ac && 'asker kartı yok'].filter(Boolean).join('; '));
       document.querySelector('.party button')?.click();
+      // Uzaylı savaşı (ikinci aşama): asker olmayan çocukta oturum sonu kartı gizli kalır. Oyunun kendisi sayfada kurulup
+      // oynanır (asker gibi davranan sahte profil; hiçbir şey yazılmaz): başlangıç kartı, mermi sayısı, başını çıkaran
+      // uzaylıya dokununca mermi azalır, "Atla" sonu yazar.
+      const st = await loadArmy().catch(() => null);
+      const bc = battleCard(5, 1, 0);
+      document.body.append(bc);
+      await wait(2500);
+      const hiddenOk = armyCorps(st?.corps) ? !bc.hidden : bc.hidden;
+      bc.remove();
+      const game = battleGame(battleSetup(8, 2, 1, 'session', state.student.grade), { ...state.student, hero_corps: 'kara' }, 3, {});
+      game.style.cssText = 'position: fixed; left: 0; top: 0; width: 360px; z-index: 99';
+      document.body.append(game);
+      const startOk = /Uzaylılar geldi/.test(game.textContent) && game.querySelector('.battle-hud b')?.textContent === '7';
+      game.start();
+      const box = game.querySelector('.battle'), els = [...box.querySelectorAll('.battle-trooper')];
+      let shot = false;
+      for (let i = 0; i < 50 && !shot; i++) {
+        await wait(100);
+        const k = game.peekState().aliens.indexOf('up');
+        if (k < 0) continue;
+        const r = els[k].getBoundingClientRect();
+        box.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + 14 }));
+        shot = game.peekState().bullets === 6;
+      }
+      game.querySelector('.battle-under button').click();
+      const endOk = /Savaşı atladın/.test(game.querySelector('.battle-banner')?.textContent || '') && game.peekState().over;
+      game.remove();
+      check('Uzaylı savaşı: asker değilken oturum sonu kartı gizli; oyun başlar, uzaylıya dokununca mermi azalır, "Atla" biter',
+        hiddenOk && startOk && shot && endOk, [!hiddenOk && 'kart görünürlüğü yanlış', !startOk && 'başlangıç kartı', !shot && 'atış', !endOk && 'atla'].filter(Boolean).join('; '));
     } else if (role === 'student') {
       go('hero'); await settle();
       check('Asker kahraman kapalıyken asker kartı yok', !document.querySelector('.army-card, .army-line'));

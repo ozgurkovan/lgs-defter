@@ -6,7 +6,7 @@
    kartı ve yıldızlı her klavye dersi birer doğru); hesap veritabanında (supabase/hero-army.sql, hero_army_state), kol
    seçimi de orada denetlenir (set_hero_corps). Veli çocuk başına açıp kapatır (Ayarlar → Günlük plan; besleme gibi 7.
    sınıfa kadar açık gelir), kolu sıfırlayabilir. Üniformalar bizim çizimimiz (app.js, HERO_UNIFORM): gerçek amblem yok.
-   Uzaylılarla savaş (ikinci aşama) henüz yok. */
+   İkinci aşama: asker olan çocukta oturum ve deneme sonunda uzaylılarla kısa bir savaş oyunu (aşağıda, battleCard). */
 
 /* Asker: saf kısım (tools/test-army.mjs bunu dener) */
 
@@ -220,6 +220,727 @@ async function viewArmyHero(st) {
     h('button', { class: 'block', onclick: () => go('home') }, 'Ana sayfa'));
   paint();
   armyCheck(st, state.student, hero.level);
+}
+
+/* Uzaylı savaşı (ikinci aşama, velinin isteği 2026-11-13/14): asker olan çocukta oturum ve deneme sonunda kısa bir oyun.
+   Düşman sevimli-komik uzaylılar: insan ya da ülke değil (aileler şiddet görmesin). Doğru cevaplar mermi, zor sorular el
+   bombası olur; her yanlış bir uzaylı daha getirir. Uzaylılar sandık, kaya, buzdağı, bulut ya da asteroit arkasına saklanır,
+   başını çıkarıp jöle atar. Başını çıkarmışken dokunulursa vurulur ve kaçış kapsülüyle kaçar ("kovaladık, kaçtılar"); el
+   bombası saklandığı yeri patlatır, arkasındakilerin hepsi kaçar. Mermi biterse kahraman geri çekilir, kalan uzaylılar radara
+   kaçar; uzun süre dokunulmazsa uzaylılar sıkılıp kaçar. Denemede ana gemi: küçük uzaylılar bitince kalkanı iner; yüzde 80 ve
+   üstü doğruda süper bomba. Kahraman ölmez, yaralanmaz, kan yok: jöle yiyince bir an sersemler. */
+
+/* Uzaylı savaşı: saf kısım */
+
+const BATTLE_WIN = 0.8; // denemede süper bombayı getiren doğru oranı
+// Kolun savaş yeri ve aracı: kara (tank), deniz (gemi), hava (jet), uzay (uzay gemisi).
+const BATTLE_FIELD = { kara: 'land', army: 'land', marines: 'land', deniz: 'sea', navy: 'sea', hava: 'air', airforce: 'air', spaceforce: 'space' };
+// Uzaylıların renkleri: [gövde, kenar, üst bant].
+const BATTLE_COLORS = [['#9B8CFF', '#6E5BD9', '#C9C0FF'], ['#4FD1C5', '#2C9C92', '#A6EDE6'], ['#FF8FB1', '#D9577F', '#FFC8D8'], ['#FFB454', '#D9862B', '#FFDCA8']];
+// Zor soru (doğruysa el bombası): hata tekrarındaki soru (önce yanlış yapmıştı) ya da uzun soru (hedef süresi 2 dakika ve
+// üstü; 4. sınıfa kadar 1,5 dakika ve üstü, küçüklerin soruları daha kısa).
+function battleHard(track, targetSeconds, grade = 8) {
+  return track === 'mistake' || (Number(targetSeconds) || 0) >= ((Number(grade) || 8) <= 4 ? 90 : 120);
+}
+// Savaşın cephanesi ve düşmanı: correct doğru, wrong yanlış (boş dahil), hard doğruların kaçı zor; kind 'session' (oturum)
+// ya da 'exam' (deneme, ana gemiyle). Her doğru bir mermi, zor doğru el bombası (oturumda en çok 3, denemede 5); 3 uzaylı ve
+// her yanlış için bir uzaylı daha. Küçüklerde uzaylı daha uzun bakar ve aynı anda tek uzaylı çıkar.
+function battleSetup(correct, wrong, hard = 0, kind = 'session', grade = 8) {
+  correct = Math.max(0, correct | 0);
+  wrong = Math.max(0, wrong | 0);
+  hard = Math.min(correct, Math.max(0, hard | 0));
+  const exam = kind === 'exam', g = Number(grade) || 8, grenades = Math.min(exam ? 5 : 3, hard);
+  return {
+    exam,
+    bullets: Math.min(exam ? 40 : 30, correct - grenades),
+    grenades,
+    aliens: Math.min(exam ? 12 : 10, 3 + wrong),
+    superBomb: exam && correct + wrong > 0 && correct / (correct + wrong) >= BATTLE_WIN,
+    motherHp: exam ? 6 : 0,
+    peekMs: g <= 4 ? 1800 : g <= 6 ? 1500 : 1250,
+    maxUp: g <= 4 ? 1 : 2,
+    timeMs: exam ? 100000 : 60000,
+    fireChance: g <= 4 ? 0.45 : 0.55, // başını çıkaran uzaylının jöle atma olasılığı
+  };
+}
+// Saklanma yerleri: n uzaylı 3 (en çok 4 uzaylıda) ya da 4 yere sırayla dağılır. x, y: yerin alt ortası (kutunun yüzdesi;
+// denemede biraz aşağıda, üstte ana gemi durur); aliens: oradaki uzaylıların sıra numaraları (renk için).
+function battlePosts(n, exam = false) {
+  const spots = n <= 4 ? [[30, 58], [56, 50], [82, 57]] : [[25, 58], [46, 50], [67, 57], [88, 50]];
+  const posts = spots.map(([x, y]) => ({ x, y: y + (exam ? 6 : 0), aliens: [] }));
+  for (let i = 0; i < n; i++) posts[i % posts.length].aliens.push(i);
+  return posts;
+}
+// Savaşın sonundaki söz. res: { reason: 'win' | 'ammo' | 'time' | 'skip' | 'empty', chased, aliens, left (kalan mermi),
+// leftGrenades (kalan el bombası), mother: 'down' | 'fled' | null }.
+function battleSay(res) {
+  if (!res) return '';
+  const { chased = 0, aliens = 0, left = 0, leftGrenades: lg = 0 } = res, rest = Math.max(0, aliens - chased);
+  if (res.reason === 'skip') return `Savaşı atladın. ${rest} uzaylı radarda bekliyor.`;
+  if (res.reason === 'empty') return `Bu sefer hiç mermi yok: ${aliens} uzaylı radara kaçtı. Doğru cevaplar mermi olur!`;
+  if (res.reason === 'win') {
+    return (res.mother === 'down' ? '💥 Ana gemi patladı! Bütün uzaylılar kapsüllerle kaçtı.' : `🎉 ${chased} uzaylının hepsini kovaladın! Kovaladık, kaçtılar!`)
+      + (left && lg ? ` ${left} mermin ve ${lg} el bomban arttı.` : left ? ` ${left} mermin arttı.` : lg ? ` ${lg} el bomban arttı.` : '');
+  }
+  if (res.reason === 'time') return `Uzaylılar sıkıldı, kaçtı! ${chased} tanesini kovaladın.`;
+  return (res.mother === 'fled' && !rest ? `Mermi bitti, ana gemi kaçtı! ${chased} uzaylıyı kovaladın.`
+    : `Mermi bitti, geri çekildik! ${chased} uzaylıyı kovaladın, ${rest} tanesi radara kaçtı.`) + ' Daha çok doğru, daha çok mermi!';
+}
+
+/* Uzaylı savaşı: çizimler (sabit SVG; kullanıcı metni yok) */
+
+// Uzaylı gemisi: yeşil, tek gözlü, gülümseyen uzaylı camın içinde; altında renkli tabak ve ışıklar. big: ana gemi.
+function battleUfo(color = 0, big = false) {
+  const [body, edge, band] = BATTLE_COLORS[color % BATTLE_COLORS.length];
+  const dot = (x, y, r, i) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${i % 2 ? '#FF8FB1' : '#FFE066'}"/>`;
+  if (big) {
+    // Ana gemi: geniş kubbede üç uzaylı, iki kat tabak, çok ışık.
+    return '<svg viewBox="0 0 140 76" aria-hidden="true">'
+      + '<path d="M36 40 C36 8 104 8 104 40 Z" fill="#CFF1FF" stroke="#8FCDE8" stroke-width="1.4"/>'
+      + [[52, 31], [70, 26], [88, 31]].map(([x, y]) => battleAlien(x, y, 0.9)).join('')
+      + `<ellipse cx="70" cy="48" rx="66" ry="13" fill="${body}" stroke="${edge}" stroke-width="2"/><ellipse cx="70" cy="43" rx="44" ry="5" fill="${band}"/>`
+      + [12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 130].map((x, i) => dot(x, 50, 3, i)).join('')
+      + `<ellipse cx="70" cy="62" rx="30" ry="7" fill="${edge}"/>` + [52, 64, 76, 88].map((x, i) => dot(x, 63, 2.2, i + 1)).join('')
+      + `<path d="M58 69 L52 75 M70 69 L70 76 M82 69 L88 75" stroke="${edge}" stroke-width="2" stroke-linecap="round"/></svg>`;
+  }
+  return '<svg viewBox="0 0 64 48" aria-hidden="true"><ellipse cx="32" cy="20" rx="14" ry="13" fill="#CFF1FF" stroke="#8FCDE8" stroke-width="1.2"/>'
+    + battleAlien(32, 21, 1)
+    + `<ellipse cx="32" cy="32" rx="29" ry="9" fill="${body}" stroke="${edge}" stroke-width="1.6"/><ellipse cx="32" cy="29" rx="19" ry="3.6" fill="${band}"/>`
+    + [12, 22, 32, 42, 52].map((x, i) => dot(x, 33, 2.2, i)).join('') + `<ellipse cx="32" cy="40" rx="10" ry="2.8" fill="${edge}"/></svg>`;
+}
+// Uzaylı başı: yeşil yuvarlak kafa, iki anten, kocaman tek göz, gülüş (s: büyüklük). scared: kapsülde şaşkın "o" ağız.
+function battleAlien(x, y, s = 1, scared = false) {
+  const r = 7.6 * s;
+  return `<path d="M${x - 3 * s} ${y - r + 1} L${x - 6 * s} ${y - r - 6 * s} M${x + 3 * s} ${y - r + 1} L${x + 6 * s} ${y - r - 6 * s}" stroke="#4CAF50" stroke-width="${1.4 * s}" stroke-linecap="round"/>`
+    + `<circle cx="${x - 6 * s}" cy="${y - r - 6 * s}" r="${1.7 * s}" fill="#FFE066"/><circle cx="${x + 6 * s}" cy="${y - r - 6 * s}" r="${1.7 * s}" fill="#FFE066"/>`
+    + `<circle cx="${x}" cy="${y}" r="${r}" fill="#7ED957" stroke="#4CAF50" stroke-width="${1 * s}"/>`
+    + `<circle cx="${x}" cy="${y - 1.4 * s}" r="${3.6 * s}" fill="#fff"/><circle cx="${x + 0.6 * s}" cy="${y - 1.2 * s}" r="${1.9 * s}" fill="#23262B"/><circle cx="${x + 1.4 * s}" cy="${y - 2.2 * s}" r="${0.7 * s}" fill="#fff"/>`
+    + `<circle cx="${x - 4.6 * s}" cy="${y + 2.4 * s}" r="${1.3 * s}" fill="#FF9EB5" opacity=".7"/><circle cx="${x + 4.6 * s}" cy="${y + 2.4 * s}" r="${1.3 * s}" fill="#FF9EB5" opacity=".7"/>`
+    + (scared ? `<ellipse cx="${x}" cy="${y + 4 * s}" rx="${1.3 * s}" ry="${1.6 * s}" fill="#2E5E1F"/>`
+      : `<path d="M${x - 2.6 * s} ${y + 3.2 * s} Q${x} ${y + 5.6 * s} ${x + 2.6 * s} ${y + 3.2 * s}" stroke="#2E5E1F" stroke-width="${1.1 * s}" fill="none" stroke-linecap="round"/>`);
+}
+// Saklanan uzaylı (sola, kahramana bakar; elinde jöle tabancası). mood: 'peek' (bakar), 'aim' (gözünü kısıp nişan alır),
+// 'hit' (vuruldu: gözü fırıldak, dili dışarıda, antenleri düşük), 'cheer' (sevinir, kollar yukarıda).
+function battleTrooper(c = 0, mood = 'peek') {
+  const [suit, edge] = BATTLE_COLORS[c % BATTLE_COLORS.length];
+  const hit = mood === 'hit', cheer = mood === 'cheer', aim = mood === 'aim';
+  const G = '#7ED957', GE = '#4CAF50', INK = '#23262B', MOUTH = '#2E5E1F';
+  const ant = hit
+    ? `<path d="M16 9 Q11 5 8 9.5 M24 9 Q29 5 32 9.5" stroke="${GE}" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="8" cy="10" r="2.2" fill="#FFE066"/><circle cx="32" cy="10" r="2.2" fill="#FFE066"/>`
+    : `<path d="M16 9 L12 2.4 M24 9 L28 2.4" stroke="${GE}" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="2.4" r="2.2" fill="#FFE066"/><circle cx="28" cy="2.4" r="2.2" fill="#FFE066"/>`;
+  const body = `<rect x="11" y="27" width="18" height="19" rx="7" fill="${suit}" stroke="${edge}" stroke-width="1.4"/><rect x="11.7" y="37" width="16.6" height="3" fill="${edge}"/><circle cx="20" cy="32" r="1.6" fill="#FFE066"/>`;
+  const head = `<circle cx="20" cy="17" r="10.5" fill="${G}" stroke="${GE}" stroke-width="1.2"/>`;
+  const eye = hit
+    ? `<circle cx="19.5" cy="15" r="5.2" fill="#fff"/><path d="M19.5 14.9 a1 1 0 1 1 -1 1 a2.2 2.2 0 1 1 2.6 -2.6 a3.4 3.4 0 1 1 -4.6 3.6" stroke="${INK}" stroke-width="1.1" fill="none" stroke-linecap="round"/>`
+    : `<circle cx="19.5" cy="15" r="5.2" fill="#fff"/><circle cx="${cheer ? 19.5 : 17.3}" cy="${cheer ? 14.5 : 16.2}" r="2.7" fill="${INK}"/><circle cx="${cheer ? 20.5 : 18.3}" cy="${cheer ? 13.4 : 15.1}" r="0.9" fill="#fff"/>`
+      + (aim ? `<path d="M13.8 12.8 Q19.5 9.4 25.4 12.8 L25.4 9 L13.8 9 Z" fill="${G}"/><path d="M13.8 12.8 Q19.5 10.6 25.4 12.8" stroke="${GE}" stroke-width="1.2" fill="none"/>` : '');
+  const cheeks = `<circle cx="13.2" cy="20.4" r="1.5" fill="#FF9EB5" opacity=".75"/><circle cx="25.8" cy="20.4" r="1.5" fill="#FF9EB5" opacity=".75"/>`;
+  const mouth = cheer ? `<path d="M15.6 21 Q20 27.5 24.2 21 Z" fill="${MOUTH}"/><path d="M17.6 24.3 Q20 26.4 22.3 24.3 Z" fill="#FF8FB1"/>`
+    : hit ? `<path d="M15.2 22.8 q1.6 -1.6 3.2 0 t3.2 0 t3.2 0" stroke="${MOUTH}" stroke-width="1.1" fill="none" stroke-linecap="round"/><ellipse cx="21.6" cy="24.6" rx="1.5" ry="1.9" fill="#FF8FB1"/>`
+    : aim ? `<path d="M16.5 22.6 H23" stroke="${MOUTH}" stroke-width="1.2" stroke-linecap="round"/>`
+    : `<path d="M16 21.6 Q19.5 24 23.2 21" stroke="${MOUTH}" stroke-width="1.2" fill="none" stroke-linecap="round"/>`;
+  const gun = (x, y, rot) => `<g transform="rotate(${rot} ${x} ${y})"><rect x="${x - 13}" y="${y - 3}" width="14" height="6" rx="3" fill="#FFB454" stroke="#D9862B" stroke-width="1"/><circle cx="${x - 12.5}" cy="${y}" r="2.6" fill="${G}" stroke="${GE}" stroke-width=".8"/></g>`;
+  const arms = cheer
+    ? `<path d="M12.5 31 L6 21 M27.5 31 L34 21" stroke="${suit}" stroke-width="4" stroke-linecap="round"/><circle cx="6" cy="20.5" r="2.6" fill="${G}"/><circle cx="34" cy="20.5" r="2.6" fill="${G}"/>`
+    : hit ? gun(15, 41, -35) + `<circle cx="14" cy="36" r="2.8" fill="${G}" stroke="${GE}" stroke-width=".8"/>`
+    : gun(15, 33, aim ? -8 : 0) + `<circle cx="14.5" cy="34" r="3" fill="${G}" stroke="${GE}" stroke-width=".8"/>`;
+  return `<svg viewBox="0 0 40 48" aria-hidden="true">${ant}${body}${arms}${head}${eye}${cheeks}${mouth}</svg>`;
+}
+// Saklanma yeri: karada sandık ya da kaya, denizde buzdağı, havada bulut, uzayda asteroit (üst kenarı düz; arkadaki uzaylının
+// yalnızca antenleri görünür).
+function battleCover(field, i = 0) {
+  const v = '<svg viewBox="0 0 60 46" aria-hidden="true">';
+  if (field === 'sea') {
+    return v + '<path d="M2 41 L8 13 L19 6 L30 2 L42 6 L52 13 L58 41 Z" fill="#F4FBFF" stroke="#8FCDE8" stroke-width="2" stroke-linejoin="round"/>'
+      + '<path d="M30 4 L26 40 M15 12 L19 40 M44 9 L41 40" stroke="#D6F1FF" stroke-width="3"/><path d="M0 40 Q7.5 36 15 40 T30 40 T45 40 T60 40 V46 H0 Z" fill="#4FB3E6"/></svg>';
+  }
+  if (field === 'air') {
+    return v + '<g fill="#fff"><circle cx="14" cy="20" r="13"/><circle cx="30" cy="15" r="14"/><circle cx="46" cy="20" r="13"/><rect x="3" y="20" width="54" height="24" rx="12"/></g>'
+      + '<path d="M10 40 Q30 46 50 40" stroke="#D3E6F7" stroke-width="3" fill="none" stroke-linecap="round"/></svg>';
+  }
+  if (field === 'space') {
+    return v + '<path d="M3 30 Q1 8 18 5 Q30 1 44 5 Q59 9 57 30 Q55 46 32 46 Q8 46 3 30 Z" fill="#8E7F9E" stroke="#5E5170" stroke-width="2"/>'
+      + '<circle cx="19" cy="20" r="5" fill="#76688A"/><circle cx="40" cy="30" r="6" fill="#76688A"/><circle cx="38" cy="13" r="3" fill="#76688A"/><circle cx="22" cy="36" r="2.5" fill="#76688A"/></svg>';
+  }
+  if (i % 2) {
+    return v + '<path d="M2 46 Q0 14 14 7 Q30 0 46 6 Q60 12 58 46 Z" fill="#A3AAB5" stroke="#6B717B" stroke-width="2"/>'
+      + '<path d="M14 30 Q20 26 26 30 M36 20 Q42 18 47 24" stroke="#8A93A3" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M5 46 L7 39 L9 46 M51 46 L53 38 L55 46" stroke="#5E9E45" stroke-width="2" fill="none"/></svg>';
+  }
+  return v + '<rect x="4" y="5" width="52" height="40" rx="3" fill="#D39A5B" stroke="#8A5A2B" stroke-width="2"/><path d="M4 18.5 H56 M4 31.5 H56" stroke="#8A5A2B" stroke-width="1.6"/>'
+    + '<path d="M9 10 L51 40 M51 10 L9 40" stroke="#A86F37" stroke-width="3"/>' + [[8, 9], [52, 9], [8, 41], [52, 41]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.4" fill="#5C3A1A"/>`).join('') + '</svg>';
+}
+// El bombasından sonra saklanma yerinden kalanlar.
+function battleRubble(field, i = 0) {
+  const v = '<svg viewBox="0 0 60 46" aria-hidden="true">';
+  if (field === 'air') return v + '<g fill="#fff" opacity=".7"><circle cx="14" cy="38" r="5"/><circle cx="30" cy="40" r="6"/><circle cx="46" cy="38" r="4"/></g></svg>';
+  const [f, s] = field === 'sea' ? ['#F4FBFF', '#8FCDE8'] : field === 'space' ? ['#8E7F9E', '#5E5170'] : i % 2 ? ['#A3AAB5', '#6B717B'] : ['#D39A5B', '#8A5A2B'];
+  return v + `<g fill="${f}" stroke="${s}" stroke-width="1.6" stroke-linejoin="round"><path d="M6 46 L12 37 L20 46 Z"/><path d="M22 46 L30 33 L38 46 Z"/><path d="M40 46 L47 39 L54 46 Z"/></g>`
+    + (field === 'sea' ? '<path d="M0 42 Q7.5 39 15 42 T30 42 T45 42 T60 42 V46 H0 Z" fill="#4FB3E6"/>' : '') + '</svg>';
+}
+// Kaçış kapsülü: içinde şaşkın uzaylı, altında alev.
+const BATTLE_POD = '<svg viewBox="0 0 34 46" aria-hidden="true"><path d="M12 33 Q17 46 22 33 Z" fill="#FF9F1C"/><path d="M14 33 Q17 41 20 33 Z" fill="#FFE066"/>'
+  + '<rect x="6" y="5" width="22" height="29" rx="11" fill="#F4F6FA" stroke="#9AA3B2" stroke-width="1.4"/><circle cx="17" cy="16" r="8" fill="#CFF1FF" stroke="#8FCDE8"/>'
+  + battleAlien(17, 18, 0.62, true) + '<rect x="11" y="27" width="12" height="3" rx="1.5" fill="#FF8FB1"/></svg>';
+// Patlama: sarı-turuncu yıldız (ateş ya da kan yok).
+const BATTLE_BOOM = '<svg viewBox="0 0 60 60" aria-hidden="true"><path d="M30 2 L36 18 L52 10 L44 25 L58 30 L44 35 L52 50 L36 42 L30 58 L24 42 L8 50 L16 35 L2 30 L16 25 L8 10 L24 18 Z" fill="#FFD23F" stroke="#FF8C1A" stroke-width="2" stroke-linejoin="round"/>'
+  + '<path d="M30 14 L34 24 L44 22 L37 30 L44 38 L34 36 L30 46 L26 36 L16 38 L23 30 L16 22 L26 24 Z" fill="#FFF6C2"/></svg>';
+// Süper bomba (denemede): sağa bakan füze, döndürülerek hedefe uçar.
+const BATTLE_MISSILE = '<svg viewBox="0 0 44 16" aria-hidden="true"><path d="M2 8 L9 4 L9 12 Z" fill="#FF9F1C"/><rect x="8" y="4" width="26" height="8" rx="4" fill="#F4F6FA" stroke="#8A93A3" stroke-width="1"/>'
+  + '<path d="M34 4 Q43 8 34 12 Z" fill="#E63946"/><path d="M12 4 L8 0 L16 4 Z M12 12 L8 16 L16 12 Z" fill="#E63946"/></svg>';
+// Mermi: sarı kapsül (sağa bakar).
+const BATTLE_BULLET = '<svg viewBox="0 0 18 8" aria-hidden="true"><rect x="1" y="1" width="12" height="6" rx="3" fill="#FFD23F" stroke="#D99A00" stroke-width="1"/><path d="M12 1.2 Q18 4 12 6.8 Z" fill="#FF8C1A"/></svg>';
+// El bombası: yeşil, pimli.
+const BATTLE_GRENADE = '<svg viewBox="0 0 20 22" aria-hidden="true"><circle cx="10" cy="13.5" r="7.5" fill="#6BBF59" stroke="#3E8E41" stroke-width="1.4"/><path d="M4 13.5 H16 M10 6.5 V20.5" stroke="#3E8E41" stroke-width="1" opacity=".6"/>'
+  + '<rect x="7" y="3" width="6" height="4" rx="1" fill="#8A93A3" stroke="#5E6672" stroke-width=".8"/><path d="M13 4 Q17 3 16 8" stroke="#5E6672" stroke-width="1.4" fill="none" stroke-linecap="round"/>'
+  + '<circle cx="15.5" cy="2.8" r="2.2" fill="none" stroke="#F4C430" stroke-width="1.2"/><circle cx="8" cy="11" r="1.6" fill="#E9FFD9"/></svg>';
+// Uzaylının attığı şey: yeşil jöle damlası; kahramana çarpınca yüzüne yapışır (yalnızca sersemletir).
+const BATTLE_GOO = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="#7ED957" stroke="#4CAF50" stroke-width="1.4"/><circle cx="7.6" cy="7.6" r="2" fill="#E9FFD9"/></svg>';
+const BATTLE_SPLAT = '<svg viewBox="0 0 40 30" aria-hidden="true"><path d="M8 10 Q4 2 12 4 Q16 0 22 4 Q30 0 32 8 Q40 10 34 16 Q38 24 30 22 Q28 30 22 25 Q14 30 12 22 Q2 22 8 16 Q2 12 8 10 Z" fill="#7ED957" stroke="#4CAF50" stroke-width="1.4" opacity=".92"/>'
+  + '<circle cx="15" cy="10" r="2.5" fill="#E9FFD9"/></svg>';
+// Merminin saklanma yerine çarpması: küçük kıvılcım.
+const BATTLE_SPARK = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8 Z" fill="#FFF6C2" stroke="#FFD23F" stroke-width="1"/></svg>';
+// Sayaçtaki uzaylı başı.
+const BATTLE_HEAD = '<svg viewBox="0 0 24 24" aria-hidden="true">' + battleAlien(12, 15, 0.95) + '</svg>';
+// Kolun aracı (sağa ve yukarı nişanlı): tank, gemi, jet, uzay gemisi. c: kolun üniforma rengi.
+function battleVehicle(field, c = '#5E6E3B') {
+  const d = darken(c, 0.75);
+  if (field === 'sea') {
+    return `<svg viewBox="0 0 140 70" aria-hidden="true"><path d="M8 40 H132 L118 62 Q70 68 22 62 Z" fill="${c}" stroke="${d}" stroke-width="2"/>`
+      + `<rect x="10" y="46" width="120" height="4" fill="#fff" opacity=".85"/><rect x="40" y="24" width="38" height="16" rx="4" fill="#E9EEF5" stroke="#9AA3B2"/>`
+      + `<circle cx="50" cy="32" r="3" fill="#8FCDE8"/><circle cx="60" cy="32" r="3" fill="#8FCDE8"/><circle cx="70" cy="32" r="3" fill="#8FCDE8"/>`
+      + `<rect x="54" y="12" width="5" height="12" fill="#9AA3B2"/><path d="M59 12 L72 16 L59 20 Z" fill="#E63946"/>`
+      + `<circle cx="104" cy="36" r="7" fill="${d}"/><line x1="104" y1="36" x2="124" y2="20" stroke="${d}" stroke-width="5" stroke-linecap="round"/></svg>`;
+  }
+  if (field === 'air') {
+    return `<svg viewBox="0 0 140 70" aria-hidden="true"><path d="M10 44 Q8 36 18 34 L104 26 Q132 26 136 34 Q132 42 104 44 Z" fill="${c}" stroke="${d}" stroke-width="2"/>`
+      + `<path d="M98 28 Q110 18 122 28 Z" fill="#CFF1FF" stroke="#8FCDE8"/><path d="M50 36 L30 60 L48 60 L74 38 Z" fill="${d}"/><path d="M22 34 L12 16 L24 16 L40 32 Z" fill="${d}"/>`
+      + `<path d="M8 38 L0 33 L0 45 Z" fill="#FF9F1C"/><circle cx="60" cy="38" r="3" fill="#F4C430"/><circle cx="76" cy="37" r="3" fill="#F4C430"/></svg>`;
+  }
+  if (field === 'space') {
+    return `<svg viewBox="0 0 140 70" aria-hidden="true"><path d="M30 26 L100 18 Q130 22 132 34 Q130 46 100 50 L30 42 Z" fill="#F4F6FA" stroke="#8A93A3" stroke-width="2"/>`
+      + `<path d="M100 18 Q130 22 132 34 L106 34 Z" fill="${c}"/><circle cx="74" cy="34" r="6" fill="#8FCDE8" stroke="#5E8FB0" stroke-width="1.5"/><circle cx="56" cy="34" r="5" fill="#8FCDE8" stroke="#5E8FB0" stroke-width="1.5"/>`
+      + `<path d="M40 24 L26 6 L48 22 Z M40 44 L26 62 L48 46 Z" fill="${c}"/><path d="M30 28 L10 34 L30 40 Z" fill="#FF9F1C"/><path d="M30 31 L18 34 L30 37 Z" fill="#FFE066"/></svg>`;
+  }
+  return `<svg viewBox="0 0 140 70" aria-hidden="true"><rect x="10" y="44" width="104" height="20" rx="10" fill="#3B3F45"/>`
+    + [22, 40, 58, 76, 94].map((x) => `<circle cx="${x + 2}" cy="54" r="6" fill="#6B717B" stroke="#2A2D31" stroke-width="1.5"/>`).join('')
+    + `<rect x="14" y="30" width="96" height="18" rx="8" fill="${c}" stroke="${d}" stroke-width="2"/><path d="M38 31 Q40 14 62 14 Q84 14 86 31 Z" fill="${c}" stroke="${d}" stroke-width="2"/>`
+    + `<line x1="78" y1="22" x2="122" y2="6" stroke="${d}" stroke-width="6" stroke-linecap="round"/><circle cx="62" cy="10" r="3" fill="#F4C430"/>`
+    + `<circle cx="30" cy="39" r="3" fill="${d}"/><circle cx="96" cy="39" r="3" fill="${d}"/></svg>`;
+}
+// Aracın namlusunun ucu (aracın kutusuna göre oran): mermi ve bombalar buradan çıkar.
+const BATTLE_TIP = { land: [0.88, 0.1], sea: [0.88, 0.3], air: [0.97, 0.48], space: [0.95, 0.48] };
+// Radar: yeşil ekran, dönen çizgi.
+const BATTLE_RADAR = '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="#103B2A" stroke="#7ED957" stroke-width="2"/>'
+  + '<circle cx="24" cy="24" r="14" fill="none" stroke="#7ED957" stroke-width="1" opacity=".5"/><circle cx="24" cy="24" r="6" fill="none" stroke="#7ED957" stroke-width="1" opacity=".5"/>'
+  + '<g class="battle-sweep"><path d="M24 24 L24 3 A21 21 0 0 1 41 13 Z" fill="#7ED957" opacity=".35"/><line x1="24" y1="24" x2="24" y2="3" stroke="#B8FF9E" stroke-width="1.5"/></g></svg>';
+const BATTLE_DIZZY = '<svg viewBox="0 0 60 60" aria-hidden="true">' + [0, 120, 240].map((a) => {
+  const r = (a * Math.PI) / 180;
+  return `<text x="${(30 + 22 * Math.cos(r)).toFixed(1)}" y="${(34 + 22 * Math.sin(r)).toFixed(1)}" text-anchor="middle" font-size="14" fill="#FFD23F" stroke="#D99A00" stroke-width=".6">★</text>`;
+}).join('') + '</svg>';
+
+/* Uzaylı savaşı: oyun */
+
+// Kaçan uzaylıların sözleri ve vuruş sesleri (yazı olarak).
+const BATTLE_SAYS = ['Kaçııın!', 'Eyvah!', 'Anneee!', 'Pardon!', 'Görüşürüz!', 'Çok hızlı!'];
+const BATTLE_POFS = ['POF!', 'BAM!', 'ZONK!'];
+const BATTLE_RISE = 32; // uzaylının başını çıkarınca yükseldiği piksel
+
+// Savaş oyunu. cfg: battleSetup; p: çocuğun profili (kol, görünüş); level: kahramanın gücü; opts.army: kahramanın çizimi için
+// armyView; opts.radar: radardaki gemi sayısı (gösterilir); opts.fromRadar: hata tekrarı (uzaylılar radardan gelmiş);
+// opts.onEnd(res): oyun bitince (battleSay'in res'i). Önce başlangıç kartı görünür; start() başlatır, skip() atlar.
+// Uzaylı başını çıkarınca ona dokunmak mermi atar; el bombası düğmesinden sonra bir saklanma yerine dokunmak onu patlatır.
+function battleGame(cfg, p, level, opts = {}) {
+  const field = BATTLE_FIELD[p?.hero_corps] || 'land', uni = HERO_UNIFORM[p?.hero_corps] || HERO_UNIFORM.kara;
+  const svgIn = (cls, svg, ...kids) => {
+    const el = h('span', { class: cls, 'aria-hidden': 'true' }, ...kids);
+    el.insertAdjacentHTML('afterbegin', svg);
+    return el;
+  };
+  const box = h('div', { class: `battle game f-${field}${cfg.exam ? ' exam' : ''}` });
+  const layer = h('div', { class: 'battle-layer', 'aria-hidden': 'true' });
+  let bullets = cfg.bullets, grenades = cfg.grenades, superLeft = cfg.superBomb ? 1 : 0, chased = 0, gooHits = 0;
+  let playing = false, ending = false, over = false, grenadeMode = false, inFlight = 0, lastShot = 0, stunUntil = 0, lastTouch = 0, lastPost = null, run = 0;
+
+  // Üst şerit: mermi, el bombası (düğme), süper bomba (denemede, kalkan inince), kalan uzaylı.
+  const ammoN = h('b', {}), grenN = h('b', {}), alienN = h('b', {});
+  const ammoPill = h('span', { class: 'battle-pill', title: 'Mermi: her doğru cevap' }, svgIn('ico', BATTLE_BULLET), ammoN);
+  const grenBtn = h('button', { type: 'button', class: 'battle-pill', 'aria-pressed': 'false', 'aria-label': 'El bombası', title: 'El bombası: zor soruyu doğru çözünce', onclick: () => setGrenade(!grenadeMode) },
+    svgIn('ico', BATTLE_GRENADE), grenN);
+  const superBtn = h('button', { type: 'button', class: 'battle-pill super', hidden: true, onclick: () => fireSuper() }, svgIn('ico', BATTLE_MISSILE), 'Süper bomba');
+  const alienPill = h('span', { class: 'battle-pill', title: 'Kalan uzaylı' }, svgIn('ico', BATTLE_HEAD), alienN);
+  const hud = h('div', { class: 'battle-hud' }, ammoPill, grenBtn, superBtn, h('span', { class: 'grow' }), alienPill);
+  const hint = h('p', { class: 'battle-hint', 'aria-live': 'polite' });
+  const banner = h('p', { class: 'battle-banner', 'aria-live': 'polite' });
+
+  const radarN = h('b', {}, String(Math.max(0, opts.radar ?? 0))), radar = h('div', { class: 'battle-radar', 'aria-hidden': 'true' }, radarN);
+  radar.insertAdjacentHTML('afterbegin', BATTLE_RADAR);
+  if (opts.radar == null) radarN.hidden = true;
+  const heroEl = h('div', { class: 'battle-hero', 'aria-hidden': 'true' });
+  heroEl.innerHTML = heroSvg(p?.avatar, level, p?.hero_look, undefined, opts.army);
+  const car = h('div', { class: 'battle-car', 'aria-hidden': 'true' });
+  car.innerHTML = battleVehicle(field, uni.shirt);
+  const deco = field === 'space' ? h('span', { class: 'battle-planet', 'aria-hidden': 'true' })
+    : field === 'air' ? null : [h('span', { class: 'battle-cloud c1', 'aria-hidden': 'true' }), h('span', { class: 'battle-cloud c2', 'aria-hidden': 'true' })];
+
+  // Saklanma yerleri ve arkalarındaki uzaylılar (antenleri görünür). state: hidden, up, ducking, hit (vuruldu), gone.
+  const posts = battlePosts(cfg.aliens, cfg.exam).map((pt, pi) => {
+    const el = h('div', { class: 'battle-post', style: `left: ${pt.x}%; top: ${pt.y}%`, 'aria-hidden': 'true' });
+    const post = { el, pi, broken: false, cover: svgIn('battle-cover', battleCover(field, pi)) };
+    post.list = pt.aliens.map((i, k) => {
+      const a = { i, post, state: 'hidden', anim: null, el: h('span', { class: 'battle-trooper', style: `margin-left: ${-19 + (k - (pt.aliens.length - 1) / 2) * 11}px` }) };
+      a.el.innerHTML = battleTrooper(i, 'peek');
+      return a;
+    });
+    fill(el, post.list.map((a) => a.el), post.cover);
+    return post;
+  });
+  const aliens = posts.flatMap((pt) => pt.list);
+  const alive = (a) => a.state !== 'hit' && a.state !== 'gone';
+
+  // Denemede ana gemi: önce kalkanlı (küçük uzaylılar bitince iner), sonra sağa sola gezer, jöle atar; canı çubukta.
+  let mother = null, motherState = null, motherHp = cfg.motherHp;
+  const hpBar = h('i', {});
+  if (cfg.exam) {
+    mother = h('div', { class: 'battle-mother shield', 'aria-hidden': 'true' }, h('span', { class: 'battle-hp' }, hpBar));
+    mother.insertAdjacentHTML('afterbegin', `<span class="battle-sway">${battleUfo(0, true)}</span>`);
+    motherState = 'shield';
+  }
+  const motherBody = () => mother?.firstElementChild;
+
+  const startBtn = h('button', { type: 'button', class: 'primary', onclick: () => start() },
+    cfg.bullets || cfg.grenades || cfg.superBomb ? 'Savaşa başla!' : 'Tamam');
+  const startCard = h('div', { class: 'battle-start' }, h('div', {},
+    h('p', { class: 'battle-title' }, opts.fromRadar ? 'Radardaki uzaylılar geldi!' : 'Uzaylılar geldi!'),
+    // "10 mermi" Türkçe harf taşımadığı için İngilizce katman tanımaz: satır iki dilde kurulur.
+    h('p', { class: 'battle-ammo' }, trEn(
+      [`${cfg.bullets} mermi`, cfg.grenades ? `${cfg.grenades} el bombası` : '', cfg.superBomb ? 'süper bomba' : '', `${cfg.aliens} uzaylı`].filter(Boolean).join(' · '),
+      [`${cfg.bullets} bullet${cfg.bullets === 1 ? '' : 's'}`, cfg.grenades ? `${cfg.grenades} grenade${cfg.grenades === 1 ? '' : 's'}` : '', cfg.superBomb ? 'super bomb' : '',
+        `${cfg.aliens} aliens`].filter(Boolean).join(' · '))),
+    h('p', { class: 'small' }, 'Her doğru bir mermi, zor soru el bombası, her yanlış bir uzaylı.'),
+    h('p', { class: 'small' }, 'Başını çıkaran uzaylıya dokun!', cfg.exam ? ' Sonra ana gemi gelir.' : ''),
+    startBtn));
+  fill(box, deco, h('div', { class: 'battle-floor', 'aria-hidden': 'true' }), posts.map((pt) => pt.el), mother, car, heroEl, layer, radar, hud, hint, banner, startCard);
+  const skipBtn = h('button', { type: 'button', class: 'ghost small', onclick: () => skip() }, 'Atla');
+  const wrap = h('div', { class: 'battle-wrap' }, box, h('div', { class: 'battle-under' }, skipBtn));
+
+  // Yardımcılar: zamanlayıcılar oyun bitince ya da kutu sayfadan çıkınca durur.
+  const timers = new Set();
+  const later = (ms, fn) => {
+    const r = run, id = setTimeout(() => { timers.delete(id); if (r === run && box.isConnected) fn(); }, ms);
+    timers.add(id);
+  };
+  const gone = () => over || !box.isConnected;
+  const rel = (el) => {
+    const a = el.getBoundingClientRect(), b = box.getBoundingClientRect();
+    return { l: a.left - b.left, t: a.top - b.top, r: a.right - b.left, b: a.bottom - b.top, w: a.width, h: a.height };
+  };
+  const mid = (el) => { const r = rel(el); return [r.l + r.w / 2, r.t + r.h / 2]; };
+  const at = (x, y, rot = 0, s = 1) => `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${rot}deg) scale(${s})`;
+  const put = (cls, svg, x, y, ...kids) => {
+    const el = svgIn(cls, svg, ...kids);
+    el.style.transform = at(x, y);
+    layer.append(el);
+    return el;
+  };
+  const anim = (el, frames, ms, easing = 'ease-in-out') => (el.animate ? el.animate(frames, { duration: ms, easing, fill: 'forwards' }).finished.catch(() => {}) : Promise.resolve());
+  const tip = () => { const r = rel(car), [fx, fy] = BATTLE_TIP[field]; return [r.l + r.w * fx, r.t + r.h * fy]; };
+  let sayT = 0;
+  const say = (t, ms = 1200) => {
+    hint.textContent = t;
+    hint.classList.add('on');
+    clearTimeout(sayT);
+    sayT = setTimeout(() => hint.classList.remove('on'), ms);
+  };
+  const show = () => {
+    ammoN.textContent = String(bullets);
+    grenN.textContent = String(grenades);
+    grenBtn.hidden = !cfg.grenades;
+    grenBtn.disabled = !grenades || !playing;
+    alienN.textContent = String(aliens.filter(alive).length);
+  };
+  const setMood = (a, m) => { if (a.el.isConnected) a.el.innerHTML = battleTrooper(a.i, m); };
+  const pof = (x, y, word, s = 1) => {
+    const el = put('battle-pof', BATTLE_BOOM, x, y, h('b', {}, word));
+    anim(el, [{ transform: at(x, y, -10, 0.3 * s), opacity: 1 }, { transform: at(x, y, 6, 1.1 * s), opacity: 1, offset: 0.35 }, { transform: at(x, y, 0, 1.2 * s), opacity: 0 }], 700).then(() => el.remove());
+  };
+  // Kaçış kapsülü (x, y)'den yukarı ve yana uçar; talk: üstünde "Kaçııın!" gibi bir söz.
+  const pod = (x, y, dx = 1, talk = true) => {
+    const el = put('battle-pod', BATTLE_POD, x, y, talk ? h('span', { class: 'battle-say' }, BATTLE_SAYS[Math.floor(Math.random() * BATTLE_SAYS.length)]) : null);
+    const ex = x + dx * (70 + Math.random() * 80);
+    anim(el, [{ transform: at(x, y, 0, 0.7) }, { transform: at(x + dx * 10, y - 26, dx * 8, 1), offset: 0.25 }, { transform: at(ex, -80, dx * 30, 0.9) }], 1500, 'ease-in').then(() => el.remove());
+  };
+  const spark = (x, y) => {
+    const el = put('battle-spark', BATTLE_SPARK, x, y);
+    anim(el, [{ transform: at(x, y, 0, 0.4), opacity: 1 }, { transform: at(x, y, 40, 1.1), opacity: 0 }], 320).then(() => el.remove());
+  };
+
+  // Uzaylı başını çıkarır, bir süre bakar, ortasında jöle atar, sonra saklanır.
+  const peek = (a) => {
+    a.state = 'up';
+    a.anim = a.el.animate?.([{ translate: '0 0' }, { translate: `0 -${BATTLE_RISE}px` }], { duration: 170, easing: 'ease-out', fill: 'forwards' });
+    if (Math.random() < (cfg.fireChance ?? 0.5)) later(cfg.peekMs * 0.55, () => { if (a.state === 'up' && playing) goo(a); });
+    later(cfg.peekMs, () => {
+      if (a.state !== 'up') return;
+      a.state = 'ducking';
+      a.anim = a.el.animate?.([{ translate: `0 -${BATTLE_RISE}px` }, { translate: '0 0' }], { duration: 200, easing: 'ease-in', fill: 'forwards' });
+      later(210, () => { if (a.state === 'ducking') { a.state = 'hidden'; setMood(a, 'peek'); } });
+    });
+  };
+  const tick = () => {
+    if (!playing) return;
+    const busy = aliens.filter((a) => a.state === 'up' || a.state === 'ducking').length;
+    if (busy < cfg.maxUp) {
+      const free = posts.filter((pt) => !pt.broken && pt.list.some((a) => a.state === 'hidden') && !pt.list.some((a) => a.state === 'up' || a.state === 'ducking'));
+      const pick = free.length > 1 ? free.filter((pt) => pt !== lastPost) : free;
+      if (pick.length) {
+        const pt = pick[Math.floor(Math.random() * pick.length)], hid = pt.list.filter((a) => a.state === 'hidden');
+        lastPost = pt;
+        peek(hid[Math.floor(Math.random() * hid.length)]);
+      }
+    }
+    later((cfg.maxUp > 1 ? 350 : 500) + Math.random() * 500, tick);
+  };
+  // Jöle: uzaylının (ya da ana geminin) tabancasından kahramana kavisle uçar; çoğu zaman çarpar, kahraman bir an sersemler.
+  const goo = (a) => {
+    let x0, y0;
+    if (a) {
+      setMood(a, 'aim');
+      const r = rel(a.el);
+      [x0, y0] = [r.l + 3, r.t + r.h * 0.69];
+    } else {
+      const r = rel(motherBody());
+      [x0, y0] = [r.l + r.w / 2, r.b - 6];
+    }
+    const [hx, hy] = mid(heroEl), miss = Math.random() < 0.35;
+    const tx = miss ? hx + 50 + Math.random() * 40 : hx, ty = miss ? hy + 34 : hy - 12;
+    const g = put('battle-goo', BATTLE_GOO, x0, y0);
+    anim(g, [{ transform: at(x0, y0, 0, 0.8) }, { transform: at((x0 + tx) / 2, Math.min(y0, ty) - 46, 180, 1), offset: 0.5 }, { transform: at(tx, ty, 360, 1.1) }], 700, 'linear').then(() => {
+      g.remove();
+      if (gone()) return;
+      if (miss) {
+        const s = put('battle-splat ground', BATTLE_SPLAT, tx, ty + 6);
+        anim(s, [{ opacity: 1 }, { opacity: 0 }], 900, 'ease-in').then(() => s.remove());
+      } else stun();
+    });
+  };
+  const stun = () => {
+    gooHits++;
+    stunUntil = Date.now() + 650;
+    heroEl.querySelector('svg')?.animate?.([{ rotate: '0deg' }, { rotate: '-7deg' }, { rotate: '7deg' }, { rotate: '0deg' }], { duration: 400, iterations: 2 });
+    heroEl.querySelectorAll('.battle-stars, .battle-splat').forEach((el) => el.remove());
+    const st = svgIn('battle-stars', BATTLE_DIZZY), sp = svgIn('battle-splat', BATTLE_SPLAT);
+    heroEl.append(st, sp);
+    setTimeout(() => { st.remove(); sp.remove(); }, 900);
+  };
+
+  // Dokunulan yerde başını çıkarmış uzaylı (görünen kısmı, biraz payla) ya da saklanma yeri ya da ana gemi var mı.
+  const alienAt = (x, y) => {
+    let best = null, bd = Infinity;
+    for (const a of aliens) {
+      if (a.state !== 'up' && a.state !== 'ducking') continue;
+      const r = rel(a.el), top = rel(a.post.cover).t + 6;
+      if (x < r.l - 10 || x > r.r + 10 || y < r.t - 10 || y > Math.min(r.b, top) + 4) continue;
+      const d = Math.abs(x - (r.l + r.w / 2)) + Math.abs(y - (r.t + r.h / 3));
+      if (d < bd) { bd = d; best = a; }
+    }
+    return best;
+  };
+  const coverAt = (x, y) => posts.find((pt) => {
+    if (pt.broken) return false;
+    const r = rel(pt.cover);
+    return x >= r.l - 4 && x <= r.r + 4 && y >= r.t - 4 && y <= r.b + 4;
+  });
+  const motherAt = (x, y) => {
+    if (motherState !== 'shield' && motherState !== 'open') return false;
+    const r = rel(motherBody());
+    return x >= r.l && x <= r.r && y >= r.t && y <= r.b;
+  };
+
+  const shoot = (x, y) => {
+    lastTouch = Date.now();
+    if (Date.now() < stunUntil) return say('Jöle! Bir saniye…', 700);
+    if (grenadeMode) return throwGrenade(x, y);
+    if (Date.now() - lastShot < 250) return;
+    if (!bullets) {
+      ammoPill.animate?.([{ scale: '1' }, { scale: '1.3' }, { scale: '1' }], 300);
+      return say(grenades ? 'Mermi bitti, el bombası at!' : superLeft && motherState === 'open' ? 'Süper bombaya bas!' : 'Mermi bitti!', 1000);
+    }
+    const target = alienAt(x, y), atMother = !target && motherAt(x, y);
+    if (atMother && motherState === 'shield') return say('Önce küçük uzaylıları kovala!', 1100);
+    lastShot = Date.now();
+    bullets--;
+    if (target) { target.state = 'hit'; target.anim?.pause(); }
+    show();
+    const [x0, y0] = tip(), rot = (Math.atan2(y - y0, x - x0) * 180) / Math.PI;
+    const b = put('battle-bullet', BATTLE_BULLET, x0, y0);
+    inFlight++;
+    anim(b, [{ transform: at(x0, y0, rot, 0.9) }, { transform: at(x, y, rot, 1.1) }], 170, 'linear').then(() => {
+      b.remove();
+      inFlight--;
+      if (gone()) return;
+      if (target) chase(target);
+      else if (atMother) hitMother(1, x, y);
+      else if (coverAt(x, y)) spark(x, y);
+      checkEnd();
+    });
+  };
+  // Vurulan uzaylı: "POF!", gözü fırıldak olur, sonra kaçış kapsülüyle uçar gider.
+  const chase = (a) => {
+    setMood(a, 'hit');
+    const [x, y] = mid(a.el);
+    pof(x, y - 8, BATTLE_POFS[chased % BATTLE_POFS.length]);
+    chased++;
+    show();
+    setTimeout(() => {
+      if (!box.isConnected || !a.el.isConnected) return;
+      const [px, py] = mid(a.el);
+      a.el.remove();
+      a.state = 'gone';
+      pod(px, py - 8, px > box.clientWidth * 0.6 ? 1 : -1);
+    }, 380);
+  };
+
+  // El bombası: düğmeye basınca nişan modu; dokunulan yere en yakın saklanma yerine (90 piksel içinde) kavisle uçar.
+  const setGrenade = (on) => {
+    grenadeMode = !!on && grenades > 0 && playing;
+    grenBtn.setAttribute('aria-pressed', String(grenadeMode));
+    box.classList.toggle('aiming', grenadeMode);
+    if (grenadeMode) say('Bir saklanma yerine dokun!', 1600);
+  };
+  const throwGrenade = (x, y) => {
+    let target = null, bd = 90;
+    for (const pt of posts) {
+      if (pt.broken) continue;
+      const [cx, cy] = mid(pt.cover), d = Math.hypot(cx - x, cy - y);
+      if (d < bd) { bd = d; target = pt; }
+    }
+    const atMother = !target && motherAt(x, y);
+    if (atMother && motherState === 'shield') { setGrenade(false); return say('Önce küçük uzaylıları kovala!', 1100); }
+    grenades--;
+    setGrenade(false);
+    hint.classList.remove('on');
+    lastShot = Date.now();
+    if (target) target.broken = true; // uçarken arkasından kimse çıkmasın
+    show();
+    const [tx, ty] = target ? mid(target.cover) : [x, y], [x0, y0] = tip();
+    const g = put('battle-grenade', BATTLE_GRENADE, x0, y0);
+    inFlight++;
+    anim(g, [{ transform: at(x0, y0, 0, 0.9) }, { transform: at((x0 + tx) / 2, Math.min(y0, ty) - 70, 300, 1.15), offset: 0.5 }, { transform: at(tx, ty, 620, 1) }], 650, 'linear').then(() => {
+      g.remove();
+      inFlight--;
+      if (gone()) return;
+      pof(tx, ty, 'BUM!', 1.7);
+      if (target) blowPost(target);
+      else if (atMother) hitMother(3, tx, ty);
+      checkEnd();
+    });
+  };
+  // Saklanma yeri patlar (geriye küçük parçalar kalır); arkasındaki bütün uzaylılar havaya fırlar, kapsüllerle kaçar.
+  const blowPost = (pt) => {
+    anim(pt.cover, [{ scale: '1', rotate: '0deg', opacity: 1 }, { scale: '1.35', rotate: '8deg', opacity: 0 }], 350, 'ease-out').then(() => {
+      pt.cover.getAnimations?.().forEach((x) => x.cancel());
+      pt.cover.innerHTML = battleRubble(field, pt.pi);
+      pt.cover.classList.add('rubble');
+    });
+    const out = pt.list.filter(alive);
+    out.forEach((a, k) => {
+      const from = a.state === 'up' || a.state === 'ducking' ? -BATTLE_RISE : 0;
+      a.state = 'hit';
+      a.anim?.cancel();
+      chased++;
+      setMood(a, 'hit');
+      a.el.animate?.([{ translate: `0 ${from}px` }, { translate: `${(k - (out.length - 1) / 2) * 20}px -52px` }], { duration: 320, easing: 'ease-out', fill: 'forwards' });
+      setTimeout(() => {
+        if (!box.isConnected || !a.el.isConnected) return;
+        const [px, py] = mid(a.el);
+        a.el.remove();
+        a.state = 'gone';
+        pod(px, py, k % 2 ? 1 : -1, k === 0);
+      }, 440 + k * 130);
+    });
+    show();
+  };
+
+  // Ana gemi: kalkan iner, sağa sola gezer, ara ara jöle atar. Mermi 1, el bombası 3 can götürür; süper bomba hepsini.
+  const openMother = () => {
+    motherState = 'open';
+    mother.classList.replace('shield', 'open');
+    superBtn.hidden = !superLeft;
+    say(superLeft ? 'Kalkan indi! Süper bomban hazır!' : 'Kalkan indi! Ana gemiye ateş!', 1800);
+    const back = () => { if (motherState === 'open' && playing) { goo(null); later(2300, back); } };
+    later(1600, back);
+  };
+  const hitMother = (dmg, x, y) => {
+    if (motherState !== 'open') return;
+    motherHp = Math.max(0, motherHp - dmg);
+    hpBar.style.width = `${(100 * motherHp) / cfg.motherHp}%`;
+    pof(x, y, dmg > 1 ? 'BUM!' : BATTLE_POFS[motherHp % BATTLE_POFS.length], dmg > 1 ? 1.4 : 0.8);
+    motherBody().animate?.([{ rotate: '0deg' }, { rotate: '5deg' }, { rotate: '-4deg' }, { rotate: '0deg' }], 260);
+    if (!motherHp) downMother();
+  };
+  const downMother = () => {
+    motherState = 'down';
+    superBtn.hidden = true;
+    hint.classList.remove('on');
+    const [mx, my] = mid(motherBody());
+    pof(mx, my, 'KABUM!', 2.6);
+    mother.style.visibility = 'hidden';
+    for (let k = 0; k < 6; k++) pod(mx + (k - 2.5) * 14, my, k < 3 ? -1 : 1, k === 2);
+  };
+  const fireSuper = () => {
+    if (!superLeft || motherState !== 'open' || !playing) return;
+    superLeft = 0;
+    superBtn.hidden = true;
+    lastTouch = Date.now();
+    const [x0, y0] = tip(), [mx, my] = mid(motherBody()), rot = (Math.atan2(my - y0, mx - x0) * 180) / Math.PI;
+    const m = put('battle-missile big', BATTLE_MISSILE, x0, y0);
+    inFlight++;
+    anim(m, [{ transform: at(x0, y0, rot, 1) }, { transform: at(mx, my, rot, 1.7) }], 600, 'ease-in').then(() => {
+      m.remove();
+      inFlight--;
+      if (gone()) return;
+      motherHp = 0;
+      hpBar.style.width = '0%';
+      downMother();
+      checkEnd();
+    });
+  };
+
+  // Bitiş: hepsi kovalandıysa kazandı; cephane bittiyse (uçan mermi yoksa) geri çekilir.
+  const endSoon = (reason, ms) => {
+    if (ending || over) return;
+    ending = true;
+    playing = false;
+    setGrenade(false);
+    show();
+    later(ms, () => finish(reason));
+  };
+  const checkEnd = () => {
+    if (ending || over || !playing) return;
+    const left = aliens.filter(alive).length;
+    if (!left && motherState === 'shield') openMother();
+    if (!left && (!mother || motherState === 'down')) return endSoon('win', 1300);
+    if (!inFlight && !bullets && !grenades && !(superLeft && motherState === 'open')) endSoon('ammo', 600);
+  };
+  const retreat = () => {
+    const [cx, cy] = mid(car), say2 = h('span', { class: 'battle-say hero' }, 'Geri çekiliiin!');
+    heroEl.append(say2);
+    [car, heroEl].forEach((el) => el.animate?.([{ translate: '0 0', rotate: '0deg' }, { translate: '10px 0', rotate: '2deg', offset: 0.15 }, { translate: '-300px 0', rotate: '-4deg' }],
+      { duration: 1100, easing: 'ease-in', fill: 'forwards' }));
+    for (let k = 0; k < 3; k++) {
+      const d = put('battle-dust', '', cx + 30 + k * 14, cy + 20);
+      anim(d, [{ transform: at(cx + 30 + k * 14, cy + 20, 0, 0.4), opacity: 0.9 }, { transform: at(cx + 50 + k * 18, cy + 8, 0, 1.6), opacity: 0 }], 900 + k * 120, 'ease-out').then(() => d.remove());
+    }
+  };
+  const finish = async (reason) => {
+    if (over) return;
+    over = true;
+    playing = false;
+    ending = true;
+    run++;
+    timers.forEach(clearTimeout);
+    timers.clear();
+    grenadeMode = false;
+    box.classList.remove('aiming');
+    hud.classList.add('off');
+    startCard.remove();
+    show();
+    const rest = aliens.filter(alive), motherAlive = motherState === 'shield' || motherState === 'open';
+    const res = { reason, chased, aliens: cfg.aliens, left: bullets, leftGrenades: grenades, mother: mother ? (motherState === 'down' ? 'down' : 'fled') : null, gooHits };
+    const step = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    if (reason !== 'skip') {
+      if (rest.length) {
+        // Kalan uzaylılar başını çıkarır; mermi bitince sevinip zıplar.
+        const cheer = reason === 'ammo' || reason === 'empty';
+        rest.forEach((a) => {
+          a.anim?.cancel();
+          setMood(a, cheer ? 'cheer' : 'peek');
+          a.anim = a.el.animate?.([{ translate: '0 0' }, { translate: `0 -${BATTLE_RISE}px` }], { duration: 200, fill: 'forwards' });
+        });
+        await step(350);
+        if (cheer) {
+          rest.forEach((a, k) => a.el.animate?.([{ translate: `0 -${BATTLE_RISE}px` }, { translate: `0 -${BATTLE_RISE + 12}px` }, { translate: `0 -${BATTLE_RISE}px` }],
+            { duration: 320, iterations: 3, delay: k * 60, composite: 'replace' }));
+          if (reason === 'ammo') retreat();
+          await step(1100);
+        }
+        // Sonra hepsi kapsüllerle radara kaçar (sıkılınca biri "Sıkıldııık!" der).
+        if (!box.isConnected) return;
+        const [rx, ry] = mid(radar);
+        rest.forEach((a, k) => setTimeout(() => {
+          if (!box.isConnected || !a.el.isConnected) return;
+          const [px, py] = mid(a.el);
+          a.el.remove();
+          a.state = 'gone';
+          const el = put('battle-pod', BATTLE_POD, px, py, k === 0 ? h('span', { class: 'battle-say' }, reason === 'time' ? 'Sıkıldııık!' : 'Radara!') : null);
+          anim(el, [{ transform: at(px, py, 0, 0.8) }, { transform: at(px, py - 30, -10, 1), offset: 0.3 }, { transform: at(rx, ry, 20, 0.2) }], 1100, 'ease-in').then(() => {
+            el.remove();
+            radarN.animate?.([{ scale: '1' }, { scale: '1.5' }, { scale: '1' }], 300);
+          });
+        }, k * 110));
+        await step(rest.length * 110 + 1000);
+      }
+      if (motherAlive && mother && box.isConnected) {
+        await anim(motherBody(), [{ translate: '0 0', rotate: '0deg' }, { translate: '-8px 0', rotate: '-5deg', offset: 0.2 }, { translate: '8px 0', rotate: '5deg', offset: 0.4 },
+          { translate: '240px -220px', rotate: '14deg' }], 1400, 'ease-in');
+      }
+      if (reason === 'win') heroEl.querySelector('svg')?.animate?.([{ translate: '0 0' }, { translate: '0 -16px' }, { translate: '0 0' }, { translate: '0 -10px' }, { translate: '0 0' }], { duration: 900 });
+    }
+    banner.textContent = battleSay(res);
+    banner.classList.add('on');
+    skipBtn.hidden = true;
+    opts.onEnd?.(res);
+  };
+
+  const start = () => {
+    if (playing || over || ending) return;
+    startCard.remove();
+    if (!cfg.bullets && !cfg.grenades && !cfg.superBomb) return finish('empty');
+    playing = true;
+    lastTouch = Date.now();
+    show();
+    say('Başla!', 900);
+    later(600, tick);
+    later(cfg.timeMs, () => endSoon('time', 0));
+    // 20 saniye hiç dokunmazsa uzaylılar sıkılıp kaçar.
+    const idle = () => { if (!playing) return; if (Date.now() - lastTouch > 20000) return endSoon('time', 0); later(2000, idle); };
+    later(2000, idle);
+  };
+  const skip = () => { if (!over) finish('skip'); };
+  box.addEventListener('pointerdown', (e) => {
+    if (!playing || e.target.closest('button')) return;
+    e.preventDefault();
+    const b = box.getBoundingClientRect();
+    shoot(e.clientX - b.left, e.clientY - b.top);
+  });
+  show();
+  wrap.start = start;
+  wrap.skip = skip;
+  // Test ve önizleme için durum.
+  wrap.peekState = () => ({ playing, over, bullets, grenades, superLeft, chased, gooHits, aliens: aliens.map((a) => a.state), mother: motherState, motherHp });
+  return wrap;
+}
+
+// Oturum ya da deneme sonundaki savaş kartı, yalnızca asker olmuş (kolunu seçmiş) çocukta: correct doğru, wrong yanlış (boş
+// dahil), hard doğruların kaçı zor; kind 'session' ya da 'exam'; fromRadar: hata tekrarı oturumu. Radarda hata tekrarında
+// bekleyen soru sayısı görünür. Asker değilse, cevap yoksa ya da numara okunamazsa kart gizli kalır; hiçbir şey yazmaz.
+function battleCard(correct, wrong, hard, kind = 'session', fromRadar = false) {
+  const box = h('section', { class: 'card stack battle-card', hidden: true, style: 'gap: 8px' });
+  const p = state.student;
+  if (!p || !armyOn(p) || correct + wrong <= 0) return box;
+  loadArmy(p).then(async (st) => {
+    if (!st || !armyCorps(st.corps)) return;
+    const [level, radar] = await Promise.all([
+      (feedOn(p) ? loadFeed(p).then((fs) => fs.hero.level) : typingHero().then((t) => t.level)).catch(() => 1),
+      sb.from('items').select('id', { count: 'exact', head: true }).eq('student_id', p.id).eq('track', 'mistake').eq('state', 'active')
+        .then((r) => (r.error ? null : r.count), () => null),
+    ]);
+    const kid = { ...p, hero_corps: st.corps };
+    const game = battleGame(battleSetup(correct, wrong, hard, kind, p.grade), kid, level, { army: armyView(kid, st), radar, fromRadar });
+    fill(box, h('p', { class: 'label' }, '👾 Uzaylı savaşı'), game);
+    box.hidden = false;
+  }).catch(() => {});
+  return box;
 }
 
 /* Asker: veli */

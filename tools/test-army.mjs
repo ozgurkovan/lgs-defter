@@ -1,7 +1,8 @@
 // Asker kahramanın kontrolü: node tools/test-army.mjs
 // Açık/kapalı varsayılanı, rütbe eşikleri ve adları, sıradaki hedef, kahramanın sözü, kutlanacak haber (100'e ulaşma,
 // terfi; ilk açılışta kutlama yok), kahramanın çizimi (numara göğüste, üniforma, şapka, bayrak, rütbe işareti; army
-// verilmezse çizim birebir aynı) ve numaranın veritabanındaki hesabı (hata tekrarı 10'da, öteki doğru 20'de bir).
+// verilmezse çizim birebir aynı), numaranın veritabanındaki hesabı (hata tekrarı 10'da, öteki doğru 20'de bir) ve uzaylı
+// savaşı (cephane, düşman, saklanma yerleri, son söz, çizimler, oturum ve deneme sonuna bağlı).
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -102,6 +103,47 @@ check('ekran okuyucu için numara ve askerlik çizimin adında', pre[0].includes
 // Veritabanındaki hesap (metin denetimi): hata tekrarı iki kat, 20'de bir; kelime kartı 8'de bir; yayın günü
 check('numaranın hesabı: (2 × hata tekrarı doğrusu + öteki doğrular + kelime kartı / 8 + klavye dersi) / 20, 2026-11-13\'ten',
   sql.includes('floor((2 * r.mistake + r.other + p.paper + floor(w.words / 8.0) + t.lessons) / 20.0)') && (sql.match(/2026-11-13T00:00:00\+03:00/g) || []).length >= 3);
+
+// Uzaylı savaşı (ikinci aşama): cephane, düşman, saklanma yerleri, son söz ve çizimler
+const B = new Function([
+  pick(app, 'const HERO_LOOK = {', '// Yolculuğun yerleri'),
+  pick(src, '/* Uzaylı savaşı: saf kısım */', '/* Uzaylı savaşı: oyun */'),
+  'return { battleHard, battleSetup, battlePosts, battleSay, battleTrooper, battleCover, battleRubble, battleVehicle, battleUfo, BATTLE_FIELD, BATTLE_POD,'
+    + ' BATTLE_BULLET, BATTLE_GRENADE, BATTLE_SPLAT, BATTLE_HEAD };',
+].join('\n'))();
+check('zor soru: hata tekrarındaki soru ya da uzun soru (8. sınıfta 2 dk, 4. sınıfa kadar 1,5 dk ve üstü)',
+  B.battleHard('mistake', 60, 8) && B.battleHard('topic', 120, 8) && !B.battleHard('topic', 90, 8) && B.battleHard('topic', 90, 4)
+  && !B.battleHard('topic', 60, 3) && !B.battleHard('deneme', undefined, 8) && B.battleHard('deneme', 150, 7));
+const g1 = B.battleSetup(12, 3, 2, 'session', 4), g2 = B.battleSetup(50, 20, 10, 'session', 8), g3 = B.battleSetup(26, 4, 6, 'exam', 8);
+check('cephane: her doğru bir mermi, zor doğru el bombası (oturumda en çok 3); 3 uzaylı + her yanlış bir uzaylı (en çok 10)',
+  g1.bullets === 10 && g1.grenades === 2 && g1.aliens === 6 && !g1.exam && !g1.superBomb
+  && g2.grenades === 3 && g2.bullets === 30 && g2.aliens === 10 && B.battleSetup(5, 0, 0).aliens === 3);
+check('denemede: en çok 5 el bombası, 12 uzaylı, ana gemi 6 can; yüzde 80 ve üstü doğruda süper bomba',
+  g3.exam && g3.grenades === 5 && g3.bullets === 21 && g3.aliens === 7 && g3.motherHp === 6 && g3.superBomb
+  && !B.battleSetup(23, 7, 0, 'exam').superBomb && B.battleSetup(24, 6, 0, 'exam').superBomb && B.battleSetup(10, 40, 0, 'exam').aliens === 12);
+check('küçüklerde uzaylı daha uzun bakar ve tek tek çıkar; bozuk sayılar sıfırlanır, zor sayısı doğruyu aşmaz',
+  g1.peekMs > B.battleSetup(1, 1, 0, 'session', 8).peekMs && g1.maxUp === 1 && B.battleSetup(1, 1, 0, 'session', 8).maxUp === 2
+  && B.battleSetup(-3, -1, 9).bullets === 0 && B.battleSetup(-3, -1, 9).grenades === 0 && B.battleSetup(2, 0, 9).grenades === 2);
+const sizes = (n, exam) => B.battlePosts(n, exam).map((p) => p.aliens.length).join();
+check('saklanma yerleri: 4 uzaylıya kadar 3, sonra 4 yer; uzaylılar sırayla dağılır; denemede yerler biraz aşağıda',
+  sizes(3) === '1,1,1' && sizes(4) === '2,1,1' && sizes(10) === '3,3,2,2' && B.battlePosts(10).flatMap((p) => p.aliens).sort((a, b) => a - b).join() === '0,1,2,3,4,5,6,7,8,9'
+  && B.battlePosts(5, true)[0].y === B.battlePosts(5)[0].y + 6);
+check('son söz: hepsi kovalandı (artan mermi ve bomba), ana gemi patladı, mermi bitti (radara kaçanlar), sıkıldılar, atlandı, hiç mermi yok',
+  /^🎉 6 uzaylının hepsini kovaladın! Kovaladık, kaçtılar! 4 mermin ve 2 el bomban arttı\.$/.test(B.battleSay({ reason: 'win', chased: 6, aliens: 6, left: 4, leftGrenades: 2 }))
+  && /^💥 Ana gemi patladı!/.test(B.battleSay({ reason: 'win', chased: 7, aliens: 7, mother: 'down' }))
+  && /geri çekildik! 3 uzaylıyı kovaladın, 7 tanesi radara kaçtı\. Daha çok doğru/.test(B.battleSay({ reason: 'ammo', chased: 3, aliens: 10 }))
+  && /ana gemi kaçtı/.test(B.battleSay({ reason: 'ammo', chased: 7, aliens: 7, mother: 'fled' }))
+  && /sıkıldı/.test(B.battleSay({ reason: 'time', chased: 2, aliens: 6 })) && /atladın\. 5 uzaylı/.test(B.battleSay({ reason: 'skip', chased: 0, aliens: 5 }))
+  && /hiç mermi yok/.test(B.battleSay({ reason: 'empty', aliens: 4 })) && B.battleSay(null) === '');
+const fields = ['land', 'sea', 'air', 'space'];
+const pics = [...['peek', 'aim', 'hit', 'cheer'].flatMap((m) => [0, 1, 2, 3].map((c) => B.battleTrooper(c, m))),
+  ...fields.flatMap((f) => [0, 1].flatMap((i) => [B.battleCover(f, i), B.battleRubble(f, i)])), ...fields.map((f) => B.battleVehicle(f, '#5E6E3B')),
+  B.battleUfo(0, true), B.battleUfo(2), B.BATTLE_POD, B.BATTLE_BULLET, B.BATTLE_GRENADE, B.BATTLE_SPLAT, B.BATTLE_HEAD];
+check('savaş çizimleri (uzaylılar, saklanma yerleri, araçlar, ana gemi) bozuk sayı taşımıyor; her kolun savaş yeri var',
+  pics.every((s) => s.startsWith('<svg') && !/NaN|undefined|Infinity/.test(s)) && corpsIds.every((id) => fields.includes(B.BATTLE_FIELD[id])));
+check('savaş bağlı: oturum sonunda (hata tekrarında radardan) ve deneme sonunda, yalnızca asker olan çocukta',
+  /battleCard\(stats\.correct, stats\.total - stats\.correct, hard, 'session', track === 'mistake'\)/.test(app) && /saved \? battleCard\([\s\S]{0,200}'exam'\)/.test(app)
+  && /target: question\.target_seconds/.test(app) && /if \(!st \|\| !armyCorps\(st\.corps\)\) return;/.test(src));
 
 console.log(fails ? `${fails} kontrol başarısız` : '');
 process.exit(fails ? 1 : 0);
