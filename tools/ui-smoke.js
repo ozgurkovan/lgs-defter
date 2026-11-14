@@ -207,9 +207,13 @@
       document.querySelector('.party button')?.click(); // kutlama açıldıysa kapat (yalnızca bu cihazdaki kayıt değişir)
       go('hero'); await settle();
       const ac = document.querySelector('.army-card');
-      check('Asker kahraman: kartta numara satırı, kahraman numarasıyla çizili; kahramanın sayfasında asker kartı',
-        line && !!ac && /Asker kahraman|Askerlik töreni|Numara \d+/.test(ac.textContent) && !!ac.querySelector('.feed-bar, .army-corps, .army-badge'),
-        [!line && 'kart satırı ya da numara eksik', !ac && 'asker kartı yok'].filter(Boolean).join('; '));
+      // Madalya rafı (2026-11-14): on madalya; kazanılanlar numaraya uyar (asker değilken; kol seçme töreninde raf yok).
+      const tiles = ac ? ac.querySelectorAll('.army-medals .army-medal-tile') : [];
+      const earned = ac ? ac.querySelectorAll('.army-medal-tile.earned').length : -1, pts = armyCache.get(state.student.id)?.points ?? 0;
+      const medalsOk = ac?.querySelector('.army-corps') ? true : tiles.length === 10 && earned === armyMedals(pts);
+      check('Asker kahraman: kartta numara satırı, kahraman numarasıyla çizili; kahramanın sayfasında asker kartı ve madalya rafı',
+        line && !!ac && /Asker kahraman|Askerlik töreni|Numara \d+/.test(ac.textContent) && !!ac.querySelector('.feed-bar, .army-corps, .army-badge') && medalsOk,
+        [!line && 'kart satırı ya da numara eksik', !ac && 'asker kartı yok', !medalsOk && `madalya rafı (${tiles.length} madalya, ${earned} kazanılmış, numara ${pts})`].filter(Boolean).join('; '));
       document.querySelector('.party button')?.click();
       // Uzaylı savaşı (ikinci aşama): asker olmayan çocukta oturum sonu kartı gizli kalır. Oyunun kendisi sayfada kurulup
       // oynanır (asker gibi davranan sahte profil; hiçbir şey yazılmaz): başlangıç kartı, mermi sayısı, başını çıkaran

@@ -42,6 +42,48 @@ const ARMY_RANKS_EN = {
   spaceforce: ['Specialist 1', 'Specialist 2', 'Specialist 3', 'Specialist 4', 'Sergeant', 'Second Lieutenant', 'First Lieutenant', 'Captain', 'Major',
     'Lieutenant Colonel', 'Colonel', 'Brigadier General', 'General'],
 };
+// Madalyalar (velinin isteği, 2026-11-14: "asker olana kadar sürekli gaz alsınlar"): 100'e giden yolda kahramanlık
+// madalyaları. at: numara; say: kutlamadaki övgü; ribbon: kurdele [zemin, orta şerit] (göğüste de görünür, heroSvg'nin
+// army.ribbons'u); icon: madalyanın ortasındaki şekil; metal: ilk üçü bronz, sonraki dördü gümüş, son üçü altın.
+const ARMY_MEDALS = [
+  { at: 5, name: 'İlk Adım Rozeti', say: 'Kahramanlık yolculuğun başladı! İlk adımı attın.', ribbon: ['#2EC4B6', '#FFFFFF'], icon: 'star', metal: 'bronz' },
+  { at: 10, name: 'Cesaret Madalyası', say: 'Zor sorulardan kaçmadın. İşte gerçek cesaret!', ribbon: ['#E63946', '#FFD166'], icon: 'shield', metal: 'bronz' },
+  { at: 20, name: 'Azim Yıldızı', say: 'Her gün biraz daha! Azmin göz kamaştırıyor.', ribbon: ['#2F80ED', '#FFFFFF'], icon: 'star', metal: 'bronz' },
+  { at: 30, name: 'Şimşek Rozeti', say: 'Şimşek gibisin! Sorular senden kaçamıyor.', ribbon: ['#FFC531', '#264653'], icon: 'bolt', metal: 'gumus' },
+  { at: 40, name: 'Aslan Yürek Madalyası', say: 'Yüreğin aslan gibi! Hiç vazgeçmiyorsun.', ribbon: ['#F25C54', '#FFFFFF'], icon: 'heart', metal: 'gumus' },
+  { at: 50, name: 'Yarı Yol Kupası', say: 'Yolun yarısı geride! Artık seni kimse durduramaz.', ribbon: ['#7B4DD8', '#FFD166'], icon: 'cup', metal: 'gumus' },
+  { at: 60, name: 'Bilgelik Nişanı', say: 'Öğrendikçe büyüyorsun, bilge kahraman!', ribbon: ['#1D3557', '#A8DADC'], icon: 'book', metal: 'gumus' },
+  { at: 70, name: 'Kartal Gözü Rozeti', say: 'Dikkatin kartal gibi keskin!', ribbon: ['#8D6E63', '#FFE082'], icon: 'eye', metal: 'altin' },
+  { at: 80, name: 'Zirve Madalyası', say: 'Zirveye çok yaklaştın! Herkes seninle gurur duyuyor.', ribbon: ['#2E7D32', '#FFFFFF'], icon: 'mountain', metal: 'altin' },
+  { at: 90, name: 'Kahramanlık Nişanı', say: 'Sen gerçek bir kahramansın! Askerliğe çok az kaldı.', ribbon: ['#E63946', '#2F80ED'], icon: 'crown', metal: 'altin' },
+];
+// Kaç madalya kazandı; sıradaki madalya (hepsini aldıysa null).
+const armyMedals = (points) => ARMY_MEDALS.filter((m) => points >= m.at).length;
+const armyNextMedal = (points) => ARMY_MEDALS.find((m) => points < m.at) || null;
+// Madalyanın çizimi (40x52): kurdele, metal madalya, ortada şekli. state: 'earned' (kazandı) ya da kazanılmamış (gri;
+// ortada numarası).
+const ARMY_METALS = { bronz: ['#E3A36F', '#A8662F', '#F5CDA6'], gumus: ['#DCE1E8', '#8E98A8', '#F7F9FB'], altin: ['#F4C430', '#C99A1C', '#FFE58A'] };
+const ARMY_ICONS = {
+  star: '<path d="M10 1.5 L12.6 7.2 L18.8 7.6 L14 11.6 L15.5 17.7 L10 14.4 L4.5 17.7 L6 11.6 L1.2 7.6 L7.4 7.2 Z"/>',
+  shield: '<path d="M10 2 L17 5 V10 C17 14.5 14 17 10 18.5 C6 17 3 14.5 3 10 V5 Z"/>',
+  bolt: '<path d="M11.5 1.5 L4 11 H9 L7.5 18.5 L16 8.5 H11 Z"/>',
+  heart: '<path d="M10 17.5 C4 13 1.5 10 1.5 6.8 C1.5 4.2 3.5 2.5 5.8 2.5 C7.6 2.5 9 3.6 10 5 C11 3.6 12.4 2.5 14.2 2.5 C16.5 2.5 18.5 4.2 18.5 6.8 C18.5 10 16 13 10 17.5 Z"/>',
+  cup: '<path d="M5 2.5 H15 V7 C15 10.5 12.8 12.5 10 12.5 C7.2 12.5 5 10.5 5 7 Z M8.6 12.3 H11.4 V15 H14 V17.5 H6 V15 H8.6 Z"/><path d="M5 4.2 H2.6 C2.6 7.6 3.8 8.8 5.6 9 M15 4.2 H17.4 C17.4 7.6 16.2 8.8 14.4 9" fill="none" stroke-width="1.5"/>',
+  book: '<path d="M2 4 C5 3 8 3.5 10 5 C12 3.5 15 3 18 4 V16 C15 15 12 15.5 10 17 C8 15.5 5 15 2 16 Z"/>',
+  eye: '<path d="M1.5 10 C4.5 4.5 15.5 4.5 18.5 10 C15.5 15.5 4.5 15.5 1.5 10 Z"/><circle cx="10" cy="10" r="3.2" fill="#fff"/><circle cx="10" cy="10" r="1.6"/>',
+  mountain: '<path d="M1 17 L7.5 5.5 L11 11 L13.5 7.5 L19 17 Z"/><path d="M7.5 5.5 L9.6 9 L7.6 8.2 L5.6 9 Z" fill="#fff"/>',
+  crown: '<path d="M2 15.5 L3.5 5 L7.5 9.5 L10 3.5 L12.5 9.5 L16.5 5 L18 15.5 Z"/>',
+};
+function armyMedalSvg(m, state = 'earned') {
+  const on = state === 'earned', [face, edge, shine] = on ? ARMY_METALS[m.metal] || ARMY_METALS.altin : ['#D5D9DF', '#A5ACB7', '#EEF0F3'];
+  const [rib, stripe] = on ? m.ribbon : ['#C9CED6', '#E8EBEF'];
+  return '<svg viewBox="0 0 40 52" aria-hidden="true">'
+    + `<path d="M11 0 H29 L25 21 H15 Z" fill="${rib}"/><path d="M18 0 H22 L21.2 21 H18.8 Z" fill="${stripe}"/>`
+    + `<circle cx="20" cy="35" r="15" fill="${face}" stroke="${edge}" stroke-width="2"/><circle cx="20" cy="35" r="11" fill="none" stroke="${shine}" stroke-width="1.4"/>`
+    + (on ? `<g transform="translate(11 26) scale(0.9)" fill="${edge}" stroke="${edge}">${ARMY_ICONS[m.icon] || ARMY_ICONS.star}</g>`
+      : `<text x="20" y="39.5" text-anchor="middle" font-size="12" font-weight="800" font-family="Arial, sans-serif" fill="#8A93A3">${m.at}</text>`)
+    + '</svg>';
+}
 // Açık mı: veli seçtiyse o; seçmediyse 7. sınıfa kadar açık (besleme gibi).
 const armyOn = (p) => p?.hero_army ?? ((p?.grade || 8) <= 7);
 const armyUs = (p) => /^us/.test(p?.curriculum || '');
@@ -59,26 +101,34 @@ function armyNext(points, corps) {
 function armyView(p, st) {
   if (!st) return undefined;
   const corps = armyCorps(st.corps) ? st.corps : null;
-  return { num: st.points, corps, rank: corps ? Math.max(0, armyRank(st.points)) : -1, country: armyUs(p) ? 'us' : 'tr' };
+  return { num: st.points, corps, rank: corps ? Math.max(0, armyRank(st.points)) : -1, country: armyUs(p) ? 'us' : 'tr',
+    ribbons: ARMY_MEDALS.slice(0, armyMedals(st.points)).map((m) => m.ribbon) };
 }
 // Kahramanın sözü: numara, kol seçme zamanı ya da rütbe ve sıradaki rütbe.
 function armySay(st) {
   const c = armyCorps(st.corps);
   if (!c) {
-    return st.points < ARMY_SOLDIER ? `Forma numaram ${st.points}! 100 olunca asker olacağım: ${ARMY_SOLDIER - st.points} kaldı.`
-      : '100\'e ulaştık! 🎖️ Hangi kolda olacağımızı sen seç.';
+    if (st.points >= ARMY_SOLDIER) return '100\'e ulaştık! 🎖️ Hangi kolda olacağımızı sen seç.';
+    // Her durum tek kalıp: İngilizce katman bütün cümleyi bir kerede eşleştirir.
+    const n = st.points, left = ARMY_SOLDIER - n, last = ARMY_MEDALS[armyMedals(n) - 1], next = armyNextMedal(n);
+    if (!last) return `Forma numaram ${n}! İlk madalyaya ${next.at - n}, askerliğe ${left} kaldı.`;
+    return next ? `Forma numaram ${n}! 🏅 ${last.name} benim! Sıradaki madalyaya ${next.at - n}, askerliğe ${left} kaldı.`
+      : `Forma numaram ${n}! 🏅 ${last.name} benim! 100 olunca asker olacağım: ${left} kaldı.`;
   }
   const r = armyRank(st.points), next = armyNext(st.points, st.corps);
   return `${c.name} · ${armyRankName(st.corps, r)}. ` + (next ? `${armyRankName(st.corps, next.rank)} olmama ${next.need} numara kaldı.` : 'En yüksek rütbedeyim! 🎖️');
 }
-// Kutlanacak haber: seen, çocuğun bu cihazda son gördüğü durum ({ r: rütbe, ready: kol seçmeye hazır }). İlk açılışta
-// (seen yok) hiçbir şey kutlanmaz, şimdiki durum kaydedilir. 100'e ulaşınca 'ready'; askerken rütbe artınca 'promoted'.
+// Kutlanacak haber: seen, çocuğun bu cihazda son gördüğü durum ({ r: rütbe, ready: kol seçmeye hazır, m: madalya sayısı }).
+// İlk açılışta (seen yok) hiçbir şey kutlanmaz, şimdiki durum kaydedilir. 100'e ulaşınca 'ready'; askerken rütbe artınca
+// 'promoted'; asker değilken yeni madalya kazanınca 'medal' (madalyalardan önceki kayıtta m yok: kazandığı son madalya bir
+// kez kutlanır).
 function armyNews(st, seen) {
   const corps = armyCorps(st.corps) ? st.corps : null;
-  const now = { r: corps ? armyRank(st.points) : -1, ready: !corps && st.points >= ARMY_SOLDIER };
+  const now = { r: corps ? armyRank(st.points) : -1, ready: !corps && st.points >= ARMY_SOLDIER, m: armyMedals(st.points) };
   if (!seen || typeof seen !== 'object') return { news: null, seen: now };
   if (now.ready && !seen.ready) return { news: 'ready', seen: now };
   if (corps && seen.r >= 0 && now.r > seen.r) return { news: 'promoted', seen: now };
+  if (!corps && st.points < ARMY_SOLDIER && now.m > (Number.isInteger(seen.m) ? seen.m : 0)) return { news: 'medal', seen: now };
   return { news: null, seen: now };
 }
 
@@ -99,18 +149,23 @@ const armyFor = (p) => (p && armyOn(p) && armyCache.has(p.id) ? armyView(p, army
 // Kahramanın kartındaki satır (ana sayfa, oturum sonu): numara ya da rütbe, bugün kaç arttığı; kol seçme zamanıysa düğme.
 function armyLine(st) {
   const c = armyCorps(st.corps), today = Math.max(0, st.points - (st.before || 0));
-  const plus = today ? ` · bugün +${today}` : '';
   if (!c && st.points >= ARMY_SOLDIER) {
     return h('div', { class: 'army-line spread' }, h('b', {}, '🎖️ 100\'e ulaştın! Kolunu seç.'),
       h('button', { class: 'primary small', onclick: () => go('hero') }, 'Kolunu seç'));
   }
-  const next = armyNext(st.points, st.corps);
-  return h('p', { class: 'army-line small' }, c
-    ? `🎖️ ${armyRankName(st.corps, armyRank(st.points))} · numara ${st.points}${plus}` + (next ? ` · ${armyRankName(st.corps, next.rank)} için ${next.need}` : '')
-    : `🎽 Forma numaran ${st.points}${plus} · 100'de asker olursun`);
+  // Satır iki dilde kurulur (trEn): parçalı yazıyı İngilizce katman parça parça eşleştirince karıştırıyordu ("numara 47"
+  // Türkçe harf taşımadığı için hiç çevrilmiyordu). Bugün artmadıysa o parça yok.
+  const next = armyNext(st.points, st.corps), medals = armyMedals(st.points), n = st.points;
+  const rank = c ? armyRankName(st.corps, armyRank(n)) : '', nextRank = next && c ? armyRankName(st.corps, next.rank) : '';
+  const tr = c ? [`🎖️ ${rank}`, `numara ${n}`, today ? `bugün +${today}` : '', next ? `${nextRank} için ${next.need}` : '']
+    : [`🎽 Forma numaran ${n}`, today ? `bugün +${today}` : '', medals ? `🏅 ${medals} madalya` : '', '100\'e ulaşınca asker olursun'];
+  const en = c ? [`🎖️ ${rank}`, `number ${n}`, today ? `today +${today}` : '', next ? `${next.need} to ${nextRank}` : '']
+    : [`🎽 Jersey number ${n}`, today ? `today +${today}` : '', medals ? `🏅 ${medals} medal${medals === 1 ? '' : 's'}` : '', 'at 100 you become a soldier'];
+  return h('p', { class: 'army-line small' }, trEn(tr.filter(Boolean).join(' · '), en.filter(Boolean).join(' · ')));
 }
 
-// Kutlama (araç kutlamasıyla aynı görünüş): 100'e ulaştı ('ready'), asker oldu ('soldier'), terfi etti ('promoted').
+// Kutlama (araç kutlamasıyla aynı görünüş): 100'e ulaştı ('ready'), asker oldu ('soldier'), terfi etti ('promoted'),
+// madalya kazandı ('medal': kazandığı son madalya, övgüsü ve sıradaki madalya).
 function armyParty(kind, st, p, level) {
   const c = armyCorps(st.corps), r = armyRank(st.points);
   const overlay = h('div', { class: 'party', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Asker kahraman' });
@@ -119,14 +174,16 @@ function armyParty(kind, st, p, level) {
   window.addEventListener('popstate', drop, { once: true });
   const pic = h('div', { class: 'army-party-hero', 'aria-hidden': 'true' });
   pic.innerHTML = heroSvg(p?.avatar, level, p?.hero_look, undefined, armyView(p, st));
-  const badge = kind === 'promoted' ? armyBadge(r, 56) : null;
-  const title = kind === 'ready' ? '🎖️ 100\'e ulaştın!' : kind === 'soldier' ? `🎖️ Artık askersin!` : `🎖️ Terfi! ${armyRankName(st.corps, r)} oldun!`;
-  const text = kind === 'ready' ? 'Askerlik töreni seni bekliyor: hangi kolda olacağını sen seçeceksin.'
+  const medal = kind === 'medal' ? ARMY_MEDALS[armyMedals(st.points) - 1] || null : null, nextMedal = armyNextMedal(st.points);
+  const badge = kind === 'promoted' ? armyBadge(r, 56) : medal ? armyMedalEl(medal, 64) : null;
+  const title = medal ? `🏅 ${medal.name}!` : kind === 'ready' ? '🎖️ 100\'e ulaştın!' : kind === 'soldier' ? `🎖️ Artık askersin!` : `🎖️ Terfi! ${armyRankName(st.corps, r)} oldun!`;
+  const text = medal ? medal.say + (nextMedal ? ` Sıradaki madalya: ${nextMedal.name} (${nextMedal.at}).` : ' Sıradaki durak: askerlik (100)!')
+    : kind === 'ready' ? 'Askerlik töreni seni bekliyor: hangi kolda olacağını sen seçeceksin.'
     : kind === 'soldier' ? `${c?.name} · ${armyRankName(st.corps, r)}. Çalıştıkça rütbe alacaksın.`
       : (() => { const next = armyNext(st.points, st.corps); return next ? `Sıradaki rütbe: ${armyRankName(st.corps, next.rank)} (${next.need} numara).` : 'En yüksek rütbeye ulaştın! 🎖️'; })();
   fill(overlay,
     h('div', { class: 'party-confetti', 'aria-hidden': 'true' }, Array.from({ length: 30 }, (_, i) =>
-      h('span', { style: `left: ${(i * 37) % 100}%; animation-delay: ${(i % 8) * 0.15}s; font-size: ${18 + (i % 4) * 6}px` }, ['🎖️', '✨', '⭐', '🎊', '🎉'][i % 5]))),
+      h('span', { style: `left: ${(i * 37) % 100}%; animation-delay: ${(i % 8) * 0.15}s; font-size: ${18 + (i % 4) * 6}px` }, (medal ? ['🏅', '✨', '⭐', '🎉', '🌟'] : ['🎖️', '✨', '⭐', '🎊', '🎉'])[i % 5]))),
     h('div', { class: 'party-card stack' }, pic, badge, h('h2', {}, title), h('p', {}, text),
       h('button', { class: 'primary block', onclick: () => { close(); if (kind === 'ready') go('hero'); } }, kind === 'ready' ? 'Kolunu seç' : 'Harika!')));
   document.body.append(overlay);
@@ -142,6 +199,26 @@ function armyCheck(st, p, level) {
   const { news, seen: now } = armyNews(st, seen);
   try { localStorage.setItem(key, JSON.stringify(now)); } catch (e) { /* gizli pencere: kutlama her seferinde olmaz, sorun değil */ }
   if (news && !document.querySelector('.party')) armyParty(news, st, p, level);
+}
+
+// Madalya (çizimi armyMedalSvg): state 'earned', 'next' ya da 'locked'.
+function armyMedalEl(m, size = 40, state = 'earned') {
+  const el = h('span', { class: 'army-medal', style: `width: ${size}px; height: ${Math.round(size * 1.3)}px`, 'aria-hidden': 'true' });
+  el.innerHTML = armyMedalSvg(m, state);
+  return el;
+}
+
+// Madalya rafı (kahramanın sayfasındaki asker kartı): kazanılanlar renkli, sıradaki işaretli, kalanlar gri ve numaralı.
+function armyMedalBox(st) {
+  const got = armyMedals(st.points), next = armyNextMedal(st.points);
+  return h('div', { class: 'stack', style: 'gap: 6px' },
+    h('div', { class: 'spread' }, h('b', {}, `🏅 Madalyaların: ${got}/${ARMY_MEDALS.length}`),
+      next ? h('span', { class: 'small muted' }, `Sıradaki: ${next.name} · ${next.at - st.points} numara kaldı`) : null),
+    h('div', { class: 'army-medals' }, ARMY_MEDALS.map((md, i) => {
+      const state = i < got ? 'earned' : md === next ? 'next' : 'locked';
+      return h('div', { class: `army-medal-tile ${state}`, title: md.say, role: 'img', 'aria-label': `${md.name}, ${md.at}${i < got ? ', kazandın' : ''}` },
+        armyMedalEl(md, 34, state), h('span', { class: 'small' }, md.name), h('span', { class: 'small muted num' }, String(md.at)));
+    })));
 }
 
 // Rütbe rozeti: rütbe işareti koyu bir kalkanın üstünde (er rütbesinde yıldızsız kalkan).
@@ -164,7 +241,7 @@ function armyCard(st, p, level, onChange) {
     fill(box, h('p', { class: 'label' }, 'Asker kahraman'),
       h('div', { class: 'spread' }, h('b', {}, `🎽 Forma numaran: ${st.points}`), h('span', { class: 'small muted num' }, `${st.points}/${ARMY_SOLDIER}`)),
       bar(st.points / ARMY_SOLDIER),
-      h('p', {}, `100 olunca asker olursun ve kolunu sen seçersin. ${ARMY_SOLDIER - st.points} numara kaldı.`), how);
+      h('p', {}, `100 olunca asker olursun ve kolunu sen seçersin. ${ARMY_SOLDIER - st.points} numara kaldı.`), armyMedalBox(st), how);
     return box;
   }
   if (!c) {
@@ -205,7 +282,7 @@ function armyCard(st, p, level, onChange) {
       : h('p', {}, 'En yüksek rütbedesin! 🎖️ Numaran artmaya devam eder.'),
     h('div', { class: 'army-ranks' }, ranks.map((name, i) => h('span', { class: 'chip army-step' + (i < r ? ' done' : i === r ? ' now' : ''), title: `${ARMY_STEPS[i]}` },
       armyBadge(i, 18), `${name} · ${ARMY_STEPS[i]}`))),
-    how);
+    armyMedalBox(st), how);
   return box;
 }
 

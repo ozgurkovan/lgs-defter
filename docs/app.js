@@ -3445,7 +3445,19 @@ function heroSvg(gender, level, look, mood, army) {
         + (uni.star ? `<text x="100" y="38.5" text-anchor="middle" font-size="9" fill="#D9DEE7">★</text>` : `<circle cx="100" cy="35" r="3.2" fill="#F4C430" stroke="#C99A1C" stroke-width=".8"/>`));
     }
   }
-  const label = num == null ? '' : uni ? `, asker, numara ${num}` : `, numara ${num}`;
+  // Madalya kurdeleleri (asker kahraman, army.ribbons: kazandığı madalyaların kurdeleleri): asker değilken göğsün üst
+  // ortasında, satırda üç; askerken sağda künyenin üstünde, satırda beş. En son çizilir (kol ve saç üstüne binmez).
+  const ribbons = Array.isArray(army?.ribbons) ? army.ribbons.slice(0, 10) : [];
+  if (ribbons.length) {
+    const per = uni ? 5 : 3, rw = uni ? Math.min(4, (tw * 0.44) / 5) : Math.min(5, 3.2 + L * 0.18), rh = uni ? 2.8 : 3.4, rows = Math.ceil(ribbons.length / per);
+    const x0 = (uni ? colR : cx) - (Math.min(per, ribbons.length) * (rw + 0.5) - 0.5) / 2, y0 = uni ? 125.4 - rows * (rh + 0.5) : 100;
+    ribbons.forEach(([c1, c2], i) => {
+      const x = x0 + (i % per) * (rw + 0.5), y = y0 + Math.floor(i / per) * (rh + 0.5);
+      s.push(`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${rw.toFixed(2)}" height="${rh}" fill="${c1}" stroke="rgba(0,0,0,.3)" stroke-width=".35"/>`
+        + `<rect x="${(x + rw * 0.36).toFixed(2)}" y="${y.toFixed(2)}" width="${(rw * 0.28).toFixed(2)}" height="${rh}" fill="${c2}"/>`);
+    });
+  }
+  const label = (num == null ? '' : uni ? `, asker, numara ${num}` : `, numara ${num}`) + (ribbons.length ? `, ${ribbons.length} madalya` : '');
   return `<svg class="hero" viewBox="0 0 200 220" role="img" aria-label="Kelime kahramanı, güç ${L}${label}">${s.join('')}</svg>`;
 }
 

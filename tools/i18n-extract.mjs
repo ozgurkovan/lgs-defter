@@ -20,6 +20,7 @@ const TR_WORDS = new Set(('Kapat Geri Rapor Konular Konu Sorular Soru Deneme Den
   'Yeni Eski Bitti Bitir Devam Ara Kalan Puan Seviye Hedef Plan Yolla Tekrarla Dinle Yaz Oku Sayfa Sayfalar Sonraki Sonra Bilgi ' +
   'Merhaba Selam Hadi Aferin Bravo Harika Kolay Zor Orta Kalem Silgi Defter Okul Sinav Mesaj Mesajlar Yorum Not Notlar Takvim Hafta Saat ' +
   'Dakika Saniye Kapali Kapalı Acik Tahmin Kart Kartlar Altın Bronz Seri Rozet Hediye Yemek Elma Pasta Uyku Yorgun Mutlu ' +
+  'Forma numara numaran madalya mermi ' +
   've ile bir bu da de ne mi mu var yok ama icin için gibi kadar sonra once önce daha en cok çok az hem soru konu ders gun gün').split(/\s+/));
 
 function tokenize(src) {

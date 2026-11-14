@@ -261,6 +261,12 @@ Her maddenin yanında nasıl denendiği yazar:
 - **Rütbe**: Er 100, Onbaşı 115, Çavuş 135, Üstçavuş 160, Astsubay 190, Asteğmen 225, Teğmen 265, Üsteğmen 310,
   Yüzbaşı 360, Binbaşı 415, Yarbay 475, Albay 540, General 620 (Deniz'de Amiral). ABD'de kolun kendi İngilizce
   rütbeleri. Terfi edince bir kez kutlama ("Terfi! … oldun!"); ilk açılışta eski durum kutlanmaz. [O]
+- **Madalyalar** (velinin isteği, 2026-11-14: asker olana kadar motivasyon): 5'te İlk Adım Rozeti, sonra 10, 20 … 90'da
+  birer madalya (Cesaret Madalyası, Azim Yıldızı, Şimşek Rozeti, Aslan Yürek Madalyası, Yarı Yol Kupası, Bilgelik Nişanı,
+  Kartal Gözü Rozeti, Zirve Madalyası, Kahramanlık Nişanı); ilk üçü bronz, dördü gümüş, son üçü altın. Yeni madalyada bir
+  kez kutlama (madalya, övgü, sıradaki madalya). Kazanılanların kurdeleleri kahramanın göğsünde (asker değilken üst ortada,
+  askerken sağda künyenin üstünde). Kahramanın sözünde son madalya ve sıradakine kalan; kartın satırında madalya sayısı;
+  kahramanın sayfasında madalya rafı (kazanılan renkli, sıradaki işaretli, kalanlar gri ve numaralı), askerken de. [O], ekran [A]
 - Kahramanın sayfasında asker kartı: asker değilken numara çubuğu ve 100'e kalan; askerken rütbe rozeti, sıradaki rütbeye
   kalan, bütün rütbeler; "Numara nasıl artar?". Besleme kapalı, asker kahraman açıksa sayfa kahramanı ve asker kartını
   gösterir (yemek rafı yok). Kahramanın kartında numara ya da rütbe satırı. İngilizce ve Klavye sayfalarındaki kahraman

@@ -2,7 +2,7 @@
 // Açık/kapalı varsayılanı, rütbe eşikleri ve adları, sıradaki hedef, kahramanın sözü, kutlanacak haber (100'e ulaşma,
 // terfi; ilk açılışta kutlama yok), kahramanın çizimi (numara göğüste, üniforma, şapka, bayrak, rütbe işareti; army
 // verilmezse çizim birebir aynı), numaranın veritabanındaki hesabı (hata tekrarı 10'da, öteki doğru 20'de bir) ve uzaylı
-// savaşı (cephane, düşman, saklanma yerleri, son söz, çizimler, oturum ve deneme sonuna bağlı).
+// savaşı (cephane, düşman, saklanma yerleri, son söz, çizimler, oturum ve deneme sonuna bağlı); asker olana kadar madalyalar.
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +20,7 @@ const T = new Function([
   pick(src, '/* Asker: saf kısım', '/* Asker: ekran */'),
   pick(app, 'const HERO_LOOK = {', '// Yolculuğun yerleri'),
   'return { ARMY_SOLDIER, ARMY_STEPS, ARMY_CORPS, ARMY_CORPS_EN, ARMY_RANKS, ARMY_RANKS_EN, armyOn, armyUs, armyCorpsList, armyCorps, armyRank,'
-    + ' armyRankName, armyNext, armyView, armySay, armyNews, HERO_UNIFORM, heroSvg, heroInsignia };',
+    + ' armyRankName, armyNext, armyView, armySay, armyNews, HERO_UNIFORM, heroSvg, heroInsignia, ARMY_MEDALS, armyMedals, armyNextMedal, armyMedalSvg };',
 ].join('\n'))();
 
 let fails = 0;
@@ -67,6 +67,35 @@ check('askerken rütbe artınca terfi kutlaması, aynı rütbede tekrar yok; kol
   promo.news === 'promoted' && promo.seen.r === 1 && T.armyNews({ points: 120, corps: 'kara' }, promo.seen).news === null
   && T.armyNews({ points: 116, corps: 'kara' }, { r: -1, ready: true }).news === null);
 check('kol sıfırlanınca (veli) yeniden "hazır" kutlaması', T.armyNews({ points: 200 }, { r: 3, ready: false }).news === 'ready');
+
+// Madalyalar (asker olana kadar): 5'te ilk madalya, sonra her 10'da bir; 90'da sonuncusu
+const M = T.ARMY_MEDALS;
+check('10 madalya, numaraları artan ve 100\'den küçük (5, 10, 20 … 90); adları farklı; ilk üçü bronz, dördü gümüş, son üçü altın',
+  M.length === 10 && M.map((m) => m.at).join() === '5,10,20,30,40,50,60,70,80,90' && new Set(M.map((m) => m.name)).size === 10
+  && M.map((m) => m.metal).join() === 'bronz,bronz,bronz,gumus,gumus,gumus,gumus,altin,altin,altin'
+  && M.every((m) => m.ribbon.every((c) => /^#[0-9A-F]{6}$/i.test(c)) && m.say.length > 10));
+check('kaç madalya ve sıradaki: 0\'da yok, 5\'te ilki, 9\'da bir, 10\'da iki, 95\'te hepsi; 47\'de sıradaki Yarı Yol Kupası',
+  T.armyMedals(0) === 0 && T.armyMedals(5) === 1 && T.armyMedals(9) === 1 && T.armyMedals(10) === 2 && T.armyMedals(95) === 10 && T.armyMedals(500) === 10
+  && T.armyNextMedal(47).at === 50 && T.armyNextMedal(0).at === 5 && T.armyNextMedal(95) === null);
+check('madalya çizimi: kazanılan metal ve şekilli, kazanılmamış gri ve numaralı; bozuk sayı yok',
+  M.every((m) => !/NaN|undefined/.test(T.armyMedalSvg(m)) && !/NaN|undefined/.test(T.armyMedalSvg(m, 'locked')))
+  && T.armyMedalSvg(M[3]).includes(M[3].ribbon[0]) && />30<\/text>/.test(T.armyMedalSvg(M[3], 'locked')) && !T.armyMedalSvg(M[3], 'locked').includes(M[3].ribbon[0]));
+check('kahramanın sözü madalyayla: kazandığı son madalya ve sıradakine kalan; madalyasızken ilk madalyaya kalan; 90\'dan sonra askerliğe kalan',
+  T.armySay({ points: 47 }) === 'Forma numaram 47! 🏅 Aslan Yürek Madalyası benim! Sıradaki madalyaya 3, askerliğe 53 kaldı.'
+  && T.armySay({ points: 3 }) === 'Forma numaram 3! İlk madalyaya 2, askerliğe 97 kaldı.'
+  && T.armySay({ points: 92 }) === 'Forma numaram 92! 🏅 Kahramanlık Nişanı benim! 100 olunca asker olacağım: 8 kaldı.');
+const mNews = T.armyNews({ points: 47 }, { r: -1, ready: false, m: 4 }), oldSeen = T.armyNews({ points: 7 }, { r: -1, ready: false });
+check('yeni madalyada bir kez kutlama; madalyalardan önceki kayıtta kazandığı madalya bir kez kutlanır; askerken madalya kutlaması yok',
+  mNews.news === 'medal' && mNews.seen.m === 5 && T.armyNews({ points: 48 }, mNews.seen).news === null && oldSeen.news === 'medal'
+  && T.armyNews({ points: 3 }, { r: -1, ready: false }).news === null && T.armyNews({ points: 130, corps: 'kara' }, { r: 1, ready: false, m: 2 }).news === null
+  && T.armyNews({ points: 47 }, null).news === null && T.armyNews({ points: 47 }, null).seen.m === 5);
+const v47 = T.armyView({}, { points: 47 }), vSol = T.armyView({}, { points: 140, corps: 'kara' });
+const mLook = { ten: 2, sac: 1, model: 'percem' };
+const r47 = T.heroSvg('erkek', 6, mLook, undefined, v47), r0 = T.heroSvg('erkek', 6, mLook, undefined, { ...v47, ribbons: [] });
+check('göğüste kazandığı madalyaların kurdeleleri (askerken hepsi); kurdele yoksa çizim aynı; ekran okuyucuya madalya sayısı',
+  v47.ribbons.length === 5 && vSol.ribbons.length === 10 && M.slice(0, 5).every((m) => r47.includes(`fill="${m.ribbon[0]}"`))
+  && r0 === T.heroSvg('erkek', 6, mLook, undefined, { num: 47, corps: null, rank: -1, country: 'tr' }) && r47.includes(', numara 47, 5 madalya"')
+  && !/NaN|undefined/.test(T.heroSvg('kiz', 0, mLook, undefined, T.armyView({}, { points: 99 }))) && !/NaN|undefined/.test(T.heroSvg('erkek', 10, mLook, undefined, vSol)));
 
 // Çizim
 const look = { ten: 2, sac: 1, model: 'percem' };
