@@ -1,9 +1,10 @@
 -- Asker kahraman yetki testi: çocuk açma ayarını ve kolunu doğrudan değiştiremez; numarası 100 olmadan kol seçemez;
 -- 100 olunca ülkesine uygun kolu bir kez seçer (yanlış ülkenin kolu, ikinci seçim reddedilir); kendi numarasını görür.
 -- Veli numarayı görür, kolu yalnızca sıfırlar (bir kol yazamaz), açma ayarını o değiştirir. Öğretmen ve kardeş numarayı
--- göremez, kolu sıfırlayamaz. Numaranın hesabı: 800 hata tekrarı doğrusu (80) + 400 öteki doğru (20) = 100.
+-- göremez, kolu sıfırlayamaz. Numaranın hesabı: 800 hata tekrarı doğrusu (1600 puan) + 400 öteki doğru (400) + 12 kelime
+-- kartı (5'te bir: 2 puan) = 2002 puan, numara 100 (20 puan bir numara).
 -- Sonuç hata mesajıyla döner; her şey geri alınır.
--- beklenen: {"cocuk_ayar":"reddedildi","cocuk_kol_dogrudan":"reddedildi","erken_secim":"reddedildi","cocuk_numara":100,"bugun_oncesi":0,"yanlis_ulke":"reddedildi","secim":"kara","ikinci_secim":"reddedildi","veli_numara":100,"veli_kol_yazdi":"reddedildi","veli_sifirladi":true,"veli_ayar":false,"kapaliyken_secim":"reddedildi","ogretmen_numara":"yok","ogretmen_sifirladi":0,"kardes_numara":"yok"}
+-- beklenen: {"cocuk_ayar":"reddedildi","cocuk_kol_dogrudan":"reddedildi","erken_secim":"reddedildi","cocuk_numara":100,"cocuk_puan":2002,"bugun_oncesi":0,"yanlis_ulke":"reddedildi","secim":"kara","ikinci_secim":"reddedildi","veli_numara":100,"veli_kol_yazdi":"reddedildi","veli_sifirladi":true,"veli_ayar":false,"kapaliyken_secim":"reddedildi","ogretmen_numara":"yok","ogretmen_sifirladi":0,"kardes_numara":"yok"}
 do $$
 declare
   kid uuid := (select id from public.profiles where display_name = 'IrfTest' and role = 'student');
@@ -40,10 +41,11 @@ begin
   perform set_config('role', 'postgres', true);
   insert into public.reviews (student_id, question_id, track, correct, duration_sec)
   select kid, qid, case when i <= 800 then 'mistake' else 'topic' end, i <= 1200, 30 from generate_series(1, 1250) i;
+  insert into public.word_answers (student_id, word, correct) select kid, 'test' || i, true from generate_series(1, 12) i;
 
   perform set_config('role', 'authenticated', true);
   s := public.hero_army_state(kid);
-  r := r || jsonb_build_object('cocuk_numara', (s->>'points')::int, 'bugun_oncesi', (s->>'before')::int);
+  r := r || jsonb_build_object('cocuk_numara', (s->>'points')::int, 'cocuk_puan', (s->>'raw')::int, 'bugun_oncesi', (s->>'before')::int);
   begin perform public.set_hero_corps('navy'); r := r || '{"yanlis_ulke": "secti"}';
   exception when others then r := r || jsonb_build_object('yanlis_ulke', 'reddedildi'); end;
   c := public.set_hero_corps('kara'); r := r || jsonb_build_object('secim', c);

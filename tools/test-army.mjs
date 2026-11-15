@@ -20,7 +20,7 @@ const T = new Function([
   pick(src, '/* Asker: saf kısım', '/* Asker: ekran */'),
   pick(app, 'const HERO_LOOK = {', '// Yolculuğun yerleri'),
   'return { ARMY_SOLDIER, ARMY_STEPS, ARMY_CORPS, ARMY_CORPS_EN, ARMY_RANKS, ARMY_RANKS_EN, armyOn, armyUs, armyCorpsList, armyCorps, armyRank,'
-    + ' armyRankName, armyNext, armyView, armySay, armyNews, HERO_UNIFORM, heroSvg, heroInsignia, ARMY_MEDALS, armyMedals, armyNextMedal, armyMedalSvg };',
+    + ' armyRankName, armyNext, armyView, armySay, armyNews, HERO_UNIFORM, heroSvg, heroInsignia, ARMY_MEDALS, armyMedals, armyNextMedal, armyMedalSvg, ARMY_PER_NUMBER, armyPointsLeft };',
 ].join('\n'))();
 
 let fails = 0;
@@ -129,9 +129,13 @@ check('rütbe işareti: erde yok, onbaşıda bir şerit, çavuşta iki, subayda 
 check('kahraman askerken de sevimli: yanaklar ve gülüş aynı', ['<circle cx="82" cy="69" r="5" fill="#F79E9E"', 'stroke="#9A4A3C"'].every((x) => kara6.includes(x)));
 check('ekran okuyucu için numara ve askerlik çizimin adında', pre[0].includes('aria-label="Kelime kahramanı, güç 0, numara 37"') && kara0.includes(', asker, numara 120"'));
 
-// Veritabanındaki hesap (metin denetimi): hata tekrarı iki kat, 20'de bir; kelime kartı 8'de bir; yayın günü
-check('numaranın hesabı: (2 × hata tekrarı doğrusu + öteki doğrular + kelime kartı / 8 + klavye dersi) / 20, 2026-11-13\'ten',
-  sql.includes('floor((2 * r.mistake + r.other + p.paper + floor(w.words / 8.0) + t.lessons) / 20.0)') && (sql.match(/2026-11-13T00:00:00\+03:00/g) || []).length >= 3);
+// Veritabanındaki hesap (metin denetimi): hata tekrarı iki kat, 20 puanda bir; kelime kartı 5'te bir; yayın günü
+check('puan: hata tekrarı doğrusu 2, öteki doğru 1, 5 kelime kartı 1 (2026-11-15\'ten önce 8), klavye dersi 1; 20 puan bir numara; 2026-11-13\'ten; puan çocuğa da gelir',
+  sql.includes('(2 * r.mistake + r.other + p.paper + floor(w.words / 5.0) + t.lessons)::int') && sql.includes('public.hero_army_raw(sid, since, upto) / 20')
+  && sql.includes("'raw', public.hero_army_raw(") && (sql.match(/2026-11-13T00:00:00\+03:00/g) || []).length >= 4);
+check('sıradaki numaraya kalan puan: 55 puanda 5, 60\'ta 20 (yeni numara), puan bilinmiyorsa yok',
+  T.ARMY_PER_NUMBER === 20 && T.armyPointsLeft({ raw: 55 }) === 5 && T.armyPointsLeft({ raw: 60 }) === 20 && T.armyPointsLeft({ raw: 0 }) === 20
+  && T.armyPointsLeft({ raw: 97 }) === 3 && T.armyPointsLeft({ points: 4 }) === null && T.armyPointsLeft(null) === null);
 
 // Uzaylı savaşı (ikinci aşama): cephane, düşman, saklanma yerleri, son söz ve çizimler
 const B = new Function([

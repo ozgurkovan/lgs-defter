@@ -1,9 +1,11 @@
 /* Asker kahraman (velinin isteği, 2026-11-13: "üzerinde numaralar olabilir, takım numarası gibi, 100'e ulaştı mı asker
    olabilsin. Hangi ülkedense o ülkenin askerlerinden seçebilsin… rütbe almaya başlayacak"). Kahramanın göğsünde bir forma
-   numarası var; çalıştıkça artar, hiç azalmaz. 100 olunca çocuk kendi ülkesinin kollarından birini kendisi seçer
+   numarası var; çalıştıkça artar, hiç azalmaz (her 20 puan bir numara; çocuk sıradaki numaraya kalan puanı görür).
+   100 olunca çocuk kendi ülkesinin kollarından birini kendisi seçer
    (Türkiye: Kara, Deniz, Hava; ABD: Army, Navy, Air Force, Marines, Space Force), üniforması değişir ve numara arttıkça
-   rütbe alır. Numaranın hesabı velinin seçimi: hata tekrarında her 10 doğru +1, öteki sorularda her 20 doğru +1 (8 kelime
-   kartı ve yıldızlı her klavye dersi birer doğru); hesap veritabanında (supabase/hero-army.sql, hero_army_state), kol
+   rütbe alır. Numaranın hesabı velinin seçimi: hata tekrarında her 10 doğru +1, öteki sorularda her 20 doğru +1 (5 kelime
+   kartı, 2026-11-15'e kadar 8, ve yıldızlı her klavye dersi birer doğru); hesap veritabanında (supabase/hero-army.sql,
+   hero_army_state), kol
    seçimi de orada denetlenir (set_hero_corps). Veli çocuk başına açıp kapatır (Ayarlar → Günlük plan; besleme gibi 7.
    sınıfa kadar açık gelir), kolu sıfırlayabilir. Üniformalar bizim çizimimiz (app.js, HERO_UNIFORM): gerçek amblem yok.
    İkinci aşama: asker olan çocukta oturum ve deneme sonunda uzaylılarla kısa bir savaş oyunu (aşağıda, battleCard). */
@@ -11,6 +13,9 @@
 /* Asker: saf kısım (tools/test-army.mjs bunu dener) */
 
 const ARMY_SOLDIER = 100; // bu numarada asker olur
+const ARMY_PER_NUMBER = 20; // bir numara bu kadar puan (hata tekrarı doğrusu 2, öteki doğru 1, 5 kelime kartı 1)
+// Sıradaki numaraya kalan puan (st.raw: veritabanının puanı); puan bilinmiyorsa null.
+const armyPointsLeft = (st) => (Number.isFinite(st?.raw) ? ARMY_PER_NUMBER - (Math.max(0, st.raw) % ARMY_PER_NUMBER) : null);
 // Rütbelerin numaraları: Er 100'de; ilk terfiler sık, sonrakiler seyrek (günde 2 numarayla ilkleri 1–2 haftada bir,
 // en yüksek rütbe okul yılını aşan uzun bir hedef).
 const ARMY_STEPS = [100, 115, 135, 160, 190, 225, 265, 310, 360, 415, 475, 540, 620];
@@ -155,12 +160,14 @@ function armyLine(st) {
   }
   // Satır iki dilde kurulur (trEn): parçalı yazıyı İngilizce katman parça parça eşleştirince karıştırıyordu ("numara 47"
   // Türkçe harf taşımadığı için hiç çevrilmiyordu). Bugün artmadıysa o parça yok.
-  const next = armyNext(st.points, st.corps), medals = armyMedals(st.points), n = st.points;
+  const next = armyNext(st.points, st.corps), medals = armyMedals(st.points), n = st.points, left = armyPointsLeft(st);
   const rank = c ? armyRankName(st.corps, armyRank(n)) : '', nextRank = next && c ? armyRankName(st.corps, next.rank) : '';
   const tr = c ? [`🎖️ ${rank}`, `numara ${n}`, today ? `bugün +${today}` : '', next ? `${nextRank} için ${next.need}` : '']
-    : [`🎽 Forma numaran ${n}`, today ? `bugün +${today}` : '', medals ? `🏅 ${medals} madalya` : '', '100\'e ulaşınca asker olursun'];
+    : [`🎽 Forma numaran ${n}`, today ? `bugün +${today}` : '', medals ? `🏅 ${medals} madalya` : '',
+      left != null ? `sıradaki numaraya ${left} puan` : '100\'e ulaşınca asker olursun'];
   const en = c ? [`🎖️ ${rank}`, `number ${n}`, today ? `today +${today}` : '', next ? `${next.need} to ${nextRank}` : '']
-    : [`🎽 Jersey number ${n}`, today ? `today +${today}` : '', medals ? `🏅 ${medals} medal${medals === 1 ? '' : 's'}` : '', 'at 100 you become a soldier'];
+    : [`🎽 Jersey number ${n}`, today ? `today +${today}` : '', medals ? `🏅 ${medals} medal${medals === 1 ? '' : 's'}` : '',
+      left != null ? `${left} point${left === 1 ? '' : 's'} to the next number` : 'at 100 you become a soldier'];
   return h('p', { class: 'army-line small' }, trEn(tr.filter(Boolean).join(' · '), en.filter(Boolean).join(' · ')));
 }
 
@@ -234,14 +241,19 @@ function armyBadge(r, size = 40) {
 function armyCard(st, p, level, onChange) {
   const box = h('section', { class: 'card stack army-card', style: 'gap: 10px' });
   const c = armyCorps(st.corps), today = Math.max(0, st.points - (st.before || 0));
-  const how = h('p', { class: 'small muted' }, 'Numara nasıl artar? Hata tekrarında her 10 doğru cevap +1, öteki sorularda her 20 doğru cevap +1. '
-    + 'Kelime kartları ve klavye dersleri de katkı yapar. Numara hiç azalmaz.' + (today ? ` Bugün +${today}.` : ''));
+  const how = h('p', { class: 'small muted' }, 'Numara nasıl artar? Hata tekrarında her doğru cevap 2 puan, öteki sorularda her doğru cevap 1 puan, '
+    + 'her 5 kelime kartı ve yıldızlı her klavye dersi 1 puan. 20 puan bir numara. Numara hiç azalmaz.' + (today ? ` Bugün +${today}.` : ''));
+  // Sıradaki numaraya kalan puan (velinin isteği, 2026-11-15): her doğruda ilerlediğini görsün.
+  const left = armyPointsLeft(st);
+  const nextNum = left == null ? null : h('div', { class: 'stack', style: 'gap: 4px' },
+    h('div', { class: 'spread' }, h('span', { class: 'small' }, `Sıradaki numara: ${st.points + 1}`), h('span', { class: 'small muted num' }, `${left} puan kaldı`)),
+    h('div', { class: 'feed-bar army-bar army-next' }, h('i', { style: `width: ${Math.max(3, Math.round(((ARMY_PER_NUMBER - left) / ARMY_PER_NUMBER) * 100))}%` })));
   const bar = (share) => h('div', { class: 'feed-bar army-bar' }, h('i', { style: `width: ${Math.max(3, Math.round(share * 100))}%` }));
   if (!c && st.points < ARMY_SOLDIER) {
     fill(box, h('p', { class: 'label' }, 'Asker kahraman'),
       h('div', { class: 'spread' }, h('b', {}, `🎽 Forma numaran: ${st.points}`), h('span', { class: 'small muted num' }, `${st.points}/${ARMY_SOLDIER}`)),
       bar(st.points / ARMY_SOLDIER),
-      h('p', {}, `100 olunca asker olursun ve kolunu sen seçersin. ${ARMY_SOLDIER - st.points} numara kaldı.`), armyMedalBox(st), how);
+      h('p', {}, `100 olunca asker olursun ve kolunu sen seçersin. ${ARMY_SOLDIER - st.points} numara kaldı.`), nextNum, armyMedalBox(st), how);
     return box;
   }
   if (!c) {
@@ -280,6 +292,7 @@ function armyCard(st, p, level, onChange) {
       h('div', { class: 'stack', style: 'gap: 2px' }, h('b', { class: 'army-rank' }, armyRankName(st.corps, r)), h('span', { class: 'small muted num' }, `Numara ${st.points}`))),
     next ? [bar((st.points - from) / (next.at - from)), h('p', {}, `${armyRankName(st.corps, next.rank)} rütbesine ${next.need} numara kaldı.`)]
       : h('p', {}, 'En yüksek rütbedesin! 🎖️ Numaran artmaya devam eder.'),
+    nextNum,
     h('div', { class: 'army-ranks' }, ranks.map((name, i) => h('span', { class: 'chip army-step' + (i < r ? ' done' : i === r ? ' now' : ''), title: `${ARMY_STEPS[i]}` },
       armyBadge(i, 18), `${name} · ${ARMY_STEPS[i]}`))),
     armyMedalBox(st), how);

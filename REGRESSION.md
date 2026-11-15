@@ -247,7 +247,9 @@ Her maddenin yanında nasıl denendiği yazar:
 **Asker kahraman** (velinin isteği, 2026-11-13; `docs/army.js`, `supabase/hero-army.sql`) [O], ekran [A], kol seçimi [E]
 - Kahramanın göğsünde bir forma numarası var; çalıştıkça artar, hiç azalmaz. Hesap veritabanında (`hero_army_state`) [O]:
   hata tekrarında her 10 doğru +1, öteki sorularda (konu tekrarı, ek çalışma, deneme, kitap, konu çalışması, kâğıt
-  deneme) her 20 doğru +1; ilk denemede doğru 8 kelime kartı ve yıldızlı her klavye dersi birer "öteki doğru". Sayım
+  deneme) her 20 doğru +1; ilk denemede doğru 5 kelime kartı (2026-11-15'e kadar 8) ve yıldızlı her klavye dersi birer
+  "öteki doğru". Puan olarak: hata tekrarı doğrusu 2, öteki doğru 1; 20 puan bir numara. Kahramanın kartında "sıradaki
+  numaraya N puan", kahramanın sayfasında sıradaki numaranın çubuğu ve "N puan kaldı" (askerken de). Sayım
   2026-11-13'ten (yayın günü) başlar. Bugün kaç arttığı da görünür ("bugün +2").
 - Asker değilken numara göğsün ortasında (yıldızın ve "10"un yerinde); pelerinli seviyelerde amblem ya da madalya sola
   kayar, numara sağda. Pelerin, taç, şapka yerinde kalır. Asker kahraman kapalıyken çizim eskisiyle birebir aynıdır. [O]

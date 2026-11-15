@@ -2,8 +2,10 @@
 -- ulaşınca çocuk asker olur, kendi ülkesinin kollarından birini kendisi seçer (Türkiye: Kara, Deniz, Hava; ABD: Army,
 -- Navy, Air Force, Marines, Space Force), üniforması değişir ve numara arttıkça rütbe alır. Numara hiç azalmaz.
 -- Numaranın hesabı (velinin seçimi): hata tekrarında her 10 doğru +1, öteki sorularda (konu tekrarı, ek çalışma, deneme,
--- kitap, konu çalışması, kâğıt deneme) her 20 doğru +1; ilk denemede doğru 8 kelime kartı ve yıldızlı her klavye dersi
--- birer "öteki doğru" sayılır. Sayım 2026-11-13'ten (yayın günü) başlar: kimse ilk gün yığınla başlamaz.
+-- kitap, konu çalışması, kâğıt deneme) her 20 doğru +1; ilk denemede doğru 5 kelime kartı (2026-11-15'e kadar 8; velinin
+-- isteği: kelime kartına biraz daha değer) ve yıldızlı her klavye dersi birer "öteki doğru" sayılır. Puan olarak: hata
+-- tekrarı doğrusu 2, öteki doğru 1 puan; 20 puan bir numara (çocuk sıradaki numaraya kalan puanı görür).
+-- Sayım 2026-11-13'ten (yayın günü) başlar: kimse ilk gün yığınla başlamaz.
 -- Veli çocuk başına açıp kapatır (profiles.hero_army; boşsa 7. sınıfa kadar açık). Kapatıp açmak numarayı silmez.
 -- Kolu çocuk bir kez seçer (set_hero_corps, numara 100 olunca); veli sıfırlarsa yeniden seçer.
 alter table public.profiles add column if not exists hero_army boolean;
@@ -13,10 +15,11 @@ alter table public.profiles drop constraint if exists profiles_hero_corps_check;
 alter table public.profiles add constraint profiles_hero_corps_check
   check (hero_corps is null or hero_corps in ('kara', 'deniz', 'hava', 'army', 'navy', 'airforce', 'marines', 'spaceforce'));
 
--- Numara: since ile upto arasındaki çalışmadan. Yalnızca bu dosyadaki fonksiyonlar çağırır (dışarıya açık değil).
-create or replace function public.hero_army_points(sid uuid, since timestamptz, upto timestamptz)
+-- Puan: since ile upto arasındaki çalışmadan (hata tekrarı doğrusu 2, öteki doğru 1, 5 kelime kartı 1, yıldızlı klavye
+-- dersi 1). Numara: her 20 puan. Yalnızca bu dosyadaki fonksiyonlar çağırır (dışarıya açık değil).
+create or replace function public.hero_army_raw(sid uuid, since timestamptz, upto timestamptz)
 returns int language sql stable security definer set search_path = public as $$
-  select (floor((2 * r.mistake + r.other + p.paper + floor(w.words / 8.0) + t.lessons) / 20.0))::int
+  select (2 * r.mistake + r.other + p.paper + floor(w.words / 5.0) + t.lessons)::int
   from (select count(*) filter (where track = 'mistake') as mistake, count(*) filter (where track <> 'mistake') as other
         from reviews where student_id = sid and correct and not voided and answered_at >= since and answered_at < upto) r,
        (select count(*) as paper from exam_questions eq join exams e on e.id = eq.exam_id
@@ -26,15 +29,23 @@ returns int language sql stable security definer set search_path = public as $$
        (select count(*) as lessons from typing_results
         where student_id = sid and stars > 0 and lesson <> 'oyun' and created_at >= since and created_at < upto) t;
 $$;
+revoke all on function public.hero_army_raw(uuid, timestamptz, timestamptz) from public, anon, authenticated;
+grant execute on function public.hero_army_raw(uuid, timestamptz, timestamptz) to service_role;
+
+create or replace function public.hero_army_points(sid uuid, since timestamptz, upto timestamptz)
+returns int language sql stable security definer set search_path = public as $$
+  select (public.hero_army_raw(sid, since, upto) / 20)::int;
+$$;
 revoke all on function public.hero_army_points(uuid, timestamptz, timestamptz) from public, anon, authenticated;
 grant execute on function public.hero_army_points(uuid, timestamptz, timestamptz) to service_role;
 
--- Çocuğun numarası: şimdiki ve bugünden önceki (bugün kaç arttığı için; gün Türkiye saatiyle), seçtiği kol. Yalnızca
--- çocuğun kendisi ve velisi çağırabilir; başkasına null.
+-- Çocuğun numarası: şimdiki ve bugünden önceki (bugün kaç arttığı için; gün Türkiye saatiyle), puanı (raw: sıradaki
+-- numaraya kalan için), seçtiği kol. Yalnızca çocuğun kendisi ve velisi çağırabilir; başkasına null.
 create or replace function public.hero_army_state(sid uuid)
 returns jsonb language sql stable security definer set search_path = public as $$
   select case when public.can_edit_student(sid) is not true then null else jsonb_build_object(
     'points', public.hero_army_points(sid, '2026-11-13T00:00:00+03:00', now() + interval '1 minute'),
+    'raw', public.hero_army_raw(sid, '2026-11-13T00:00:00+03:00', now() + interval '1 minute'),
     'before', public.hero_army_points(sid, '2026-11-13T00:00:00+03:00',
       ((now() at time zone 'Europe/Istanbul')::date)::timestamp at time zone 'Europe/Istanbul'),
     'corps', (select hero_corps from profiles where id = sid),

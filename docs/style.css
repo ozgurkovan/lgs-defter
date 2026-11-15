@@ -546,6 +546,8 @@ td.wrap { white-space: normal; min-width: 160px; }
 .army-party-hero svg { width: 100%; height: 100%; display: block; }
 @media (prefers-reduced-motion: reduce) { .army-party-hero { animation: none; } }
 /* Madalyalar (army.js): asker kartında raf; kazanılan renkli, sıradaki kesik altın çerçeveli, kalanlar gri. */
+.army-bar.army-next { height: 8px; }
+.army-bar.army-next i { background: linear-gradient(90deg, #FFD166, #F4A261); }
 .army-medal { display: inline-block; flex: none; }
 .army-medal svg { width: 100%; height: 100%; display: block; }
 .army-medals { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
