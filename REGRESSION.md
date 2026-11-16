@@ -395,8 +395,10 @@ Her maddenin yanında nasıl denendiği yazar:
     uçarsa makine de gider ("💨 Çatı uçtu, buz makinesi de gitti."). [O]
   - Oyunda Ctrl'li kısayollar çalışmaz (Ctrl+R, Ctrl+P…); Ctrl+W ya da sayfayı yenileme tarayıcıda "çıkılsın mı?" sorar.
   - Bitişte puan, vurulan kelime, seviye, doğruluk, en iyi puan (bu tarayıcıda; "Yeni rekor!"), "Tekrar oyna".
-    Rekor uzaktan sıfırlanabilir (velinin isteği, 2026-11-16): öğrencinin hesabına 'oyun-sifir' satırı yazılınca Klavye
-    sayfası açılırken bu cihazdaki eski rekor silinir; satır ders değildir, harf, bronz ve numara taşımaz.
+    Rekor veritabanında (velinin isteği, 2026-11-16: tablet, telefon ve bilgisayarda aynı): her oyunun puanı oyun satırına
+    yazılır (typing_results.score), rekor en yüksek puandır; en son 'oyun-sifir' satırından önceki oyunlar sayılmaz (biri
+    çocuğun yerine oynadıysa o satır silinir ya da 'oyun-sifir' yazılır). Cihazdaki eski rekor bir kez silinir. Çocuk yalnız
+    kendi puanını yazar, eksi ya da çok büyük puan yazılamaz (test-game-score.sql). [O], ekran [A]
   - Pencere arka plana geçince oyun durur, bir harfe basınca sürer. Geri tuşu önce sorar. Oyunun sonucu yalnızca bronz sayımı için kaydedilir
     (kahramanı besleme).
 - Klavye kahramanı da büyütür. Kelime sayfası, mağaza ve rapor bunu sayar; güç arttıysa kutlama olur. Kahraman Klavye

@@ -329,6 +329,21 @@
       if (typingTab) check('Klavye sekmesi İngilizce\'nin solunda', labels.at(-3) === 'Klavye', labels.join(', '));
     }
 
+    // Kelime roketi rekoru veritabanından (velinin isteği, 2026-11-16: her cihazda aynı): Klavye sayfası açılınca okunan
+    // rekor, oyun satırlarının en yüksek puanı (son 'oyun-sifir' satırından sonra); cihazdaki eski rekor silinmiş. Salt okunur.
+    if (typingTab) {
+      go('typing'); await settle();
+      const s = sid();
+      const reset = (await sb.from('typing_results').select('created_at').eq('student_id', s).eq('lesson', 'oyun-sifir').order('created_at', { ascending: false }).limit(1)).data?.[0]?.created_at;
+      let qb = sb.from('typing_results').select('score').eq('student_id', s).eq('lesson', 'oyun').not('score', 'is', null).order('score', { ascending: false }).limit(1);
+      if (reset) qb = qb.gt('created_at', reset);
+      const direct = (await qb).data?.[0]?.score || 0;
+      let local = null;
+      try { local = localStorage.getItem(`defter.typingGameBest.${s}`); } catch (e) { local = null; }
+      check('Kelime roketi rekoru veritabanından: her cihazda aynı, cihazdaki eski rekor silinmiş', gameBest() === direct && local === null,
+        `sayfadaki ${gameBest()}, veritabanı ${direct}${local !== null ? ', cihazda eski kayıt var' : ''}`);
+    }
+
     // Klavye dersi: ders soru çözme gibi açılır (alt menü gizli), ekranda bütün tuşlar ve eller. F ve J'ye basınca yeni
     // tuşlar tanıtılır; doğru harf alttaki satırda yanar; yanlışta ⌫ yanıp söner, sağ serçe parmak ona uzanır; ⌫ siler.
     // Geri tuşu önce sorar, Klavye sayfasına döner. Ders bitmediği için hiçbir şey yazılmaz.

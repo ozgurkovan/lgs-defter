@@ -538,10 +538,8 @@ async function typingHero() {
 async function viewTyping() {
   loading();
   // feed: kahramanı besleme (feed.js); loadArmy: asker kahramanın numarası, kahramanın çizimi okur (army.js)
-  const [hero, feed, reset] = await Promise.all([typingHero(), loadFeed(state.student, false).catch(() => null), loadArmy().catch(() => null), gameResetAt()]);
-  // Rekor sıfırlama (velinin isteği, 2026-11-16: veli çocukla denerken rekoru kırmıştı): veritabanındaki 'oyun-sifir'
-  // satırından eski rekor bu cihazdan silinir. Satır ders değildir, harf ve bronz taşımaz.
-  if (reset && gameBestRec().at < reset) try { localStorage.removeItem(gameBestKey()); } catch (e) { /* gizli pencere */ }
+  // gameBestLoad: Kelime roketi rekoru veritabanından (her cihazda aynı).
+  const [hero, feed] = await Promise.all([typingHero(), loadFeed(state.student, false).catch(() => null), loadArmy().catch(() => null), gameBestLoad()]);
   const { best } = hero.typing;
   const goal = typingPerDay(state.student);
   const lessons = typingLessons(); // dilin dersleri: Türkçe ya da ABD
@@ -833,25 +831,35 @@ async function endTyping(run) {
 const GAME_COLORS = ['#F2738C', '#5AB0F0', '#F5A524', '#7ACB6A', '#A383F0']; // çatıların renkleri
 const fingerDot = (f) => h('span', { class: 'dot', style: `background: ${FINGER_COLOR[f]}` });
 // En iyi puan bu tarayıcıda, çocuğa göre tutulur (oyunun sonucu yalnızca bronz sayımı için kaydedilir: gameOver).
+// Kelime roketi rekoru (velinin isteği, 2026-11-16: tablet, telefon ve bilgisayarda aynı rekor): veritabanındaki oyun
+// satırlarının (lesson 'oyun', score) en yüksek puanı; en son 'oyun-sifir' satırından önceki oyunlar sayılmaz (biri çocuğun
+// yerine oynadıysa). Klavye sayfası açılırken ve oyun başlarken okunur, oyun bitince güncellenir; okunamazsa 0. Eskiden
+// rekor yalnızca cihazda (localStorage) duruyordu: o kayıt bir kez silinir.
 const gameBestKey = () => `defter.typingGameBest.${sid()}`;
-// Kelime roketi rekorunun en son sıfırlandığı an (ms; yoksa 0): 'oyun-sifir' satırı.
-const gameResetAt = () => sb.from('typing_results').select('created_at').eq('student_id', sid()).eq('lesson', 'oyun-sifir')
-  .order('created_at', { ascending: false }).limit(1).then(({ data }) => (data?.[0] ? Date.parse(data[0].created_at) : 0), () => 0);
-// Rekor bu cihazda saklanır: { s: puan, at: zaman } (eski kayıt yalnızca sayı, zamanı 0 sayılır).
-function gameBestRec() {
+let gameBestCache = { sid: null, best: 0 };
+async function gameBestLoad() {
+  const s = sid();
+  try { localStorage.removeItem(gameBestKey()); } catch (e) { /* gizli pencere */ }
   try {
-    const v = JSON.parse(localStorage.getItem(gameBestKey()) || '0');
-    return typeof v === 'number' ? { s: v || 0, at: 0 } : { s: +v?.s || 0, at: +v?.at || 0 };
-  } catch (e) { return { s: 0, at: 0 }; }
+    const reset = await sb.from('typing_results').select('created_at').eq('student_id', s).eq('lesson', 'oyun-sifir')
+      .order('created_at', { ascending: false }).limit(1);
+    let query = sb.from('typing_results').select('score').eq('student_id', s).eq('lesson', 'oyun').not('score', 'is', null)
+      .order('score', { ascending: false }).limit(1);
+    if (reset.data?.[0]?.created_at) query = query.gt('created_at', reset.data[0].created_at);
+    const { data, error } = await query;
+    if (!error && sid() === s) gameBestCache = { sid: s, best: Math.max(0, +data?.[0]?.score || 0) };
+  } catch (e) { /* okunamazsa önceki değer */ }
+  return gameBest();
 }
 function gameBest() {
-  return gameBestRec().s;
+  return gameBestCache.sid === sid() ? gameBestCache.best : 0;
 }
 
 // Oyun Klavye sayfasından açılır; ders gibi alt menü gizli, geri tuşu önce sorar. Pencere arka plana geçince durur, bir
 // harfe basınca sürer. game.spawn(tür: '', 'super' ya da 'ice') ve game.tick duman testi içindir.
 function runTypingGame(hero) {
   if (!gameWords(hero.typing.best).length) return;
+  if (gameBestCache.sid !== sid()) gameBestLoad(); // rekor okunmadıysa (bitişteki "Yeni rekor!" için)
   const game = {
     track: 'game', hero, words: gameWords(hero.typing.best), level: 1, hits: 0, score: 0, typed: 0, errors: 0,
     list: [], roofs: Array(GAME_ROOFS).fill(GAME_ROOF_HP), target: null, spawnIn: 1, last: 0, paused: false, over: false,
@@ -1349,12 +1357,12 @@ function gameOver(game) {
   game.detach();
   state.session = null;
   const best = gameBest(), record = game.score > best;
-  if (record) try { localStorage.setItem(gameBestKey(), JSON.stringify({ s: game.score, at: Date.now() })); } catch (e) { /* önemli değil */ }
+  if (record) gameBestCache = { sid: sid(), best: game.score };
   // Oyunun sonucu kaydedilir (ders adı 'oyun', yıldızsız): yazdığı harfler kahramanı besleyen bronza sayılır (feed.js,
   // günlük sınırla). Dersleri, yıldızları ve günün ders sayısını etkilemez (typingStats bilmediği dersi atlar).
   if (game.typed > 0) {
     sb.from('typing_results').insert({ student_id: sid(), lesson: 'oyun', chars: Math.min(20000, game.typed), errors: Math.min(20000, game.errors),
-      seconds: Math.min(86400, Math.round(game.play || 0)), stars: 0 }).then(() => {}, () => {});
+      seconds: Math.min(86400, Math.round(game.play || 0)), stars: 0, score: Math.min(10000000, Math.max(0, Math.round(game.score || 0))) }).then(() => {}, () => {});
   }
   const acc = Math.floor((100 * game.typed) / Math.max(1, game.typed + game.errors));
   game.kb.show({});
