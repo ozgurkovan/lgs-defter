@@ -58,12 +58,12 @@
       for (const tab of allowedTabs().filter((x) => !['konu', 'reasons'].includes(x))) {
         go(tab); await settle();
         if (tab === 'report') {
-          for (const c of [...document.querySelectorAll('#app .report-tabs .chip')]) {
+          for (const c of [...document.querySelectorAll('#app .report-bar .chip')]) {
             c.click(); await wait(250);
             const l = visibleTurkish();
             if (l.length) bad[`report:${c.dataset.tab}`] = l.slice(0, 3);
           }
-          [...document.querySelectorAll('#app .report-tabs .chip')].find((c) => c.dataset.tab === 'gun')?.click();
+          [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'gun')?.click();
         } else {
           if (tab === 'settings') { document.querySelectorAll('#app details').forEach((d) => { d.open = true; }); await wait(300); }
           const l = visibleTurkish();
@@ -104,7 +104,7 @@
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
-            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı', 'kahramanı besleme', 'açlığı dondur', 'asker kahraman'], together: ['birlikte bakılacaklar'] }
+            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı', 'kahramanı besleme', 'açlığı dondur', 'asker kahraman', 'tatilde günlük soru'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
     if (role === 'student' && wordsPerDay(state.student) > 0) {
       pages.words = ['kelime kartları', 'güç', 'mağaza'];
@@ -664,7 +664,7 @@
     // Rapor sekmeleri (2026-11-10): yedi sekme; yalnızca seçili sekmenin bölümleri görünür, seçim hatırlanır. Salt okunur.
     if (role !== 'student') {
       go('report'); await settle();
-      const chips = () => [...document.querySelectorAll('#app .report-tabs .chips .chip')];
+      const chips = () => [...document.querySelectorAll('#app .report-bar .chip')];
       const visible = () => [...document.querySelectorAll('#app .report-panel')].filter((p) => !p.hidden).map((p) => p.dataset.tab);
       const names = chips().map((c) => c.textContent);
       chips().find((c) => c.dataset.tab === 'denemeler')?.click(); await wait(100);
@@ -672,8 +672,11 @@
       go(role === 'parent' ? 'questions' : 'topics'); await settle(); go('report'); await settle();
       const remembered = visible().join() === 'denemeler';
       chips().find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
-      check('Rapor sekmeleri: yedi sekme, seçili olanın bölümleri görünür, seçim hatırlanır', names.length === 7 && afterClick && remembered && visible().join() === 'gun',
-        `${names.length} sekme: ${names.join(' | ')}; görünen ${visible().join()}`);
+      // Sekmeler başlığın hemen altında (2026-11-16).
+      const top = document.querySelector('#app header')?.nextElementSibling?.classList.contains('report-bar');
+      check('Rapor sekmeleri: yedi sekme, başlığın hemen altında; seçili olanın bölümleri görünür, seçim hatırlanır',
+        names.length === 7 && top && afterClick && remembered && visible().join() === 'gun',
+        `${names.length} sekme: ${names.join(' | ')}; görünen ${visible().join()}${top ? '' : '; sekmeler üstte değil'}`);
     }
 
     // Mesaj kutusu (2026-11-10): yalnızca son mesaj görünür, okudu ya da okumadı etiketiyle. Salt okunur.
@@ -689,7 +692,7 @@
     // açılır, soru metni yüklenir; yeniden dokununca kapanır. Salt okunur. Çalıştığı bir gün yoksa atlanır.
     if (role !== 'student') {
       go('report'); await settle();
-      [...document.querySelectorAll('#app .report-tabs .chip')].find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
+      [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
       const dayBox = () => [...document.querySelectorAll('#app h2')].find((x) => x.textContent === 'Gün gün çalışma')?.parentElement;
       for (let i = 0; i < 40 && !dayBox(); i++) await wait(150);
       // Sayı olan en yakın güne git (en çok 10 gün geri).
@@ -710,7 +713,7 @@
           !shown ? (panel?.textContent || 'panel yok').slice(0, 80) : '');
       } else check('Rapor: tablodaki sayılar', true, 'son günlerde soru çözülmemiş, atlandı');
       // Derslere göre yanlış ve boş (2026-11-10): çubuğun sayısına dokununca o dersin soruları konuya göre, en yeniden eskiye açılır.
-      [...document.querySelectorAll('#app .report-tabs .chip')].find((c) => c.dataset.tab === 'denemeler')?.click(); await wait(100);
+      [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'denemeler')?.click(); await wait(100);
       const subjBtn = document.querySelector('#app .bar-btn');
       if (subjBtn) {
         subjBtn.click();
@@ -724,7 +727,7 @@
       } else check('Rapor: derse göre yanlış sayısı', true, 'deneme yanlışı yok, atlandı');
       // Zayıf konular (2026-11-09): "Yanlış soruları göster" o konunun yanlış sorularını kartın altında açar (soru metni,
       // şıklar ya da deneme fotoğrafı); yeniden dokununca kapanır. Salt okunur.
-      [...document.querySelectorAll('#app .report-tabs .chip')].find((c) => c.dataset.tab === 'zayif')?.click(); await wait(100);
+      [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'zayif')?.click(); await wait(100);
       const weakBtn = [...document.querySelectorAll('#app button')].find((x) => /^Yanlış soruları göster \(\d+\)$/.test(x.textContent));
       if (weakBtn) {
         weakBtn.scrollIntoView({ block: 'center' }); weakBtn.click();

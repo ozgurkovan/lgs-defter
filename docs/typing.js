@@ -538,7 +538,10 @@ async function typingHero() {
 async function viewTyping() {
   loading();
   // feed: kahramanı besleme (feed.js); loadArmy: asker kahramanın numarası, kahramanın çizimi okur (army.js)
-  const [hero, feed] = await Promise.all([typingHero(), loadFeed(state.student, false).catch(() => null), loadArmy().catch(() => null)]);
+  const [hero, feed, reset] = await Promise.all([typingHero(), loadFeed(state.student, false).catch(() => null), loadArmy().catch(() => null), gameResetAt()]);
+  // Rekor sıfırlama (velinin isteği, 2026-11-16: veli çocukla denerken rekoru kırmıştı): veritabanındaki 'oyun-sifir'
+  // satırından eski rekor bu cihazdan silinir. Satır ders değildir, harf ve bronz taşımaz.
+  if (reset && gameBestRec().at < reset) try { localStorage.removeItem(gameBestKey()); } catch (e) { /* gizli pencere */ }
   const { best } = hero.typing;
   const goal = typingPerDay(state.student);
   const lessons = typingLessons(); // dilin dersleri: Türkçe ya da ABD
@@ -831,8 +834,18 @@ const GAME_COLORS = ['#F2738C', '#5AB0F0', '#F5A524', '#7ACB6A', '#A383F0']; // 
 const fingerDot = (f) => h('span', { class: 'dot', style: `background: ${FINGER_COLOR[f]}` });
 // En iyi puan bu tarayıcıda, çocuğa göre tutulur (oyunun sonucu yalnızca bronz sayımı için kaydedilir: gameOver).
 const gameBestKey = () => `defter.typingGameBest.${sid()}`;
+// Kelime roketi rekorunun en son sıfırlandığı an (ms; yoksa 0): 'oyun-sifir' satırı.
+const gameResetAt = () => sb.from('typing_results').select('created_at').eq('student_id', sid()).eq('lesson', 'oyun-sifir')
+  .order('created_at', { ascending: false }).limit(1).then(({ data }) => (data?.[0] ? Date.parse(data[0].created_at) : 0), () => 0);
+// Rekor bu cihazda saklanır: { s: puan, at: zaman } (eski kayıt yalnızca sayı, zamanı 0 sayılır).
+function gameBestRec() {
+  try {
+    const v = JSON.parse(localStorage.getItem(gameBestKey()) || '0');
+    return typeof v === 'number' ? { s: v || 0, at: 0 } : { s: +v?.s || 0, at: +v?.at || 0 };
+  } catch (e) { return { s: 0, at: 0 }; }
+}
 function gameBest() {
-  try { return +localStorage.getItem(gameBestKey()) || 0; } catch (e) { return 0; }
+  return gameBestRec().s;
 }
 
 // Oyun Klavye sayfasından açılır; ders gibi alt menü gizli, geri tuşu önce sorar. Pencere arka plana geçince durur, bir
@@ -1336,7 +1349,7 @@ function gameOver(game) {
   game.detach();
   state.session = null;
   const best = gameBest(), record = game.score > best;
-  if (record) try { localStorage.setItem(gameBestKey(), String(game.score)); } catch (e) { /* önemli değil */ }
+  if (record) try { localStorage.setItem(gameBestKey(), JSON.stringify({ s: game.score, at: Date.now() })); } catch (e) { /* önemli değil */ }
   // Oyunun sonucu kaydedilir (ders adı 'oyun', yıldızsız): yazdığı harfler kahramanı besleyen bronza sayılır (feed.js,
   // günlük sınırla). Dersleri, yıldızları ve günün ders sayısını etkilemez (typingStats bilmediği dersi atlar).
   if (game.typed > 0) {
@@ -1363,9 +1376,9 @@ function gameOver(game) {
 function typingBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
   (async () => {
-    // Kelime roketinin sonuçları (ders adı 'oyun') ders değildir; burada sayılmaz.
+    // Kelime roketinin sonuçları (ders adı 'oyun') ve rekor sıfırlama satırı ('oyun-sifir') ders değildir; burada sayılmaz.
     const rows = (await q(sb.from('typing_results').select('lesson, chars, errors, seconds, stars, misses, created_at').eq('student_id', sid())
-      .order('created_at', { ascending: false }).limit(500))).filter((r) => r.lesson !== 'oyun');
+      .order('created_at', { ascending: false }).limit(500))).filter((r) => r.lesson !== 'oyun' && r.lesson !== 'oyun-sifir');
     if (!rows.length) return;
     const stats = typingStats(rows, typingPerDay(state.student));
     // Çocuğun dersleri: son dersi ABD dersiyse ABD dersleri (ABD öğrencisi), değilse Türkçe dersler.

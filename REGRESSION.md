@@ -101,6 +101,13 @@ Her maddenin yanında nasıl denendiği yazar:
 - Ders kutularının üstünde "Günde toplam" kutusu (velinin isteği, 2026-11-12): toplam değişince dersler en son elle girilen
   oranla dağılır (yuvarlama en büyük kalanla, toplam tam tutar; ders başına en fazla 60). Bir dersi elle değiştirince toplam
   kendiliğinden güncellenir. Kaydet'e basmadan hiçbir şey kaydedilmez. [A]
+- **Okul tatilleri** (velinin isteği, 2026-11-16: "tatillerde soru sayısını artırmamız lazım"): tatil günlerinde her dersin
+  sayısı katlanır (ders başına en fazla 60). Türkiye'de MEB 2026-2027 takvimi hazır: 1. ara tatil 14–22 Kasım 2026, yarıyıl
+  23 Ocak–7 Şubat 2027, 2. ara tatil 6–14 Mart 2027 (çevredeki hafta sonları dahil); ABD'de yalnızca velinin eklediği
+  günler. Veli Günlük plan'da "Tatilde günlük soru": Aynı kalsın / 1,5 kat / 2 kat (önerilen, seçilmezse bu) / 3 kat;
+  yaklaşan tatiller listede, kendi tatil günlerini ekler ve siler; Kaydet ile kaydedilir. Öğrencinin ana sayfasında
+  selamın altında "🏖️ 1. dönem ara tatili: bugün hedefin 2 kat, 70 soru." Bronz fiyatları ve ikramiye normal planla. Ayarları
+  öğrenci değiştiremez (test-holidays.sql). [O], ekran [A]
 - Bir dersin hakkı bir konu tekrarından küçükse o dersin günün ilk tekrarı yine tam yapılır.
 - Hata tekrarı 1, 2, 4, 14 ve 30 gün sonra gelir; her yanlışa üç benzer soru yazılır, sorunun kendisi değil.
 - Aralık, "tamamen eminim" ya da "büyük ölçüde eminim" ile ipucusuz ve süresinde doğru bilinince uzar; büyük ölçüde emin
@@ -120,6 +127,8 @@ Her maddenin yanında nasıl denendiği yazar:
 - Yanlıştan sonra "Çözümü anladın mı? Anladım / Anlamadım". Hata tekrarında "Benzer soru" etiketi.
 - "Bu konuyu okulda henüz işlemedik" düğmesi önce sorar (velinin isteği, 2026-11-09): pencerede konunun adı, öne çıkan
   "Vazgeç, soruyu çözeceğim" ve "Evet, henüz işlemedik". Evet denirse konu bekletilir; vazgeçilirse soru yerinde kalır. [A]
+  Konu tekrarında, hata tekrarında ve ek çalışmada çıkar (velinin sorusu, 2026-11-16: denemedeki yanlışlar konusu
+  işlenmemiş olsa da hata tekrarına girer); kitap soruları ve konu çalışmasında yok. Konu "işlendi" olunca sorular geri gelir.
 - "Soruda sorun var": cevap yanlış, soru hatalı ya da anlaşılmıyor seçilirse açıklama yazmak zorunlu. "Gönder" önce sorar:
   ne bildirdiğini ve sonucunu söyler ("Soru kontrol edilecek ve sana sayılmayacak"); "Evet, bildir" ya da "Vazgeç". [A]
 - Konu tekrarında ya da ek çalışmada yanlış yapılan soru hata tekrarına girer.
@@ -386,6 +395,8 @@ Her maddenin yanında nasıl denendiği yazar:
     uçarsa makine de gider ("💨 Çatı uçtu, buz makinesi de gitti."). [O]
   - Oyunda Ctrl'li kısayollar çalışmaz (Ctrl+R, Ctrl+P…); Ctrl+W ya da sayfayı yenileme tarayıcıda "çıkılsın mı?" sorar.
   - Bitişte puan, vurulan kelime, seviye, doğruluk, en iyi puan (bu tarayıcıda; "Yeni rekor!"), "Tekrar oyna".
+    Rekor uzaktan sıfırlanabilir (velinin isteği, 2026-11-16): öğrencinin hesabına 'oyun-sifir' satırı yazılınca Klavye
+    sayfası açılırken bu cihazdaki eski rekor silinir; satır ders değildir, harf, bronz ve numara taşımaz.
   - Pencere arka plana geçince oyun durur, bir harfe basınca sürer. Geri tuşu önce sorar. Oyunun sonucu yalnızca bronz sayımı için kaydedilir
     (kahramanı besleme).
 - Klavye kahramanı da büyütür. Kelime sayfası, mağaza ve rapor bunu sayar; güç arttıysa kutlama olur. Kahraman Klavye
@@ -491,6 +502,8 @@ Her maddenin yanında nasıl denendiği yazar:
   derslere ve soru tipine göre, kavram yanılgıları) · Zayıf konular (özel derste çalışılacaklar, derse göre gruplu zayıf
   konular ve "Yanlışlar nereden geliyor?") · Son 14 gün (ve önümüzdeki 7 gün) · Yüklemeler (ve saatlik görevin son çalışması) · Kelime, Klavye,
   Kitap. Seçilen sekme bu tarayıcıda hatırlanır. Hiçbir bölüm kaldırılmadı, yalnızca sekmelere taşındı. [A]
+  Sekme düğmeleri başlığın hemen altında (velinin isteği, 2026-11-16: "en üste getir"); bölümün kendisi özet, mesaj ve
+  birlikte bakılacaklardan sonra gelir, sekmeye dokununca sayfa oraya kayar. [A]
 - Özet kutuları.
 - "… mesaj bırak":
   - tatlı söz ya da şaka önerisi, imza;

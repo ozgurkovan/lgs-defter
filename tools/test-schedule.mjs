@@ -7,6 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(join(root, 'docs', 'app.js'), 'utf8');
 const pick = (from, to) => src.slice(src.indexOf(from), src.indexOf(to));
 const code = [
+  "const isUsCurriculum = (p) => /^us/.test(p?.curriculum || ''); const LANG = 'tr';",
   pick('const SUBJECTS', '// Hata takibi:'),
   pick('const MISTAKE_LADDER', 'const REASONS'),
   pick('function localDate', 'function fmtDate'),
@@ -15,10 +16,10 @@ const code = [
   pick('/* Tekrar zamanı: FSRS', 'const wordsPerDay'),
   pick('/* Kelime kahramanı', '// Mağaza:'),
   'return { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins, heroBest, heroPower, heroCap,'
-    + ' studentCurriculum, isLgsStudent, studentSubjects };',
+    + ' studentCurriculum, isLgsStudent, studentSubjects, dailyPlanToday, holidayOn, holidayFactor, holidayList };',
 ].join('\n');
 const { gradeItem, localDate, addDays, SUBJECTS, examOrder, dailyPlan, planTotal, nextWordBox, nextWordState, wordDays, fitWordScale, heroLevel, heroCoins, heroBest, heroPower, heroCap,
-  studentCurriculum, isLgsStudent, studentSubjects } = new Function(code)();
+  studentCurriculum, isLgsStudent, studentSubjects, dailyPlanToday, holidayOn, holidayFactor, holidayList } = new Function(code)();
 
 // Soru süreleri LGS oturum sürelerine eşit olmalı: sözel 50 soru / 75 dk, sayısal 40 soru / 80 dk.
 const counts = { turkce: 20, inkilap: 10, din: 10, ingilizce: 10, matematik: 20, fen: 20 };
@@ -191,5 +192,24 @@ check('LGS yalnızca Türkiye müfredatındaki 8. sınıfta', isLgsStudent({ gra
 const usPlan = dailyPlan({ grade: 8, curriculum: 'us-pa', daily_questions: 30 });
 check('başka müfredatta LGS dersleri ve LGS planı kullanılmaz', !studentSubjects({ grade: 8, curriculum: 'us-pa' }).includes('inkilap')
   && studentSubjects({ grade: 8 }).includes('inkilap') && planTotal(usPlan) === 30 && !('inkilap' in usPlan), JSON.stringify(usPlan));
+
+// Okul tatilleri (velinin isteği, 2026-11-16): tatil günlerinde plan katlanır; Türkiye'de MEB takvimi hazır, ABD'de yalnızca
+// velinin eklediği günler; kat seçilmediyse 2, 1 kapalı, en çok 3; ders başına en fazla 60.
+const omer = { grade: 4, daily_questions: 35 };
+const hol = dailyPlanToday(omer, '2026-11-18'), norm = dailyPlanToday(omer, '2026-11-25');
+check('tatilde (ara tatil 18 Kasım) günlük plan 2 kat, tatil bitince normal; kat seçilmediyse 2',
+  planTotal(hol.plan) === 70 && hol.factor === 2 && hol.holiday?.name === '1. dönem ara tatili' && planTotal(norm.plan) === 35 && norm.holiday === null
+  && holidayFactor({}) === 2, `${planTotal(hol.plan)} / ${planTotal(norm.plan)}`);
+check('ara tatilin hafta sonları dahil (14 ve 22 Kasım), 13 ve 23 Kasım değil; yarıyıl ve 2. ara tatil de var',
+  !!holidayOn(omer, '2026-11-14') && !!holidayOn(omer, '2026-11-22') && !holidayOn(omer, '2026-11-13') && !holidayOn(omer, '2026-11-23')
+  && !!holidayOn(omer, '2027-01-27') && !!holidayOn(omer, '2027-03-10'));
+check('velinin seçtiği kat: 1 kapalı, 1,5 kat, en çok 3; ders başına en fazla 60',
+  planTotal(dailyPlanToday({ ...omer, holiday_factor: 1 }, '2026-11-18').plan) === 35 && dailyPlanToday({ ...omer, holiday_factor: 1 }, '2026-11-18').holiday === null
+  && dailyPlanToday({ ...omer, holiday_factor: 1.5 }, '2026-11-18').factor === 1.5 && holidayFactor({ holiday_factor: 9 }) === 3
+  && Object.values(dailyPlanToday({ grade: 8, daily_by_subject: { turkce: 50, matematik: 40 }, holiday_factor: 3 }, '2026-11-18').plan).every((n) => n <= 60));
+check('ABD için MEB takvimi yok, velinin eklediği günler geçerli; bozuk tarih sayılmaz',
+  !holidayOn({ curriculum: 'us-pa' }, '2026-11-18') && !!holidayOn({ curriculum: 'us-pa', holidays: [{ from: '2026-11-26', to: '2026-11-27' }] }, '2026-11-27')
+  && holidayList({ curriculum: 'us-pa', holidays: [{ from: 'x', to: '2026-11-27' }, { from: '2026-12-02', to: '2026-12-01' }, null] }).length === 0
+  && !!holidayOn({ holidays: [{ from: '2026-12-24', to: '2026-12-26' }] }, '2026-12-25'));
 
 process.exit(fails ? 1 : 0);

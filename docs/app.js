@@ -84,6 +84,30 @@ function dailyPlan(p) {
   return plan;
 }
 const planTotal = (plan) => Object.values(plan).reduce((n, v) => n + (v || 0), 0);
+
+// Okul tatilleri (velinin isteği, 2026-11-16: "tatillerde soru sayısını artırmamız lazım… bu hafta için otomatik 2 kat"):
+// tatil günlerinde günlük plan katlanır (velinin seçtiği kat; seçmediyse 2, 1 = kapalı; ders başına en fazla 60).
+// Türkiye'de MEB 2026-2027 takvimi hazır (ara tatillerin ve yarıyılın çevresindeki hafta sonları dahil); veli kendi tatil
+// günlerini de ekler (ABD'de okul takvimi bölgeye göre değiştiği için yalnızca velinin eklediği günler). Bronz fiyatları
+// ve kahramanın ikramiyesi normal planla hesaplanır (feed.js dailyPlan'ı kullanır).
+const HOLIDAYS_TR = [
+  { from: '2026-11-14', to: '2026-11-22', name: '1. dönem ara tatili' },
+  { from: '2027-01-23', to: '2027-02-07', name: 'Yarıyıl tatili' },
+  { from: '2027-03-06', to: '2027-03-14', name: '2. dönem ara tatili' },
+];
+const HOLIDAY_FACTORS = [1, 1.5, 2, 3];
+const holidayFactor = (p) => { const f = Number(p?.holiday_factor); return p?.holiday_factor != null && Number.isFinite(f) && f >= 1 ? Math.min(3, f) : 2; };
+const holidayDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+const holidayList = (p) => [...(typeof isUsCurriculum === 'function' && isUsCurriculum(p) ? [] : HOLIDAYS_TR),
+  ...(Array.isArray(p?.holidays) ? p.holidays.filter((x) => x && holidayDay(x.from) && holidayDay(x.to) && x.from <= x.to) : [])];
+const holidayOn = (p, day = localDate()) => holidayList(p).find((x) => x.from <= day && day <= x.to) || null;
+// Bugünün planı: tatildeyse her dersin sayısı kat kadar. { plan, holiday, factor }
+function dailyPlanToday(p, day = localDate()) {
+  const plan = dailyPlan(p), holiday = holidayOn(p, day), factor = holidayFactor(p);
+  if (!holiday || factor <= 1) return { plan, holiday: null, factor: 1 };
+  return { plan: Object.fromEntries(Object.entries(plan).map(([s, n]) => [s, Math.min(60, Math.round(n * factor))])), holiday, factor };
+}
+const fmtFactor = (f) => String(f).replace('.', LANG === 'en' ? '.' : ',');
 // Toplamı derslere oranla dağıtır (en büyük kalan yöntemi; ders başına en fazla 60). base hep sıfırsa eşit dağıtır.
 function planSplit(base, subjects, total) {
   const cap = 60;
@@ -1020,7 +1044,7 @@ async function viewHome() {
   // Günlük plan derse göre soru sayısıdır. Önce hata tekrarları, sonra konu tekrarları hakkı kullanır;
   // kalan hak ek çalışmayla dolar. Kitap soruları ve öğrencinin kendi seçtiği konu çalışması bu sayılara girmez
   // (o gün konu çalıştı diye günü gelen tekrarlar ertelenmesin).
-  const plan = dailyPlan(state.student);
+  const { plan, holiday, factor: holidayX } = dailyPlanToday(state.student); // tatilde katlanır
   const dailyTarget = planTotal(plan);
   const remaining = { ...plan };
   const planCount = todayCount.filter((r) => r.track !== 'book' && r.track !== 'practice' && r.track !== 'check'); // check: velinin benzer soru denemesi
@@ -1090,7 +1114,8 @@ async function viewHome() {
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })),
       h('h1', {}, playfulGreeting(name) || (name ? `${hello}, ${name}` : hello)),
-      isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null),
+      isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null,
+      holiday ? h('p', { class: 'small muted holiday-line' }, `🏖️ ${holiday.name}: bugün hedefin ${fmtFactor(holidayX)} kat, ${dailyTarget} soru.`) : null),
     // Kahramanı besleme açıksa kahraman burada konuşur: acıkınca yardım ister, çalışmaya çağırır (feed.js). Kapalıysa görünmez.
     feedHomeCard(),
     // Mesaj yoksa ara sıra (üç girişte bir kadar) bir fıkra, bilmece ya da şiir; gün yorucu geçmesin.
@@ -1466,7 +1491,8 @@ function showQuestion() {
     feedback,
     h('div', { class: 'row', style: 'justify-content: space-between' },
       reportLink,
-      entry.item.track === 'topic' ? notTaughtBtn : null),
+      // Hata tekrarında da (velinin sorusu, 2026-11-16: denemedeki yanlışlar konusu işlenmemiş olsa da hata tekrarına girer).
+      ['topic', 'mistake', 'extra'].includes(ss.track) && ['topic', 'mistake'].includes(entry.item.track) ? notTaughtBtn : null),
     report);
 }
 
@@ -4222,6 +4248,8 @@ function planSection(p) {
     const typingRow = switchRow('Klavye dersleri (Klavye sekmesi)', typingPerDay(p) > 0, typingPerDay(p), 10, 2,
       'Aile isterse açar, her sınıfta. On parmak klavye: ekranda klavye ve eller, hangi parmağın hangi tuşa basacağı yanar. '
         + 'Bilgisayarda yapılır, telefonda sekme görünmez. Açıkken günde kaç ders? Kazandığı yıldızlar kelime kahramanını güçlendirir.', '1px');
+    // Okul tatilleri (velinin isteği, 2026-11-16): tatilde günlük soru kaç kat; Türkiye takvimi ve velinin ekledikleri.
+    const holidayRow = holidaySetting(p);
     // Kahramanı besleme (velinin isteği): çocuk başına açılır, hastalıkta ve tatilde açlık dondurulur (feed.js).
     const feedRow = feedSetting(p);
     // Asker kahraman (velinin isteği, 2026-11-13): çocuk başına açılır; seçtiği kol sıfırlanabilir (army.js).
@@ -4229,7 +4257,7 @@ function planSection(p) {
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
-      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value(), ...feedRow.value(), ...armyRow.value() };
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value(), ...holidayRow.value(), ...feedRow.value(), ...armyRow.value() };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;
@@ -4237,6 +4265,7 @@ function planSection(p) {
       subjects.forEach((s) => { inputs[s].value = by[s]; });
       wordsRow.show(upd.daily_words);
       typingRow.show(upd.daily_typing);
+      holidayRow.show();
       feedRow.show();
       armyRow.show();
       update();
@@ -4249,7 +4278,7 @@ function planSection(p) {
         + (days ? `, çalıştığı ${days} günde ortalama ${fmtMinutes(sum('week') / days)}.` : '.')),
       h('p', { class: 'small muted' }, 'Her dersten günde en fazla kaç soru gelsin? Önce hata tekrarları, sonra konu tekrarları gelir; kalan sayı en zayıf konulardan ek çalışmayla dolar. Süre, soruyu açtığı andan şıkkı seçtiği ana kadar ölçülür.'),
       h('div', { class: 'spread', style: 'padding: 8px 0' }, h('label', {}, h('b', {}, 'Günde toplam'), h('span', { class: 'small muted' }, ' · değiştirince derslere aynı oranla dağılır')), totalInput),
-      rowsEl, totalLine, wordsRow, typingRow, feedRow, armyRow, save);
+      rowsEl, totalLine, holidayRow, wordsRow, typingRow, feedRow, armyRow, save);
   })().catch(() => fill(box, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yüklenemedi, sayfayı yenile.')));
   return box;
 }
@@ -4493,6 +4522,55 @@ function familySection() {
       kids.length ? addForm('teacher') : null);
   }).catch((e) => fill(box, h('h2', {}, 'Aile'), h('p', { class: 'error small' }, e.message)));
   return box;
+}
+
+// Velinin Günlük planındaki tatil satırı: tatilde günlük soru kaç kat (aynı, 1,5, 2, 3 kat), yaklaşan tatiller (Türkiye
+// takvimi ve velinin ekledikleri), velinin kendi tatil günlerini eklemesi ve silmesi. Kaydet düğmesiyle kaydedilir.
+function holidaySetting(p) {
+  const sel = h('select', { 'aria-label': 'Tatilde günlük soru' },
+    HOLIDAY_FACTORS.map((f) => h('option', { value: String(f) }, f === 1 ? 'Aynı kalsın' : f === 2 ? '2 kat (önerilen)' : trEn(`${fmtFactor(f)} kat`, `${fmtFactor(f)}×`))));
+  let custom = [];
+  const from = h('input', { type: 'date', 'aria-label': 'Tatilin ilk günü' }), to = h('input', { type: 'date', 'aria-label': 'Tatilin son günü' });
+  const list = h('div', { class: 'stack', style: 'gap: 2px' });
+  const range = (x) => (x.from === x.to ? fmtDate(x.from) : `${fmtDate(x.from)} – ${fmtDate(x.to)}`);
+  const paintList = () => {
+    const today = localDate(), school = holidayList({ ...p, holidays: [] }).filter((x) => x.to >= today);
+    fill(list,
+      school.map((x) => h('p', { class: 'small' }, `📅 ${x.name}: ${range(x)}` + (x.from <= today ? ' · şimdi' : ''))),
+      custom.filter((x) => x.to >= today).map((x) => h('div', { class: 'spread small' }, h('span', {}, `🏖️ Eklediğiniz tatil: ${range(x)}` + (x.from <= today ? ' · şimdi' : '')),
+        h('button', { class: 'ghost small', onclick: () => { custom = custom.filter((y) => y !== x); paintList(); } }, 'Sil'))),
+      !school.length && !custom.some((x) => x.to >= today) ? h('p', { class: 'small muted' }, 'Yaklaşan tatil yok.') : null);
+  };
+  const paint = () => {
+    sel.value = String(holidayFactor(p));
+    custom = Array.isArray(p.holidays) ? p.holidays.filter((x) => x && holidayDay(x.from) && holidayDay(x.to)) : [];
+    paintList();
+  };
+  const add = h('button', { class: 'small', onclick: () => {
+    if (!from.value || !to.value || from.value > to.value) return toast('Tatilin ilk ve son gününü seç.');
+    if (custom.length >= 30) return toast('En fazla 30 tatil eklenebilir.');
+    custom.push({ from: from.value, to: to.value });
+    from.value = '';
+    to.value = '';
+    paintList();
+  } }, 'Ekle');
+  paint();
+  const row = h('div', { class: 'stack', style: 'gap: 6px; padding: 10px 0 4px; border-top: 1px solid var(--rule)' },
+    h('div', { class: 'spread' }, h('label', {}, h('b', {}, 'Tatilde günlük soru')), sel),
+    h('p', { class: 'small muted' }, isUsCurriculum(p)
+      ? 'Okul tatili günlerinde her dersin sayısı bu kadar katlanır (ders başına en fazla 60). Okul takviminiz bölgeye göre değiştiği için tatil günlerini siz ekleyin.'
+      : 'Okul tatili günlerinde her dersin sayısı bu kadar katlanır (ders başına en fazla 60). MEB takvimindeki tatiller hazır; başka günler de ekleyebilirsiniz.'),
+    list,
+    h('div', { class: 'row small', style: 'gap: 6px; flex-wrap: wrap' }, from, h('span', {}, '–'), to, add));
+  row.value = () => {
+    const upd = {}, f = Number(sel.value);
+    if (f !== holidayFactor(p) || (p.holiday_factor == null && f !== 2)) upd.holiday_factor = f;
+    const was = JSON.stringify(Array.isArray(p.holidays) ? p.holidays : []);
+    if (JSON.stringify(custom) !== was) upd.holidays = custom.length ? custom : null;
+    return upd;
+  };
+  row.show = paint;
+  return row;
 }
 
 // ---------------------------------------------------------------- sorular (veli ve öğretmen)
@@ -5178,25 +5256,30 @@ async function viewReport() {
       `hatalı bulunan ${feedbackRows.filter((f) => f.verdict === 'soru_hatali').length}.`) : null,
     runs[0] ? h('p', { class: 'small muted' }, `Saatlik görev en son ${new Date(runs[0].started_at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })} çalıştı.`) : null);
 
+  // Rapor bölümleri sekmelerde (velinin isteği, 2026-11-10): sayfa çok uzamıştı. Seçilen sekme bu tarayıcıda hatırlanır.
+  const tabs = reportTabs([
+    ['gun', 'Gün gün çalışma', () => [dayReport(reviews30, items, topicName)]],
+    ['bildirdikleri', 'Bildirdiği sorular', () => [reportedBox(), poemBox()]],
+    ['denemeler', 'Denemeler', () => [h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable), subjects, styles, misconceptions]],
+    ['zayif', 'Zayıf konular', () => [gapCards, weakCards, causes, pastNoteCards]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
+    ['son14', 'Son 14 gün', () => [perf, load]],
+    ['yuklemeler', 'Yüklemeler', () => [job]],
+    ['diger', 'Kelime · Klavye · Kitap', () => [wordBox(), typingBox(), booksBox()]],
+  ]);
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, isTeacherView() ? 'Öğretmen görünümü' : 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
+    // Sekmeler başlığın hemen altında (velinin isteği, 2026-11-16: "en üste getir, görünmüyor altlarda"); bölümün kendisi
+    // özet, mesaj ve birlikte bakılacaklardan sonra gelir, sekmeye dokununca oraya kayar.
+    tabs.bar,
     tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows),
-    // Rapor bölümleri sekmelerde (velinin isteği, 2026-11-10): sayfa çok uzamıştı. Seçilen sekme bu tarayıcıda hatırlanır.
-    reportTabs([
-      ['gun', 'Gün gün çalışma', () => [dayReport(reviews30, items, topicName)]],
-      ['bildirdikleri', 'Bildirdiği sorular', () => [reportedBox(), poemBox()]],
-      ['denemeler', 'Denemeler', () => [h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable), subjects, styles, misconceptions]],
-      ['zayif', 'Zayıf konular', () => [gapCards, weakCards, causes, pastNoteCards]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
-      ['son14', 'Son 14 gün', () => [perf, load]],
-      ['yuklemeler', 'Yüklemeler', () => [job]],
-      ['diger', 'Kelime · Klavye · Kitap', () => [wordBox(), typingBox(), booksBox()]],
-    ]));
+    tabs.body);
 }
 // Rapor sekmeleri: [kimlik, başlık, bölümleri üreten işlev]. Bölümler ilk açılışta üretilir (hepsi bir kez), yalnızca seçili
-// sekmeninki görünür. Seçim localStorage'da (defter.reportTab) durur.
+// sekmeninki görünür. Seçim localStorage'da (defter.reportTab) durur. { bar: sekme düğmeleri, body: bölümler } döner; düğmeye
+// dokununca bölüm görünür ve sayfa oraya kayar.
 function reportTabs(tabs) {
   let current = 'gun';
   try { current = localStorage.getItem('defter.reportTab') || 'gun'; } catch (e) { /* önemli değil */ }
@@ -5207,8 +5290,10 @@ function reportTabs(tabs) {
     try { localStorage.setItem('defter.reportTab', id); } catch (e) { /* önemli değil */ }
     chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.tab === id)));
     Object.entries(panels).forEach(([k, p]) => { p.hidden = k !== id; });
+    body.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
   } }, label));
-  return h('div', { class: 'stack report-tabs' }, h('div', { class: 'chips', role: 'tablist', 'aria-label': 'Rapor bölümleri' }, chips), ...Object.values(panels));
+  const body = h('div', { class: 'stack report-tabs' }, ...Object.values(panels));
+  return { bar: h('div', { class: 'chips report-bar', role: 'tablist', 'aria-label': 'Rapor bölümleri' }, chips), body };
 }
 
 /* Gün gün çalışma (son 30 gün): seçili günde konu konu kaç soru, kaçı doğru, kaçı yanlış, ne kadar sürdü.
