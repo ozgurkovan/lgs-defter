@@ -284,6 +284,20 @@
         document.querySelector('.ask')?.remove();
       }
     }
+    // Adım adım çözüm (velinin isteği, 2026-11-16): kısa çözümün altında "Adım adım anlat"; adımlar tek tek açılır, şekil
+    // çizilir, sonda "Baştan anlat". Adımlar sayfada verilir (veritabanına bir şey gitmez). Her rolde.
+    {
+      const box = solutionBox('Kısa çözüm', null, { steps: [{ text: 'Birinci adım.' }, { text: 'İkinci adım.', fig: { type: 'numberline', from: 0, to: 10, jumps: [{ from: 0, to: 5, label: '+5' }] } }] });
+      document.body.append(box);
+      const open = box.querySelector('.steps-open');
+      open?.click();
+      const first = box.querySelectorAll('.step').length === 1 && /Adım 1 \/ 2/.test(box.textContent);
+      [...box.querySelectorAll('button')].find((b) => /Sonraki adım/.test(b.textContent))?.click();
+      const second = box.querySelectorAll('.step').length === 2 && !!box.querySelector('.step.now .step-svg') && /Baştan anlat/.test(box.textContent);
+      box.remove();
+      check('Adım adım çözüm: kısa çözümün altında düğme, adımlar tek tek açılır, şekil çizilir, sonda "Baştan anlat"', !!open && first && second,
+        [!open && 'düğme yok', !first && 'ilk adım', !second && 'ikinci adım ya da şekil'].filter(Boolean).join('; '));
+    }
     // Veli: Günlük planda "Kahramanı besleme" ve "Açlığı dondur" kutuları (kaydedilmez).
     if (role === 'parent' && state.student) {
       go('settings'); await settle();

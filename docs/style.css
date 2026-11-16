@@ -651,3 +651,22 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 @keyframes battle-spin { to { transform: rotate(360deg); } }
 @keyframes battle-pulse { to { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .battle-radar .battle-sweep, .battle-stars svg, .battle-pill.super, .battle-mother .battle-sway { animation: none; } .battle-banner.on { animation: none; } }
+
+/* Adım adım çözüm (steps.js): adımlar tek tek açılır, şimdiki adım vurgulu; şekiller kartın genişliğinde. */
+.steps-open { align-self: flex-start; }
+.steps-box { gap: 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); }
+.steps-list { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; }
+.step { opacity: 0.72; }
+.step.now { opacity: 1; animation: step-in 0.35s ease-out; }
+.step-row { display: flex; align-items: flex-start; gap: 6px; }
+.step-row p { margin: 0; flex: 1; line-height: 1.5; }
+.step-say { flex: none; padding: 0 6px; }
+.step-fig { margin-top: 6px; }
+.step-svg { display: block; width: 100%; max-width: 360px; height: auto; }
+.step-table { border-collapse: collapse; font-size: 0.9rem; }
+.step-table th, .step-table td { border: 1px solid var(--rule); padding: 4px 8px; text-align: center; }
+.step-table th { background: #EEF4FF; }
+.step-mark { margin: 0; padding: 8px 10px; border-radius: 8px; background: #FFFBEA; line-height: 1.6; }
+.step-mark mark { background: #FFE066; padding: 0 2px; border-radius: 3px; }
+@keyframes step-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .step.now { animation: none; } }

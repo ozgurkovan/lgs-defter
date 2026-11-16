@@ -125,6 +125,14 @@ Her maddenin yanında nasıl denendiği yazar:
 - Sayaç (derse göre süre), emin olma ölçeği, ipucu.
 - "Bunu birlikte bakalım": boş geçer, birlikte bakılacaklara düşer.
 - Yanlıştan sonra "Çözümü anladın mı? Anladım / Anlamadım". Hata tekrarında "Benzer soru" etiketi.
+- **Adım adım çözüm** (velinin isteği, 2026-11-16: "birisi kısa çözüm, diğeri daha detaylı hatta şekilli, bir bir yavaş
+  yavaş"; `docs/steps.js`, `questions.steps`): kısa çözümün altında, sorunun adımları yazılmışsa "🪜 Adım adım anlat".
+  Adımlar "Sonraki adım ›" ile tek tek açılır (öncekiler üstte soluk, "‹ Önceki adım", sonda "Baştan anlat"); her adımda
+  🔊 sesli okuma (Türkçe ya da İngilizce) ve gerekirse şekil: sayı doğrusu, kesir şeridi, bant modeli, kareli alan, gruplar,
+  dikdörtgen/kare/üçgen/daire, tablo, metinde işaretli sözcükler (uygulamanın kalıpları; yazılar kaçışlı, sayılar sınırlı).
+  Çözümün göründüğü her yerde: oturumda cevaptan sonra, birlikte bakılacaklar, Birlikte çöz kartı, benzer sorular, deneme
+  sonucu, öğrencinin gönderdiği sorular, velinin soru listeleri. Adımları saatlik görev yazar, önce son 14 günde yanlış
+  yapılan sorulara (job/INSTRUCTIONS.md 1h). Adım yoksa yalnız kısa çözüm. [O] şekiller, [A] görünüm
 - "Bu konuyu okulda henüz işlemedik" düğmesi önce sorar (velinin isteği, 2026-11-09): pencerede konunun adı, öne çıkan
   "Vazgeç, soruyu çözeceğim" ve "Evet, henüz işlemedik". Evet denirse konu bekletilir; vazgeçilirse soru yerinde kalır. [A]
   Konu tekrarında, hata tekrarında ve ek çalışmada çıkar (velinin sorusu, 2026-11-16: denemedeki yanlışlar konusu

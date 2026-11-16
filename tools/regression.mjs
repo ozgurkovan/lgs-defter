@@ -25,13 +25,13 @@ const node = (args) => {
 };
 
 // 1
-const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']) + node(['--check', 'docs/feed.js']) + node(['--check', 'docs/army.js'])
+const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']) + node(['--check', 'docs/feed.js']) + node(['--check', 'docs/army.js']) + node(['--check', 'docs/steps.js'])
   + node(['--check', 'docs/i18n.js']) + node(['--check', 'docs/i18n-en.js']);
-report(!checked.trim(), 'app.js, typing.js, feed.js, army.js ve dil dosyaları sözdizimi', checked.trim().split('\n')[0]);
+report(!checked.trim(), 'app.js, typing.js, feed.js, army.js, steps.js ve dil dosyaları sözdizimi', checked.trim().split('\n')[0]);
 const html = readFileSync('docs/index.html', 'utf8');
 const v = JSON.parse(readFileSync('docs/version.json', 'utf8')).v;
-const inHtml = [...html.matchAll(/(?:app\.js|style\.css|typing\.js|typing\.css|feed\.js|army\.js|i18n\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
-report(inHtml.length === 7 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
+const inHtml = [...html.matchAll(/(?:app\.js|style\.css|typing\.js|typing\.css|feed\.js|army\.js|steps\.js|i18n\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
+report(inHtml.length === 8 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
 // Başka bir adres reddedilmeli. Deneme kapalı bir porta gider: koruma bozulsa bile Supabase'e ulaşmaz, hesap açılmaz.
 // Giriş bağlantısı üreten her araç adresi test-accounts.mjs'ten almalı.
 const refused = await testAccountEmail('velitest@hotmail.com', 'http://127.0.0.1:9', {}).then(() => 'kabul edildi', (e) => e.message);
@@ -76,6 +76,10 @@ report(feedOut.length > 0 && !feedBad.length, 'Kahramanı besleme', feedBad.leng
 const armyOut = node(['tools/test-army.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const armyBad = armyOut.filter((l) => !l.startsWith('OK'));
 report(armyOut.length > 0 && !armyBad.length, 'Asker kahraman', armyBad.length ? armyBad.join(' | ') : `${armyOut.length} kontrol`);
+// Adım adım çözüm: adımların temizlenmesi, şekil kalıpları, kaçış (tools/test-steps.mjs).
+const stepsOut = node(['tools/test-steps.mjs']).trim().split(/\r?\n/).filter(Boolean);
+const stepsBad = stepsOut.filter((l) => !l.startsWith('OK'));
+report(stepsOut.length > 0 && !stepsBad.length, 'Adım adım çözüm', stepsBad.length ? stepsBad.join(' | ') : `${stepsOut.length} kontrol`);
 // İngilizce katman (2026-11-10): kodda yeni bir Türkçe yazı varsa çevirisi de olmalı; çeviriler yer tutucuları korur,
 // Türkçe harf taşımaz; docs/i18n-en.js en.json'dan üretilmiş ve güncel (tools/i18n-build.mjs).
 const i18nOut = node(['tools/i18n-build.mjs', '--check']).trim();

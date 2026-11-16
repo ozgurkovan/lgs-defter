@@ -1313,11 +1313,11 @@ function showQuestion() {
       ? [h('p', { class: 'verdict' }, 'Tamam, bu soruyu ayırdım.'),
          h('p', { class: 'small' }, `Bunu sonra velin ya da öğretmeninle birlikte çözeceksiniz. Doğru cevap ${question.answer}.`),
          question.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüme şimdi bakmak istersen'),
-           h('div', { class: 'note teacher', style: 'margin-top: 6px' }, question.solution)) : null,
+           solutionBox(question.solution, question.id, { cls: 'note teacher', style: 'margin-top: 6px' })) : null,
          gapBox, yt]
       : [h('p', { class: 'verdict ' + (correct ? 'ok' : 'no') }, correct ? 'Doğru' : `Yanlış. Doğru cevap ${question.answer}.`),
          coachNote ? h('p', { class: 'small' }, coachNote) : null,
-         question.solution ? h('div', { class: 'note teacher' }, question.solution) : null,
+         question.solution ? solutionBox(question.solution, question.id, { cls: 'note teacher' }) : null,
          confidence === 25 ? h('p', { class: 'small muted' }, 'Tahmin ettiğin için bu soruyu birlikte bakılacaklara ekledim.') : null],
       understoodRow,
       h('button', { class: 'primary block', onclick: () => { ss.index++; showQuestion(); } },
@@ -1558,7 +1558,7 @@ function togetherCard(qn, t, when, study) {
     h('div', { class: 'stack', style: 'gap: 4px' }, ['A', 'B', 'C', 'D'].filter((k) => qn.choices?.[k] !== undefined).map((k) =>
       h('div', { class: 'opt small' + (k === qn.answer ? ' right' : k === t.answer ? ' wrong' : '') },
         h('b', {}, k), h('span', {}, qn.choices[k]), k === t.answer ? h('span', { class: 'muted' }, ' ← seçimi') : null))),
-    qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, qn.solution)) : null,
+    qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), solutionBox(qn.solution, qn.id, { style: 'margin-top: 6px' })) : null,
     when);
 }
 
@@ -2035,7 +2035,7 @@ async function viewReasons() {
           h('p', {}, h('b', {}, CAUSE_LABEL[r.diagnosis_cause] || r.diagnosis_cause), same ? ' · Senin seçiminle aynı.' : ' · Senin seçiminden farklı.'),
           r.diagnosis_text ? h('p', { style: 'margin-top: 8px' }, r.diagnosis_text) : null,
           r.misconception ? h('p', { style: 'margin-top: 8px' }, h('b', {}, 'Dikkat: '), r.misconception) : null),
-        r.solution ? h('details', {}, h('summary', {}, 'Çözümü göster'), h('div', { class: 'note', style: 'margin-top: 8px' }, r.solution)) : null,
+        r.solution ? h('details', {}, h('summary', {}, 'Çözümü göster'), solutionBox(r.solution, r.question_id, { cls: 'note', style: 'margin-top: 8px' })) : null,
         h('button', { class: 'primary block', onclick: () => { i++; show(); } }, i + 1 < rows.length ? 'Sonraki' : 'Bitir'));
       reveal.hidden = false;
     }
@@ -2507,7 +2507,7 @@ async function viewSend() {
           h('div', { class: 'note', style: 'margin-top: 8px' },
             h('p', {}, h('b', {}, `Doğru cevap: ${x.answer}`)),
             x.hint ? h('p', { class: 'small', style: 'margin-top: 6px' }, h('b', {}, 'İpucu: '), x.hint) : null,
-            x.solution ? h('p', { style: 'margin-top: 6px' }, x.solution) : null))))) : null,
+            x.solution ? solutionBox(x.solution, x.id, { cls: '', style: 'margin-top: 6px' }) : null))))) : null,
     subs.length ? h('section', { class: 'card flat stack', style: 'gap: 6px' },
       h('p', { class: 'label' }, 'Son yüklemeler'),
       subs.map((s) => h('div', { class: 'stack', style: 'gap: 2px; padding-top: 6px; border-top: 1px solid var(--rule)' },
@@ -2740,7 +2740,7 @@ function showExamResult(exam, rows, results, reason, saved) {
         h('div', { class: 'stack', style: 'gap: 4px' }, ['A', 'B', 'C', 'D'].filter((k) => r.qn.choices?.[k] !== undefined).map((k) =>
           h('div', { class: 'opt small' + (k === r.qn.answer ? ' right' : k === r.ans ? ' wrong' : '') },
             h('b', {}, k), h('span', {}, r.qn.choices[k]), k === r.ans ? h('span', { class: 'muted' }, ' ← seçimin') : null))),
-        r.qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, r.qn.solution)) : null))) : null,
+        r.qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), solutionBox(r.qn.solution, r.qn.id, { style: 'margin-top: 6px' })) : null))) : null,
     h('button', { class: 'primary block', onclick: () => go('upload') }, 'Deneme sayfası'));
 }
 
@@ -4669,7 +4669,7 @@ function checkPanel(src, onDone) {
             } catch (e) { toast('Kaydedilemedi; internetini kontrol et.'); }
           }
           fill(after, h('p', {}, h('b', { style: `color: var(--${correct ? 'green' : 'red'})` }, correct ? 'Doğru.' : `Yanlış. Doğru cevap ${qn.answer}.`)),
-            qn.solution ? h('div', { class: 'note small' }, qn.solution) : null,
+            qn.solution ? solutionBox(qn.solution, qn.id) : null,
             h('button', { class: 'primary block', onclick: () => { i++; show(); } }, i + 1 < picks.length ? 'Sonraki benzer soru' : 'Sonucu gör'));
           after.hidden = false;
         } }, h('b', {}, k), h('span', {}, qn.choices[k])));
@@ -4740,7 +4740,7 @@ function studyCard(data, src, onDone) {
         data.comment ? h('p', {}, data.comment) : null,
         data.misconception ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Dikkat: '), data.misconception) : null) : null,
       // Çözüm kapalı durur (velinin isteği, 2026-11-10): önce birlikte konuşsunlar, gerekirse açsınlar.
-      data.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, data.solution))
+      data.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), solutionBox(data.solution, data.questionId, { style: 'margin-top: 6px' }))
         : h('p', { class: 'small muted' }, 'Bu sorunun yazılı çözümü yok; birlikte çözün.'),
       // Doğru yaptıysa "anladı mı?" sorulmaz (velinin sorusu, 2026-11-10): benzer soru doğrudan teklif edilir.
       canSimilar && correct ? h('div', { class: 'stack', style: 'gap: 6px' },
@@ -4851,7 +4851,7 @@ async function viewQuestions() {
         r.student_confident === true ? ' (emin olarak işaretlemiş)' : r.student_confident === false ? ' (emin değilmiş)' : '') : null,
       r.misconception ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Kavram yanılgısı: '), r.misconception) : null,
       r.scratch_note ? h('p', { style: 'margin-top: 6px' }, h('b', {}, 'Karalamasında: '), r.scratch_note) : null) : null,
-    r.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, r.solution)) : null,
+    r.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), solutionBox(r.solution, r.question_id, { style: 'margin-top: 6px' })) : null,
     r.outcome !== 'dogru' && ['parent', 'teacher'].includes(state.profile?.role) ? togetherButton(() => { const [d, src] = examStudy(r); return [{ ...d, comment: null, misconception: null }, src]; }) : null); // yorum kartın üstünde zaten var
 
   const reviewCard = (r) => {
@@ -4875,7 +4875,7 @@ async function viewQuestions() {
         r.hint_used ? 'ipucu kullandı' : null,
       ].filter(Boolean).join(' · ')),
       !r.correct && r.confidence >= 75 ? h('p', { class: 'small error' }, 'Emin olduğu hâlde yanlış: kavram yanılgısı olabilir.') : null,
-      qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), h('div', { class: 'note small', style: 'margin-top: 6px' }, qn.solution)) : null,
+      qn.solution ? h('details', {}, h('summary', { class: 'small' }, 'Çözüm'), solutionBox(qn.solution, qn.id, { style: 'margin-top: 6px' })) : null,
       !r.correct ? togetherButton(reviewStudy(r, qn)) : null);
   };
 

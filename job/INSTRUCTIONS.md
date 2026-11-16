@@ -360,6 +360,42 @@ Every run, also pause the mistakes of books whose exam is over, so that they sto
 - patch `items?track=eq.mistake&state=eq.active&question_id=in.(...)` with
   `{"state":"paused","note":"Kitap sınavı geçti"}`.
 
+## 1h. Step-by-step solutions (every run, after 1c)
+
+The parent asked (2026-11-16) for solutions at several depths: the short `solution` stays as it is, and
+a question can also carry `steps`, a slow, child-sized explanation the app reveals one step at a time
+("Adım adım anlat", docs/steps.js), with an optional drawing. Write `steps` first for the questions the
+children got wrong, newest first:
+```
+node tools/sb.mjs get "reviews?correct=eq.false&voided=eq.false&answered_at=gte.<14 days ago>T00:00:00Z&select=question_id&order=answered_at.desc&limit=200"
+node tools/sb.mjs get "questions?id=in.(<ids>)&steps=is.null&active=eq.true&select=id,subject,topic_id,stem,image_path,choices,answer,hint,solution"
+```
+Also the variants written in 1c this run (they are what the child sees next). Up to 15 questions per run.
+
+How to write them:
+- 3 to 6 steps; `[{"text": "..."}, ...]`, at most 8. One idea per step, one or two short sentences at the
+  child's grade (primary school: very short, everyday words). Warm, never "kolay".
+- Step 1 says what the question asks. The middle steps do the work. The last step gives the answer and a
+  quick check ("Kontrol: 9 × 4 = 36 ✓"). Solve it yourself first; the steps must reach the stored
+  `answer`. If they do not, skip the question and log it for section 4 instead of writing steps.
+- Add `"fig"` to a step only when a drawing really helps, using one of these types and nothing else
+  (numbers must match the question; texts short):
+  - `{"type":"numberline","from":0,"to":36,"step":3,"jumps":[{"from":0,"to":9,"label":"+9"}],"marks":[36]}`
+  - `{"type":"fraction","bars":[{"parts":8,"filled":3,"label":"3/8"}]}` (up to 4 bars, parts 1–24)
+  - `{"type":"bars","rows":[{"label":"Ece","parts":[{"size":1,"text":"?"}]},{"label":"Elif","parts":[{"size":1,"text":"?","tone":1}]}]}`
+    (tape / bar model; up to 4 rows, 8 parts; `size` is the relative length, `tone` 0–5 a colour)
+  - `{"type":"grid","rows":3,"cols":4,"filled":12,"label":"3 × 4 = 12"}` (rows, cols 1–12)
+  - `{"type":"groups","groups":4,"each":9,"extra":0,"label":"4 grup, 9'ar"}` (groups 1–10, each 0–12)
+  - `{"type":"shape","kind":"rect","labels":{"top":"8 cm","left":"5 cm"}}` (rect/square: top, right,
+    bottom, left; triangle: left, right, bottom, height; circle: r, d, center)
+  - `{"type":"table","head":["Anlam","Örnek"],"rows":[["yukarı doğru gitmek","Merdivenden çıktı."]]}`
+    (up to 6 columns, 8 rows; good for word meanings, sorting, patterns)
+  - `{"type":"mark","text":"Hafta sonu dağın tepesine çıktık.","marks":["tepesine çıktık"]}` (a sentence
+    or short passage with the key words highlighted; good for Türkçe and reading questions)
+- Language: Turkish for Turkish topics; American English for US topics (`pa.` topic ids), as everywhere.
+- Write with a JSON file: `node tools/sb.mjs patch "questions?id=eq.<id>" <file.json>` where the file is
+  `{"steps": [...]}`. Never change `answer`, `solution` or anything else in this step.
+
 ## 1d. MEB booklets (every run until all are done)
 
 The family downloaded MEB's past LGS booklets and sample-question sets for private practice. They
