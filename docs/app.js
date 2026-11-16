@@ -4499,10 +4499,48 @@ function familySection() {
 
 /* Öğrencinin çözdüğü her soru: denemelerdeki sorular (görsel, cevabı, teşhis, kendi gerekçesi)
    ve tekrar soruları (metin, şıklar, seçimi, emin olma, süre). Öğretmen sadece kendi derslerini görür. */
+/* Kim çözüyor (velinin isteği, 2026-11-16: "Veli mi öğrenci mi, sonra datalar bozulmasın"): velinin ya da öğretmenin
+   ekranındaki "öğrenci çözer" kartlarında (Birlikte çöz, benzer sorular) şıkka ilk dokunuşta sorulur. Öğrenci çözerse cevap
+   onun adına kaydedilir; veli ya da öğretmen kendisi denerse hiçbir şey kaydedilmez (hata tekrarı açılmaz, "birlikte
+   bakıldı" işaretlenmez). Seçim o öğrenci için bu oturumda hatırlanır; kartın üstünde görünür, "Değiştir" ile yeniden sorulur. */
+const solverWho = () => (state.solver?.sid === sid() ? state.solver.who : null);
+const solverAdult = () => (state.profile?.role === 'teacher' ? 'teacher' : 'parent');
+async function solverAsk() {
+  const name = state.student?.display_name || 'öğrenci', teacher = solverAdult() === 'teacher';
+  const who = await askDialog({
+    title: 'Bu soruyu kim çözüyor?',
+    text: `Öğrenci çözerse cevap ${name} adına kaydedilir. ` + (teacher ? 'Öğretmen kendisi deniyorsa hiçbir şey kaydedilmez.' : 'Veli kendisi deniyorsa hiçbir şey kaydedilmez.'),
+    actions: [{ label: `Öğrenci (${name}) çözüyor`, value: 'student', cls: 'primary block' },
+      { label: teacher ? 'Öğretmen deniyor (kaydedilmez)' : 'Veli deniyor (kaydedilmez)', value: 'adult', cls: 'block' }],
+  });
+  if (!who) return null;
+  state.solver = { sid: sid(), who };
+  window.dispatchEvent(new Event('defter-solver'));
+  return who;
+}
+const solverPick = async () => solverWho() || solverAsk();
+// Kartın üstündeki satır: kim çözüyor, "Değiştir".
+function solverLine() {
+  const el = h('p', { class: 'small muted solver-line' });
+  const paint = () => {
+    if (el.dataset.drawn && !el.isConnected) return window.removeEventListener('defter-solver', paint);
+    el.dataset.drawn = '1';
+    const w = solverWho(), name = state.student?.display_name || 'öğrenci', teacher = solverAdult() === 'teacher';
+    fill(el, w === 'student' ? `✍️ Çözen: öğrenci (${name}). Cevap kaydedilir. `
+      : w === 'adult' ? (teacher ? '👀 Çözen: öğretmen. Cevap kaydedilmez. ' : '👀 Çözen: veli. Cevap kaydedilmez. ')
+        : '✍️ Şıkka dokununca kimin çözdüğünü soracağım.',
+    w ? h('button', { class: 'ghost small', onclick: () => solverAsk() }, 'Değiştir') : null);
+  };
+  paint();
+  window.addEventListener('defter-solver', paint);
+  return el;
+}
+
 /* Benzer sorularla deneme paneli (veli): yanlış sorunun kartının altında açılır (similarPick). Sorular sırayla gelir; çocuk
    velinin ekranında cevaplar, doğru ya da yanlış ve çözüm hemen görünür. Cevaplar çocuğun adına 'check' tarzıyla kaydedilir:
    soru görülmüş sayılır (kendi tekrarlarında bir daha gelmez), günlük plana sayılmaz. Yanlış yapılan benzer soru hata
-   tekrarına girer. Sonunda kaç doğru yaptığı yazar; onDone({ right, total }) çağrılır. */
+   tekrarına girer. Sonunda kaç doğru yaptığı yazar; onDone({ right, total }) çağrılır. Veli kendisi denediyse (solverPick)
+   hiçbir şey kaydedilmez ve onDone çağrılmaz. */
 function checkPanel(src, onDone) {
   const box = h('div', { class: 'check-panel stack' }, h('p', { class: 'small muted' }, 'Benzer sorular aranıyor…'));
   (async () => {
@@ -4514,9 +4552,13 @@ function checkPanel(src, onDone) {
     if (!picks.length) {
       return fill(box, h('p', { class: 'small' }, 'Bu konuda görmediği benzer soru kalmadı. Yenileri hazırlanınca (bir saat içinde) buradan deneyebilirsiniz.'));
     }
-    let i = 0, right = 0;
+    let i = 0, right = 0, adultTried = false;
     const show = () => {
       if (i >= picks.length) {
+        if (adultTried) {
+          return fill(box, h('p', {}, h('b', {}, `${picks.length} benzer sorudan ${right} tanesi doğru.`)),
+            h('p', { class: 'small' }, 'Sorulardan bazılarını veli ya da öğretmen denedi: hiçbiri öğrencinin adına kaydedilmedi.'));
+        }
         fill(box, h('p', {}, h('b', {}, `${picks.length} benzer sorudan ${right} tanesini doğru yaptı.`)),
           h('p', { class: 'small' }, right === picks.length ? 'Anlamış görünüyor. 👍'
             : 'Yanlış yaptığı benzer soru yarın hata tekrarında gelecek. Konuya birlikte bir kez daha bakın.'));
@@ -4524,23 +4566,30 @@ function checkPanel(src, onDone) {
         return;
       }
       const qn = picks[i], startedAt = Date.now();
-      let done = false;
+      let done = false, asking = false;
       const after = h('div', { class: 'stack', style: 'gap: 8px', hidden: true });
       const btns = ['A', 'B', 'C', 'D'].filter((k) => qn.choices?.[k] !== undefined).map((k) =>
         h('button', { class: 'choice', 'data-k': k, onclick: async () => {
-          if (done) return;
+          if (done || asking) return;
+          asking = true;
+          const who = await solverPick();
+          asking = false;
+          if (!who || done) return;
           done = true;
           const correct = k === qn.answer;
           if (correct) right++;
           btns.forEach((b) => { b.disabled = true; b.classList.toggle('right', b.dataset.k === qn.answer); b.classList.toggle('wrong', b.dataset.k === k && !correct); });
-          try {
-            await q(sb.from('reviews').insert({ student_id: s, question_id: qn.id, track: 'check', answer: k, correct,
-              duration_sec: Math.round((Date.now() - startedAt) / 1000), hint_used: false }));
-            if (!correct) {
-              await q(sb.from('items').insert({ student_id: s, track: 'mistake', topic_id: qn.topic_id, question_id: qn.id, step: 0, interval_days: 1,
-                due_date: addDays(localDate(), 1), note: 'Veli denemesinde yanlış' }));
-            }
-          } catch (e) { toast('Kaydedilemedi; internetini kontrol et.'); }
+          if (who !== 'student') adultTried = true;
+          else {
+            try {
+              await q(sb.from('reviews').insert({ student_id: s, question_id: qn.id, track: 'check', answer: k, correct,
+                duration_sec: Math.round((Date.now() - startedAt) / 1000), hint_used: false }));
+              if (!correct) {
+                await q(sb.from('items').insert({ student_id: s, track: 'mistake', topic_id: qn.topic_id, question_id: qn.id, step: 0, interval_days: 1,
+                  due_date: addDays(localDate(), 1), note: 'Veli denemesinde yanlış' }));
+              }
+            } catch (e) { toast('Kaydedilemedi; internetini kontrol et.'); }
+          }
           fill(after, h('p', {}, h('b', { style: `color: var(--${correct ? 'green' : 'red'})` }, correct ? 'Doğru.' : `Yanlış. Doğru cevap ${qn.answer}.`)),
             qn.solution ? h('div', { class: 'note small' }, qn.solution) : null,
             h('button', { class: 'primary block', onclick: () => { i++; show(); } }, i + 1 < picks.length ? 'Sonraki benzer soru' : 'Sonucu gör'));
@@ -4549,6 +4598,7 @@ function checkPanel(src, onDone) {
       const own = (src.questionId && qn.variant_of === src.questionId) || (src.examQuestionId && qn.variant_of_exam === src.examQuestionId);
       fill(box, h('div', { class: 'spread' }, h('b', {}, `Benzer soru ${i + 1} / ${picks.length}`),
           own ? h('span', { class: 'tag amber' }, 'Bu sorudan yazıldı') : h('span', { class: 'small muted' }, 'Aynı konudan')),
+        solverLine(),
         qn.image_path ? lazyImg('questions', qn.image_path) : null,
         qn.stem ? h('p', { class: 'stem' }, qn.stem) : null,
         h('div', { class: 'stack', style: 'gap: 6px' }, btns), after);
@@ -4562,7 +4612,8 @@ function checkPanel(src, onDone) {
    açılır. Ardından "Anladı mı?": "Anladım" deyince benzer soru (checkPanel) burada sorulur; "Anlamadım" deyince konuya
    birlikte bir kez daha bakmaları önerilir, benzer soru düğmesi yine durur. "Cevabı göster" çözmeden açar (eski görünüm).
    Yeniden çözüm, soru havuzdaysa, 'check' tarzıyla çocuğun adına kaydedilir (doğruysa bronz); hata tekrarına yeniden
-   girmez. Kâğıt denemenin fotoğrafında şıklar yoktur: yalnız A–D harfleri.
+   girmez. Önce kim çözdüğü sorulur (solverPick): veli ya da öğretmen kendisi deniyorsa kaydedilmez. Kâğıt denemenin
+   fotoğrafında şıklar yoktur: yalnız A–D harfleri.
    data: { content, choices, answer, chosen, blank, solution, questionId }; src: checkPanel kaynağı. */
 function studyCard(data, src, onDone) {
   const canWrite = ['parent', 'teacher'].includes(state.profile?.role);
@@ -4570,6 +4621,20 @@ function studyCard(data, src, onDone) {
   const after = h('div', { class: 'stack', style: 'gap: 8px', hidden: true });
   const startedAt = Date.now();
   let done = false;
+  const save = canWrite && !!data.questionId; // havuzdaki soru: cevap öğrencinin adına kaydedilebilir
+  let asking = false, byStudent = false;
+  // Şıkka dokunuş: önce kim çözüyor (bir kez sorulur, hatırlanır); sonra cevap açılır.
+  const choose = async (k) => {
+    if (done || asking) return;
+    if (save) {
+      asking = true;
+      const who = await solverPick();
+      asking = false;
+      if (!who) return;
+      byStudent = who === 'student';
+    }
+    reveal(k);
+  };
   const reveal = async (k) => {
     if (done) return;
     done = true;
@@ -4577,7 +4642,7 @@ function studyCard(data, src, onDone) {
     const wrongKey = k ? (correct ? null : k) : (data.chosen !== data.answer ? data.chosen : null);
     btns.forEach((b) => { b.disabled = true; b.classList.toggle('right', b.dataset.k === data.answer); b.classList.toggle('wrong', b.dataset.k === wrongKey); });
     hint.hidden = true;
-    if (k && canWrite && data.questionId) {
+    if (k && save && byStudent) {
       try {
         await q(sb.from('reviews').insert({ student_id: sid(), question_id: data.questionId, track: 'check', answer: k, correct,
           duration_sec: Math.round((Date.now() - startedAt) / 1000), hint_used: false }));
@@ -4589,7 +4654,8 @@ function studyCard(data, src, onDone) {
     fill(after,
       h('p', { class: 'study-result' }, h('b', { style: `color: var(--${correct ? 'green' : 'red'})` },
         k ? (correct ? 'Doğru.' : `Yanlış. Doğru cevap ${data.answer || '?'}.`) : `Doğru cevap ${data.answer || '?'}.`),
-      first ? h('span', { class: 'small muted' }, ` ${first}`) : null),
+      first ? h('span', { class: 'small muted' }, ` ${first}`) : null,
+      k && save && !byStudent ? h('span', { class: 'small muted' }, ' Veli ya da öğretmen denedi: kaydedilmedi.') : null),
       // Denemedeki sorunun yorumu (nerede takıldığı), cevap açılınca (velinin isteği, 2026-11-11: eski yanlışlara bakarken görünsün).
       data.comment || data.misconception ? h('div', { class: 'note teacher small' },
         h('p', { class: 'label' }, 'Yorum'),
@@ -4614,12 +4680,12 @@ function studyCard(data, src, onDone) {
         ask) : null);
     after.hidden = false;
   };
-  const btns = keys.map((k) => h('button', { class: 'choice', 'data-k': k, 'aria-label': `${k} şıkkı`, onclick: () => reveal(k) },
+  const btns = keys.map((k) => h('button', { class: 'choice', 'data-k': k, 'aria-label': `${k} şıkkı`, onclick: () => choose(k) },
     h('b', {}, k), data.choices ? h('span', {}, data.choices[k]) : null));
   const hint = h('div', { class: 'spread' },
     h('p', { class: 'small muted' }, 'Önce yeniden çözsün: cevap ve çözüm sonra açılır.'),
     h('button', { class: 'ghost small', onclick: () => reveal(null) }, 'Cevabı göster'));
-  return h('div', { class: 'study-card stack', style: 'gap: 8px' }, data.content, h('div', { class: 'stack', style: 'gap: 6px' }, btns), hint, after);
+  return h('div', { class: 'study-card stack', style: 'gap: 8px' }, data.content, save ? solverLine() : null, h('div', { class: 'stack', style: 'gap: 6px' }, btns), hint, after);
 }
 // Birlikte çöz kartının verisi: denemedeki sorudan (exam_questions satırı; eşleşen havuz sorusu varsa şıkları) ya da tekrar
 // sorusundan (reviews satırı + havuz sorusu). [data, src] döner.

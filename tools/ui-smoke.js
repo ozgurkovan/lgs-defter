@@ -248,6 +248,42 @@
       go('hero'); await settle();
       check('Asker kahraman kapalıyken asker kartı yok', !document.querySelector('.army-card, .army-line'));
     }
+    // Kim çözüyor (velinin isteği, 2026-11-16): velinin ya da öğretmenin ekranındaki Birlikte çöz kartında şıkka dokununca
+    // sorulur; veli denerse hiçbir şey kaydedilmez, öğrenci çözerse cevap öğrencinin adına kaydedilir. Kayıt sahte: sb.from
+    // test boyunca taklit edilir, veritabanına hiçbir şey gitmez.
+    if ((role === 'parent' || role === 'teacher') && state.student) {
+      const realFrom = sb.from, writes = [], savedSolver = state.solver;
+      sb.from = (t) => ({ insert: (row) => { writes.push([t, row]); return Promise.resolve({ data: null, error: null }); } });
+      const mk = () => studyCard({ content: h('p', {}, 'Örnek soru'), choices: { A: '1', B: '2' }, answer: 'B', chosen: 'A', questionId: '00000000-0000-0000-0000-000000000000' }, null);
+      try {
+        state.solver = null;
+        const c1 = mk();
+        document.body.append(c1);
+        c1.querySelector('.choice[data-k="B"]').click();
+        await wait(150);
+        const dlg = document.querySelector('.ask');
+        const asked = !!dlg && /kim çözüyor/i.test(dlg.textContent) && /Öğrenci \(/.test(dlg.textContent) && /(Veli|Öğretmen) deniyor/.test(dlg.textContent);
+        [...(dlg?.querySelectorAll('button') || [])].find((b) => /deniyor/.test(b.textContent))?.click();
+        await wait(250);
+        const adultOk = writes.length === 0 && /kaydedilmedi/.test(c1.textContent) && /Çözen: (veli|öğretmen)/.test(c1.textContent);
+        c1.remove();
+        state.solver = null;
+        const c2 = mk();
+        document.body.append(c2);
+        c2.querySelector('.choice[data-k="A"]').click();
+        await wait(150);
+        [...document.querySelectorAll('.ask button')].find((b) => /Öğrenci/.test(b.textContent))?.click();
+        await wait(250);
+        const studentOk = writes.length === 1 && writes[0][0] === 'reviews' && writes[0][1].track === 'check' && writes[0][1].student_id === sid();
+        c2.remove();
+        check('Kim çözüyor: Birlikte çöz kartında şıkka dokununca sorar; veli denerse kaydedilmez, öğrenci çözerse öğrencinin adına kaydedilir',
+          asked && adultOk && studentOk, [!asked && 'soru çıkmadı', !adultOk && 'veli denemesi', !studentOk && `öğrenci cevabı (${writes.length} kayıt)`].filter(Boolean).join('; '));
+      } finally {
+        sb.from = realFrom;
+        state.solver = savedSolver;
+        document.querySelector('.ask')?.remove();
+      }
+    }
     // Veli: Günlük planda "Kahramanı besleme" ve "Açlığı dondur" kutuları (kaydedilmez).
     if (role === 'parent' && state.student) {
       go('settings'); await settle();

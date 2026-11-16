@@ -509,6 +509,11 @@ Her maddenin yanında nasıl denendiği yazar:
   denemenin fotoğrafında yalnız A–D harfleri. Öğrencide yok. [A]
   Deneme sorusunun yorumu (nerede takıldığı, "Dikkat:" yanılgısı) cevap açılınca kartta "Yorum" olarak görünür (velinin
   isteği, 2026-11-11); Sorular listesinde yorum kartın üstünde zaten olduğu için kartta tekrar çıkmaz. [A]
+  - **Kim çözüyor** (velinin isteği, 2026-11-16: "Veli mi öğrenci mi, sonra datalar bozulmasın"): havuzdaki soruda şıkka
+    ilk dokunuşta "Bu soruyu kim çözüyor?": "Öğrenci (ad) çözüyor" ya da "Veli deniyor (kaydedilmez)" (öğretmende
+    "Öğretmen deniyor"). Veli denerse hiçbir şey kaydedilmez: cevap, bronz, numara yok; benzer sorularda da hata tekrarı
+    açılmaz, hepsi doğru olsa da "birlikte bakıldı" işaretlenmez; kartta "kaydedilmedi". Seçim o öğrenci için oturum boyunca
+    hatırlanır; kartın üstünde "Çözen: …" ve "Değiştir". [A]
 - **Özel ders notları kaybolmaz** (velinin isteği, 2026-11-11: "bu güzel notu kaldırmış olabilir miyiz?"). Eksik konu
   tekrarlarda düzelip "Özel derste çalışılacaklar"dan çıkınca not ve konu anlatımı silinmez: Rapor → Zayıf konular'da
   "Önceki özel ders notları" bölümünde (açılır kutular, ne zaman eksik konu olduğu), zayıf konu kartında ve velinin konu
