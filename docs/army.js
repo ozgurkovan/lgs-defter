@@ -1011,6 +1011,9 @@ function battleGame(cfg, p, level, opts = {}) {
   return wrap;
 }
 
+// Kahramanın seviyesi (çizim için): besleme açıksa beslemenin kahramanı, değilse kelime ve klavye kahramanı; okunamazsa 1.
+const armyHeroLevel = (p) => (feedOn(p) ? loadFeed(p).then((fs) => fs.hero.level) : typingHero().then((t) => t.level)).catch(() => 1);
+
 // Oturum ya da deneme sonundaki savaş kartı, yalnızca asker olmuş (kolunu seçmiş) çocukta: correct doğru, wrong yanlış (boş
 // dahil), hard doğruların kaçı zor; kind 'session' ya da 'exam'; fromRadar: hata tekrarı oturumu. Radarda hata tekrarında
 // bekleyen soru sayısı görünür. Asker değilse, cevap yoksa ya da numara okunamazsa kart gizli kalır; hiçbir şey yazmaz.
@@ -1021,7 +1024,7 @@ function battleCard(correct, wrong, hard, kind = 'session', fromRadar = false) {
   loadArmy(p).then(async (st) => {
     if (!st || !armyCorps(st.corps)) return;
     const [level, radar] = await Promise.all([
-      (feedOn(p) ? loadFeed(p).then((fs) => fs.hero.level) : typingHero().then((t) => t.level)).catch(() => 1),
+      armyHeroLevel(p),
       sb.from('items').select('id', { count: 'exact', head: true }).eq('student_id', p.id).eq('track', 'mistake').eq('state', 'active')
         .then((r) => (r.error ? null : r.count), () => null),
     ]);
@@ -1031,6 +1034,169 @@ function battleCard(correct, wrong, hard, kind = 'session', fromRadar = false) {
     box.hidden = false;
   }).catch(() => {});
   return box;
+}
+
+/* Antrenman (velinin isteği, 2026-11-16: "sorular çözdükçe kahraman kum torbasını yumruklayabilir mi? döner tekme atsın üst üste
+   doğrular gelince, yanlış cevapta düşsün komik şekilde sonra gülümsesin, hadi bir daha deneyelim desin… asker olana kadar";
+   "kum torbası başlangıçta, 70 puandan sonra komik alien karakter ile dövüş"). Asker kahraman açık, henüz asker olmamış
+   çocukta oturumda cevaptan sonra kısa bir sahne (1 saniye kadar): doğruda yumruk, 3 doğru üst üste döner tekme, 5 ve
+   üstünde kombo; yanlışta kahraman komik biçimde düşer, kalkar, "Hadi bir daha deneyelim!". 70 numaradan sonra kum torbası
+   yerine eldivenli sevimli uzaylı antrenman partneri (düşman değil: vurulunca sendeler, gülümseyip eldivenlerini kaldırır;
+   yanlışta kahramanı hafifçe iter, kıkırdar). Kimse yaralanmaz. Denemede yok; hareket azaltılmışsa yok. */
+
+/* Antrenman: saf kısım */
+
+const TRAIN_ALIEN_AT = 70; // bu numaradan sonra kum torbası yerine uzaylı partner
+// Hareket: doğruda üst üste doğru sayısına göre yumruk, döner tekme (3), kombo (5 ve üstü); yanlışta düşüş.
+const trainMove = (correct, streak) => (!correct ? 'fall' : streak >= 5 ? 'combo' : streak >= 3 ? 'kick' : 'punch');
+// Antrenman açık mı: asker kahraman açık ve henüz asker değil (numara bilinmiyorsa da açık; kol seçildiyse kapalı).
+const trainOn = (p, st) => armyOn(p) && !(st && (armyCorps(st.corps) || st.points >= ARMY_SOLDIER));
+// Kahramanın sözü: düşünce cesaret, kombo ve tekmede sevinç (n: kaçıncı sahne; sözler sırayla döner).
+// İki dilde yazılır (trEn): bazılarında Türkçe harf yok, İngilizce katmanı onları Türkçe sanmaz.
+const TRAIN_FALL_SAYS = [['Hadi bir daha deneyelim!', 'Let\'s try again!'], ['Düştüm ama kalktım!', 'I fell, but I got up!'],
+  ['Bir dahakine olacak!', 'I\'ll get it next time!'], ['Hata yapmak öğrenmektir!', 'Mistakes help us learn!']];
+function trainSay(move, streak, n = 0) {
+  if (move === 'fall') return trEn(...TRAIN_FALL_SAYS[(Math.abs(Math.trunc(n)) || 0) % TRAIN_FALL_SAYS.length]);
+  if (move === 'combo') return trEn(`Kombo ×${streak}!`, `Combo ×${streak}!`);
+  if (move === 'kick') return trEn('Döner tekme!', 'Spinning kick!');
+  return '';
+}
+
+/* Antrenman: çizimler (sabit SVG; kullanıcı metni yok) */
+
+// Kum torbası: tavandan zincirle asılı, kırmızı, beyaz şeritli.
+const TRAIN_BAG = '<svg viewBox="0 0 60 120" aria-hidden="true"><path d="M30 0 V22" stroke="#8A93A3" stroke-width="3" stroke-dasharray="4 3"/>'
+  + '<path d="M18 22 H42 L44 30 H16 Z" fill="#5E6672"/><rect x="12" y="30" width="36" height="80" rx="16" fill="#E63946" stroke="#B02A35" stroke-width="2"/>'
+  + '<rect x="12" y="52" width="36" height="7" fill="#fff" opacity=".9"/><rect x="12" y="86" width="36" height="7" fill="#fff" opacity=".9"/>'
+  + '<path d="M19 38 Q17 70 20 102" stroke="#fff" stroke-width="3" fill="none" opacity=".35" stroke-linecap="round"/></svg>';
+// Boks eldiveni (sağa bakar): yumrukta kahramanın elinden torbaya uzanır.
+const TRAIN_GLOVE = '<svg viewBox="0 0 40 30" aria-hidden="true"><rect x="2" y="8" width="10" height="14" rx="3" fill="#fff" stroke="#C9CED6"/>'
+  + '<path d="M10 6 Q30 0 37 12 Q40 24 26 27 Q14 28 10 22 Z" fill="#E63946" stroke="#B02A35" stroke-width="1.5"/>'
+  + '<path d="M16 8 Q24 6 26 12" stroke="#B02A35" stroke-width="1.4" fill="none"/><circle cx="28" cy="10" r="2.4" fill="#fff" opacity=".5"/></svg>';
+// Uzaylı antrenman partneri (sola, kahramana bakar): yeşil, tek gözlü, kafa bandı, kırmızı boks eldivenleri. mood: 'guard'
+// (eldivenler önde), 'hit' (gözü fırıldak, eldivenler aşağıda), 'cheer' (eldivenler yukarıda, gülüyor), 'push' (bir eldiven önde).
+function trainAlien(mood = 'guard') {
+  const G = '#7ED957', GE = '#4CAF50', INK = '#23262B', M = '#2E5E1F', hit = mood === 'hit', cheer = mood === 'cheer', push = mood === 'push';
+  const glove = (x, y, s = 1, flip = false) => `<g transform="translate(${x} ${y}) scale(${flip ? -s : s} ${s})"><path d="M-8 -6 Q4 -10 8 -2 Q10 7 1 8 Q-6 9 -8 4 Z" fill="#E63946" stroke="#B02A35" stroke-width="1.2"/>`
+    + `<rect x="-11" y="-4" width="5" height="9" rx="2" fill="#fff" stroke="#C9CED6" stroke-width=".8"/></g>`;
+  const ant = hit ? `<path d="M23 12 Q16 8 13 13 M37 12 Q44 8 47 13" stroke="${GE}" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="13" cy="13.5" r="2.6" fill="#FFE066"/><circle cx="47" cy="13.5" r="2.6" fill="#FFE066"/>`
+    : `<path d="M24 12 L19 3 M36 12 L41 3" stroke="${GE}" stroke-width="2" stroke-linecap="round"/><circle cx="19" cy="3" r="2.6" fill="#FFE066"/><circle cx="41" cy="3" r="2.6" fill="#FFE066"/>`;
+  const body = `<rect x="18" y="38" width="24" height="30" rx="10" fill="#9B8CFF" stroke="#6E5BD9" stroke-width="1.6"/><rect x="18.8" y="54" width="22.4" height="4" fill="#6E5BD9"/>`
+    + `<path d="M22 68 V82 M38 68 V82" stroke="${G}" stroke-width="6" stroke-linecap="round"/><ellipse cx="21" cy="84" rx="6" ry="3" fill="#4C8DF6"/><ellipse cx="39" cy="84" rx="6" ry="3" fill="#4C8DF6"/>`;
+  const head = `<circle cx="30" cy="24" r="14" fill="${G}" stroke="${GE}" stroke-width="1.4"/><path d="M16.5 19 Q30 13 43.5 19" stroke="#F25C54" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
+  const eye = hit ? `<circle cx="28" cy="25" r="6.4" fill="#fff"/><path d="M28 25 a1.2 1.2 0 1 1 -1.2 1.2 a2.6 2.6 0 1 1 3 -3 a4 4 0 1 1 -5.4 4.2" stroke="${INK}" stroke-width="1.3" fill="none" stroke-linecap="round"/>`
+    : `<circle cx="28" cy="25" r="6.4" fill="#fff"/><circle cx="${cheer ? 28 : 25.6}" cy="${cheer ? 24 : 25.8}" r="3.2" fill="${INK}"/><circle cx="${cheer ? 29.2 : 26.8}" cy="${cheer ? 22.8 : 24.6}" r="1.1" fill="#fff"/>`;
+  const cheeks = `<circle cx="19.5" cy="30" r="2" fill="#FF9EB5" opacity=".75"/><circle cx="38.5" cy="30" r="2" fill="#FF9EB5" opacity=".75"/>`;
+  const mouth = cheer ? `<path d="M24 31 Q29 38 34 31 Z" fill="${M}"/>` : hit ? `<path d="M23.5 33 q2 -2 4 0 t4 0 t4 0" stroke="${M}" stroke-width="1.3" fill="none" stroke-linecap="round"/>`
+    : `<path d="M24 32 Q28.5 35 33 31.5" stroke="${M}" stroke-width="1.4" fill="none" stroke-linecap="round"/>`;
+  const arms = cheer ? `<path d="M19 42 L9 30 M41 42 L51 30" stroke="#9B8CFF" stroke-width="5" stroke-linecap="round"/>` + glove(8, 26, 1, true) + glove(52, 26, 1)
+    : hit ? glove(14, 62, 1, true) + glove(44, 64, 1)
+    : push ? glove(10, 44, 1.1, true) + glove(40, 48, 1)
+    : glove(14, 44, 1.05, true) + glove(26, 48, 1.05, true);
+  return `<svg viewBox="0 0 60 90" aria-hidden="true">${ant}${body}${head}${eye}${cheeks}${mouth}${arms}</svg>`;
+}
+// Vuruş yıldızı ("POF").
+const TRAIN_POW = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 1 L24 12 L35 7 L29 17 L39 20 L29 23 L35 33 L24 28 L20 39 L16 28 L5 33 L11 23 L1 20 L11 17 L5 7 L16 12 Z" fill="#FFD23F" stroke="#FF8C1A" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+// Döner tekmenin izi.
+const TRAIN_SWOOSH = '<svg viewBox="0 0 80 50" aria-hidden="true"><path d="M6 40 Q40 -14 74 22" stroke="#4FB3E6" stroke-width="6" fill="none" stroke-linecap="round" opacity=".55"/>'
+  + '<path d="M14 42 Q42 2 70 30" stroke="#BDE8FF" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/></svg>';
+
+/* Antrenman: sahne */
+
+// Antrenman sahnesi: move ('punch' | 'kick' | 'combo' | 'fall'), streak, p (görünüş), level, opts.army (armyView),
+// opts.partner ('bag' ya da 'alien'), opts.n (söz sırası). Kutu döner; play() oynatır. Hareket azaltılmışsa durağan.
+function trainScene(move, streak, p, level, opts = {}) {
+  const partner = opts.partner === 'alien' ? 'alien' : 'bag';
+  const box = h('div', { class: `train train-${partner}`, 'aria-hidden': 'true' });
+  const hero = h('div', { class: 'train-hero' });
+  hero.innerHTML = heroSvg(p?.avatar, level, p?.hero_look, undefined, opts.army);
+  const foe = h('div', { class: 'train-foe' });
+  const draw = (mood) => { foe.innerHTML = partner === 'alien' ? trainAlien(mood) : TRAIN_BAG; };
+  draw('guard');
+  const fx = h('div', { class: 'train-fx' });
+  const bubble = h('span', { class: 'train-say' });
+  fill(box, hero, foe, fx, bubble);
+  const anim = (el, frames, ms, o = {}) => (el.animate ? el.animate(frames, { duration: ms, easing: o.easing || 'ease-out', fill: 'forwards', delay: o.delay || 0 }).finished.catch(() => {}) : Promise.resolve());
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const say = (t, who = 'hero') => { if (!t) return; bubble.textContent = t; bubble.className = `train-say on ${who}`; };
+  const pow = (word) => {
+    const el = h('span', { class: 'train-pow' }, word ? h('b', {}, word) : null);
+    el.insertAdjacentHTML('afterbegin', TRAIN_POW);
+    fx.append(el);
+    anim(el, [{ scale: '0.3', opacity: 1 }, { scale: '1.15', opacity: 1, offset: 0.4 }, { scale: '1.3', opacity: 0 }], 520).then(() => el.remove());
+  };
+  const hitFoe = async (big = false) => {
+    pow(big ? 'BAM!' : 'POF!');
+    if (partner === 'bag') return anim(foe, [{ rotate: '0deg' }, { rotate: big ? '26deg' : '16deg', offset: 0.3 }, { rotate: big ? '-12deg' : '-7deg', offset: 0.65 }, { rotate: '0deg' }], 760, { easing: 'ease-in-out' });
+    draw('hit');
+    await anim(foe, [{ translate: '0 0', rotate: '0deg' }, { translate: big ? '14px -4px' : '8px 0', rotate: big ? '14deg' : '8deg', offset: 0.35 }, { translate: '0 0', rotate: '0deg' }], 620);
+    draw('cheer');
+  };
+  // Yumruk: eldiven partnere uzanır; değdiği anda (onHit) partner sarsılır.
+  const punch = async (high = false, onHit = null) => {
+    const g = h('span', { class: 'train-glove' + (high ? ' high' : '') });
+    g.innerHTML = TRAIN_GLOVE;
+    fx.append(g);
+    const reach = `${Math.max(24, Math.round(foe.getBoundingClientRect().left - g.getBoundingClientRect().right + 10))}px 0`;
+    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '10px 0', rotate: '5deg', offset: 0.4 }, { translate: '0 0', rotate: '0deg' }], 360);
+    if (onHit) setTimeout(onHit, 170);
+    await anim(g, [{ translate: '0 0', scale: '0.6', opacity: 0.9 }, { translate: reach, scale: '1', opacity: 1, offset: 0.5 }, { translate: '0 0', scale: '0.6', opacity: 0 }], 360, { easing: 'ease-in-out' });
+    g.remove();
+  };
+  const kick = async (onHit = null) => {
+    if (onHit) setTimeout(onHit, 300);
+    const sw = h('span', { class: 'train-swoosh' });
+    sw.innerHTML = TRAIN_SWOOSH;
+    fx.append(sw);
+    anim(sw, [{ opacity: 0, scale: '0.6' }, { opacity: 1, scale: '1', offset: 0.5 }, { opacity: 0, scale: '1.1' }], 520).then(() => sw.remove());
+    await anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '12px -16px', rotate: '200deg', offset: 0.5 }, { translate: '14px -6px', rotate: '330deg', offset: 0.8 }, { translate: '0 0', rotate: '360deg' }], 560, { easing: 'ease-in-out' });
+  };
+  const fall = async () => {
+    if (partner === 'alien') {
+      draw('push');
+      anim(foe, [{ translate: '0 0' }, { translate: '-18px 0', offset: 0.5 }, { translate: '0 0' }], 420);
+      await wait(180);
+    }
+    await anim(hero, [{ rotate: '0deg', translate: '0 0' }, { rotate: '-12deg', translate: '-4px 0', offset: 0.25 }, { rotate: '-82deg', translate: '-10px 6px' }], 380, { easing: 'ease-in' });
+    const st = h('span', { class: 'train-stars' });
+    st.innerHTML = BATTLE_DIZZY;
+    hero.append(st);
+    if (partner === 'alien') { draw('cheer'); say('Hihi!', 'foe'); }
+    await wait(520);
+    st.remove();
+    await anim(hero, [{ rotate: '-82deg', translate: '-10px 6px' }, { rotate: '8deg', translate: '0 -6px', offset: 0.7 }, { rotate: '0deg', translate: '0 0' }], 420, { easing: 'ease-out' });
+    if (partner === 'alien') draw('guard');
+  };
+  let busy = false;
+  box.play = async () => {
+    if (busy || reduceMotion() || !box.isConnected) { if (move === 'fall') say(trainSay(move, streak, opts.n)); return; }
+    busy = true;
+    bubble.className = 'train-say';
+    if (move === 'punch') { await punch(false, () => hitFoe()); await wait(450); }
+    else if (move === 'kick') { say(trainSay(move, streak, opts.n)); await kick(() => hitFoe(true)); await wait(450); }
+    else if (move === 'combo') { say(trainSay(move, streak, opts.n)); await punch(false, () => hitFoe()); await punch(true, () => hitFoe()); await kick(() => hitFoe(true)); await wait(450); }
+    else { await fall(); say(trainSay(move, streak, opts.n)); }
+    busy = false;
+  };
+  return box;
+}
+
+// Oturumdaki cevabın altındaki antrenman yeri: ss oturum (üst üste doğru sayısı ss.streak, düşüş sırası ss.falls), correct.
+// Numara ve kahramanın seviyesi oturumda bir kez okunur; asker kahraman kapalıysa, çocuk asker olduysa, numara okunamazsa ya
+// da hareket azaltılmışsa yer boş kalır. Hiçbir şey yazmaz.
+function trainSlot(ss, correct) {
+  const slot = h('div', { class: 'train-slot' });
+  const p = state.student;
+  if (!p || !armyOn(p) || reduceMotion()) return slot;
+  ss.train ??= Promise.all([loadArmy(p), armyHeroLevel(p)]).catch(() => [null, 1]);
+  const streak = ss.streak || 0, n = correct ? 0 : Math.max(0, (ss.falls || 1) - 1);
+  ss.train.then(([st, level]) => {
+    if (!st || !trainOn(p, st) || !slot.isConnected) return;
+    const sc = trainScene(trainMove(correct, streak), streak, p, level, { partner: st.points >= TRAIN_ALIEN_AT ? 'alien' : 'bag', army: armyView(p, st), n });
+    fill(slot, sc);
+    sc.play();
+  }).catch(() => {});
+  return slot;
 }
 
 /* Asker: veli */

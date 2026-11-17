@@ -286,6 +286,14 @@ Her maddenin yanında nasıl denendiği yazar:
   kez kutlama (madalya, övgü, sıradaki madalya). Kazanılanların kurdeleleri kahramanın göğsünde (asker değilken üst ortada,
   askerken sağda künyenin üstünde). Kahramanın sözünde son madalya ve sıradakine kalan; kartın satırında madalya sayısı;
   kahramanın sayfasında madalya rafı (kazanılan renkli, sıradaki işaretli, kalanlar gri ve numaralı), askerken de. [O], ekran [A]
+- **Antrenman** (velinin isteği, 2026-11-16: asker olana kadar; `army.js`, trainScene/trainSlot): oturumda her cevabın
+  altında ("Doğru"/"Yanlış" satırının hemen altı) kısa sahne. Doğruda kahraman kum torbasına yumruk atar ("POF!"), 3 doğru
+  üst üste döner tekme ("Döner tekme!", "BAM!"), 5 ve üstü kombo ("Kombo ×5!": iki yumruk ve tekme). Yanlışta komik düşer,
+  başında yıldızlar, kalkar ve sırayla "Hadi bir daha deneyelim!", "Düştüm ama kalktım!", "Bir dahakine olacak!", "Hata
+  yapmak öğrenmektir!". 70 numaradan sonra torba yerine eldivenli sevimli uzaylı partner (vurulunca sendeler, gülüp
+  eldivenlerini kaldırır; yanlışta kahramanı hafifçe iter, "Hihi!"). Boş geçilen soruda sahne yok, seri sıfırlanır. Asker
+  olunca (100 ya da kol seçildi), asker kahraman kapalıysa, hareket azaltılmışsa ve denemede yok. Hiçbir şey kaydetmez.
+  İngilizce öğrencide sözler İngilizce. [O] hesap ve çizimler, [A] ekran
 - Kahramanın sayfasında asker kartı: asker değilken numara çubuğu ve 100'e kalan; askerken rütbe rozeti, sıradaki rütbeye
   kalan, bütün rütbeler; "Numara nasıl artar?". Besleme kapalı, asker kahraman açıksa sayfa kahramanı ve asker kartını
   gösterir (yemek rafı yok). Kahramanın kartında numara ya da rütbe satırı. İngilizce ve Klavye sayfalarındaki kahraman

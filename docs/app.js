@@ -1270,6 +1270,9 @@ function showQuestion() {
       else if (b.dataset.k === selected) b.classList.add('wrong');
     });
     ss.stats.total++; if (correct) ss.stats.correct++;
+    // Antrenman (army.js, trainSlot): üst üste doğru sayısı ve düşüş sırası; boş geçilen soru seriyi bozar, sahnesi yok.
+    ss.streak = correct ? (ss.streak || 0) + 1 : 0;
+    if (!correct && !help) ss.falls = (ss.falls || 0) + 1;
     const list = ss.results.get(item.id) || [];
     // track ve target: oturum sonundaki uzaylı savaşında zor soru (el bombası) için (army.js, battleHard).
     myResult = { correct, strong, confidence, hint: !!hintUsed, slow: overTime, track: entry.extra ? 'extra' : item.track, target: question.target_seconds };
@@ -1316,6 +1319,7 @@ function showQuestion() {
            solutionBox(question.solution, question.id, { cls: 'note teacher', style: 'margin-top: 6px' })) : null,
          gapBox, yt]
       : [h('p', { class: 'verdict ' + (correct ? 'ok' : 'no') }, correct ? 'Doğru' : `Yanlış. Doğru cevap ${question.answer}.`),
+         trainSlot(ss, correct),
          coachNote ? h('p', { class: 'small' }, coachNote) : null,
          question.solution ? solutionBox(question.solution, question.id, { cls: 'note teacher' }) : null,
          confidence === 25 ? h('p', { class: 'small muted' }, 'Tahmin ettiğin için bu soruyu birlikte bakılacaklara ekledim.') : null],

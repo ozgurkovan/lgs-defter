@@ -670,3 +670,27 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .step-mark mark { background: #FFE066; padding: 0 2px; border-radius: 3px; }
 @keyframes step-in { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .step.now { animation: none; } }
+
+/* Antrenman (army.js, trainScene): cevaptan sonra kahraman kum torbasına ya da eldivenli uzaylı partnere vurur; yanlışta düşüp
+   kalkar. Mavi minder, sağda torba (tavandan sallanır) ya da uzaylı. */
+.train { position: relative; height: 132px; margin: 6px 0 2px; border-radius: 14px; overflow: hidden; background: linear-gradient(#F3F7FF, #E3ECFA); }
+.train::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: #4C8DF6; opacity: 0.85; }
+.train-hero { position: absolute; left: 14%; bottom: 10px; width: 82px; height: 90px; transform-origin: 50% 100%; z-index: 2; }
+.train-hero svg, .train-foe svg, .train-glove svg, .train-swoosh svg, .train-stars svg { width: 100%; height: 100%; display: block; }
+.train-foe { position: absolute; left: 58%; top: 0; width: 48px; height: 118px; transform-origin: 50% 0; z-index: 1; }
+.train-alien .train-foe { top: auto; bottom: 8px; width: 62px; height: 94px; transform-origin: 50% 100%; }
+.train-fx { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.train-glove { position: absolute; left: calc(14% + 58px); bottom: 50px; width: 34px; height: 26px; }
+.train-glove.high { bottom: 64px; }
+.train-pow { position: absolute; left: calc(58% - 2px); top: 34px; width: 48px; height: 48px; display: grid; place-items: center; }
+.train-pow svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.train-pow b { position: relative; font: 900 11px/1 var(--font-body, sans-serif); color: #C2185B; }
+.train-swoosh { position: absolute; left: calc(14% + 18px); bottom: 44px; width: 96px; height: 60px; }
+.train-stars { position: absolute; left: 50%; top: -14px; width: 54px; height: 54px; translate: -50% 0; scale: 1 0.42; }
+.train-stars svg { animation: battle-spin 0.9s linear infinite; }
+.train-say { position: absolute; left: 30%; top: 8px; padding: 3px 10px; border-radius: 12px; background: #fff; color: #1D2A4D; font: 800 0.85rem/1.3 var(--font-body, sans-serif);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); opacity: 0; z-index: 4; white-space: nowrap; }
+.train-say.on { opacity: 1; animation: train-pop 0.3s ease-out; }
+.train-say.foe { left: 60%; }
+@keyframes train-pop { from { transform: scale(0.6); } }
+@media (prefers-reduced-motion: reduce) { .train-say.on { animation: none; } .train-stars svg { animation: none; } }

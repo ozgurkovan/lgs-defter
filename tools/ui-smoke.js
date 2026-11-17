@@ -244,6 +244,27 @@
       game.remove();
       check('Uzaylı savaşı: asker değilken oturum sonu kartı gizli; oyun başlar, uzaylıya dokununca mermi azalır, "Atla" biter',
         hiddenOk && startOk && shot && endOk, [!hiddenOk && 'kart görünürlüğü yanlış', !startOk && 'başlangıç kartı', !shot && 'atış', !endOk && 'atla'].filter(Boolean).join('; '));
+      // Antrenman (2026-11-16): asker olmayan çocukta cevabın altındaki sahne. Sahte oturumla kurulur (cevap yazılmaz): doğruda
+      // eldiven ve "POF", yanlışta düşüp kalkar, "Hadi bir daha deneyelim!"; 70'ten sonra torba yerine uzaylı. Askerse ya da
+      // hareket azaltılmışsa yer boş kalır. Düşüş sahnesinin animasyonları ileri sarılır (bölme gizliyken animasyon ilerlemez).
+      const t1 = trainSlot({ streak: 1 }, true), t2 = trainSlot({ streak: 0, falls: 1 }, false);
+      t1.style.cssText = 'position: fixed; left: 0; top: 0; width: 360px; z-index: 99';
+      t2.style.cssText = 'position: fixed; left: 0; top: 150px; width: 360px; z-index: 99';
+      document.body.append(t1, t2);
+      const noTrain = reduceMotion() || armyCorps(st?.corps) || (st?.points ?? 0) >= ARMY_SOLDIER;
+      let glove = false, fallSay = '';
+      for (let i = 0; i < 50 && !noTrain && !(glove && fallSay); i++) {
+        await wait(100);
+        glove ||= !!t1.querySelector('.train-glove, .train-pow');
+        t2.getAnimations({ subtree: true }).forEach((a) => { try { a.finish(); } catch (e) { /* bitmiş */ } });
+        fallSay = t2.querySelector('.train-say.on')?.textContent || '';
+      }
+      const partnerOk = noTrain || !!t1.querySelector(st.points >= TRAIN_ALIEN_AT ? '.train-alien' : '.train-bag');
+      const trainOk = noTrain ? !t1.firstChild && !t2.firstChild
+        : !!t1.querySelector('.train-hero svg') && glove && partnerOk && /Hadi bir daha deneyelim|Let's try again/.test(fallSay);
+      t1.remove(); t2.remove();
+      check('Antrenman: asker olana kadar cevabın altında; doğruda yumruk, yanlışta düşüp "Hadi bir daha deneyelim!", 70\'ten sonra uzaylı',
+        trainOk, noTrain ? 'asker ya da hareket azaltılmış: sahne yok' : [!glove && 'yumruk yok', !partnerOk && 'partner yanlış', !fallSay && 'düşüş sözü yok'].filter(Boolean).join('; '));
     } else if (role === 'student') {
       go('hero'); await settle();
       check('Asker kahraman kapalıyken asker kartı yok', !document.querySelector('.army-card, .army-line'));

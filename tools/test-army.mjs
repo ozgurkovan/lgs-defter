@@ -178,5 +178,37 @@ check('savaş bağlı: oturum sonunda (hata tekrarında radardan) ve deneme sonu
   /battleCard\(stats\.correct, stats\.total - stats\.correct, hard, 'session', track === 'mistake'\)/.test(app) && /saved \? battleCard\([\s\S]{0,200}'exam'\)/.test(app)
   && /target: question\.target_seconds/.test(app) && /if \(!st \|\| !armyCorps\(st\.corps\)\) return;/.test(src));
 
+// Antrenman (asker olana kadar): kum torbası, 70'ten sonra uzaylı partner; doğruda yumruk, 3'te döner tekme, 5'te kombo, yanlışta düşüş
+let lang = 'tr';
+const R = new Function([
+  "const trEn = (tr, en) => (this.lang() === 'en' ? en : tr);",
+  pick(src, '/* Asker: saf kısım', '/* Asker: ekran */'),
+  pick(src, '/* Antrenman: saf kısım */', '/* Antrenman: sahne */'),
+  'return { TRAIN_ALIEN_AT, trainMove, trainOn, trainSay, trainAlien, TRAIN_BAG, TRAIN_GLOVE, TRAIN_POW, TRAIN_SWOOSH };',
+].join('\n')).call({ lang: () => lang });
+check('antrenman hareketi: yanlışta düşüş, doğruda yumruk; 3 doğru üst üste döner tekme, 5 ve üstü kombo',
+  R.trainMove(false, 0) === 'fall' && R.trainMove(false, 7) === 'fall' && R.trainMove(true, 1) === 'punch' && R.trainMove(true, 2) === 'punch'
+  && R.trainMove(true, 3) === 'kick' && R.trainMove(true, 4) === 'kick' && R.trainMove(true, 5) === 'combo' && R.trainMove(true, 12) === 'combo');
+check('antrenman asker olana kadar: asker kahraman açıkken var, 100\'e ulaşınca ya da kol seçince yok; 70\'ten sonra uzaylı partner',
+  R.trainOn({ grade: 4 }, { points: 50 }) && R.trainOn({ grade: 4 }, null) && R.trainOn({ grade: 4 }, { points: 99 })
+  && !R.trainOn({ grade: 4 }, { points: 100 }) && !R.trainOn({ grade: 4 }, { points: 20, corps: 'kara' }) && !R.trainOn({ grade: 8 }, { points: 10 })
+  && !R.trainOn({ grade: 4, hero_army: false }, { points: 10 }) && R.TRAIN_ALIEN_AT === 70);
+const says = [0, 1, 2, 3, 4, -1, NaN, 2.5].map((n) => R.trainSay('fall', 0, n));
+check('antrenman sözü: düşünce "Hadi bir daha deneyelim!" ve sırayla öteki cesaret sözleri, kombo sayısıyla, tekmede "Döner tekme!"',
+  says[0] === 'Hadi bir daha deneyelim!' && says[1] === 'Düştüm ama kalktım!' && says[4] === says[0] && says.every((s) => typeof s === 'string' && s.length > 5)
+  && R.trainSay('combo', 6) === 'Kombo ×6!' && R.trainSay('kick', 3) === 'Döner tekme!' && R.trainSay('punch', 1) === '');
+lang = 'en';
+check('antrenman sözü İngilizce öğrencide İngilizce (Türkçe harfsiz sözler de)',
+  R.trainSay('fall', 0, 0) === 'Let\'s try again!' && R.trainSay('fall', 0, 2) === 'I\'ll get it next time!' && R.trainSay('combo', 5) === 'Combo ×5!'
+  && R.trainSay('kick', 3) === 'Spinning kick!');
+lang = 'tr';
+const trainPics = [...['guard', 'hit', 'cheer', 'push', 'başka'].map((m) => R.trainAlien(m)), R.trainAlien(), R.TRAIN_BAG, R.TRAIN_GLOVE, R.TRAIN_POW, R.TRAIN_SWOOSH];
+check('antrenman çizimleri (uzaylı partnerin dört hâli, kum torbası, eldiven, vuruş yıldızı, tekme izi) bozuk sayı taşımıyor',
+  trainPics.every((s) => s.startsWith('<svg') && s.endsWith('</svg>') && !/NaN|undefined|Infinity/.test(s)) && R.trainAlien('xyz') === R.trainAlien('guard'));
+check('antrenman bağlı: oturumda cevabın altında; seri ve düşüş sayılır, asker olunca ya da hareket azaltılmışsa yok, hiçbir şey yazmaz',
+  /trainSlot\(ss, correct\),/.test(app) && /ss\.streak = correct \? \(ss\.streak \|\| 0\) \+ 1 : 0;/.test(app) && /if \(!correct && !help\) ss\.falls/.test(app)
+  && /if \(!st \|\| !trainOn\(p, st\) \|\| !slot\.isConnected\) return;/.test(src) && /if \(!p \|\| !armyOn\(p\) \|\| reduceMotion\(\)\) return slot;/.test(src)
+  && !/sb\.from\(/.test(pick(src, 'function trainSlot(', '/* Asker: veli */')));
+
 console.log(fails ? `${fails} kontrol başarısız` : '');
 process.exit(fails ? 1 : 0);
