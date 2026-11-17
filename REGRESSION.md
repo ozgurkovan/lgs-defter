@@ -45,6 +45,13 @@ Her maddenin yanında nasıl denendiği yazar:
 - Aynı tarayıcıda başka sekmede başka biri giriş yaparsa açık sekmeler yenilenip o kişiyi gösterir; eski sekme eski oturumu
   geri yazıp yeni giriş yapanı önceki hesaba döndürmez (2026-11-10). [A]
 - Geri: üst çubuktaki "← Geri" ve tarayıcının geri tuşu bir önceki sayfaya döner; ilk sayfada tarayıcı tuşu siteden çıkar. [A]
+- Telafio adı, logosu ve yeni görünüş (velinin isteği, 2026-11-17: "güzel bir logomuz olsa… bizim app modern gözükmüyor"):
+  sekme başlığı, ana ekran simgesi ve kurulum adı Telafio; açılışta ve giriş ekranında logo (giriş ekranındaki slogan aynı).
+  Üst çubukta ilk sayfada logo ve ad, "← Geri" görünen sayfalarda yalnızca simge; dar telefonda üst çubuk tek satır.
+  Görünüş `docs/theme.css`'te (öteki stillerden sonra yüklenir): düz açık zemin, kalın kenarlı kartlar, kabartmalı ana
+  düğmeler, ana sayfada sarı "Başla" ve simgeli Hata tekrarı / Konu tekrarı kartları, mavi kahraman kartı, seçili sekmesi
+  renkli alt menü, soru ekranında kalın ilerleme çubuğu ve dolu şık harfleri; koyu tema. Hiçbir ekranın içeriği değişmedi.
+  Sürüm numarası theme.css'i de kapsar (9 dosya). [O] (sürüm sayımı), [A] (sayfalar hatasız açılır), [E] (görünüş)
 - Ülke ve müfredat ayrımı (velinin isteği, 2026-11-09; `supabase/country-curriculum.sql`): konular sınıfın yanında müfredata
   göre de seçilir (`topics.curriculum`, `profiles.curriculum`; bugün hepsi `tr`). Başka müfredatın aynı sınıftaki konusu
   öğrenciye görünmez ve yıllık plana göre açılmaz. LGS'ye özgü dersler, günlük plan ağırlıkları, sayaç ve denemeler
@@ -689,6 +696,10 @@ Her maddenin yanında nasıl denendiği yazar:
   - çocuk kendi kutusunu ve cevabını yazar, kardeşi adına yazamaz;
   - günlük sayıyı veli ayarlar, çocuk değiştiremez;
   - veli ve İngilizce öğretmeni okur; başka öğretmen ve kardeş göremez.
+- Abonelik (`test-subscriptions.sql`; velinin isteği, 2026-11-16): abonelik bir veliye yazılır; o velinin veli bağıyla bağlı
+  çocukları ve çocukların öteki velisi aynı plandadır (`my_plan()`: 'family' ya da 'free'), öğretmen bağı plan taşımaz,
+  süresi biten abonelik sayılmaz. Satırı yalnızca gizli anahtar yazar: çocuk da veli de yazamaz; veli yalnız kendi satırını
+  görür, çocuk ve başka veli hiçbir satır görmez. Uygulama planı henüz okumuyor; hiçbir kısıt bağlı değil.
 - Aile dışından biri hiçbir şey görmez.
 - Test araçları şifresiz giriş bağlantısını yalnızca test hesaplarına üretir (IrfTest, test4.sinif, Test Veli, Test Öğretmen).
   Başka bir ad ya da adres verilirse durur, Supabase'e hiç gitmez; hesap açılmaz.

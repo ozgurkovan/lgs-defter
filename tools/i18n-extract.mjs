@@ -132,7 +132,7 @@ const looksTurkish = (s) => {
 };
 // CSS sınıf adları (style.css ve typing.css): yalnızca bunlardan oluşan dize sınıf listesidir, ekranda görünmez.
 const CSS_CLASSES = new Set(['card', 'stack', 'row', 'spread', 'small', 'muted', 'ghost', 'primary', 'block', 'danger', 'error', 'big', 'num',
-  ...['docs/style.css', 'docs/typing.css'].flatMap((f) => [...fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1]))]);
+  ...['docs/style.css', 'docs/typing.css', 'docs/theme.css'].flatMap((f) => [...fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1]))]);
 // Ekranda görünebilecek yazı mı? Türkçe görünen her şey; ayrıca harf taşıyan, kod olmayan dizeler (Türkçe harfsiz
 // Türkçe yazılar da var: "Okudum", "Besle", "Kaydedilemedi, tekrar dene."). İngilizce olanlar kendisine çevrilir.
 const KEY_CODES = /^(GET|POST|PATCH|Key[A-Z]?|Digit\d?|Arrow|Shift|Control|Alt|Meta|Enter|Backspace|Space|Tab|Escape|CapsLock|IntlBackslash|ContextMenu|Slash|Backslash|Quote|Semicolon|Bracket|Comma|Period|Backquote|Minus|Equal|AuthRetryableFetchError|use strict)/;
@@ -172,7 +172,8 @@ function joinConcats(src, tokens) {
 export function extract() {
   const keys = new Map();
   for (const f of FILES) {
-    const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    // Satır sonları tek tipe çevrilir: Windows'ta git dosyayı CRLF ile çıkarınca çok satırlı şablonlar ayrı anahtar sayılıyordu (2026-11-17).
+    const src = fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\r\n/g, '\n');
     const ranges = skipRanges(src);
     for (const t of joinConcats(src, tokenize(src))) {
       if (ranges.some(([a, b]) => t.at >= a && t.at <= b)) continue;
