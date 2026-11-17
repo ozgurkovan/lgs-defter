@@ -487,6 +487,8 @@ Her maddenin yanında nasıl denendiği yazar:
   - Her başlayışta yeniden kurulur.
 - Süre, "T (tahmin)" işareti, soru haritası, "Ara ver" ve devam, "Bitir".
 - Sonuç ve net. Yanlış ve boşların hepsi hata tekrarına girer, konusu henüz işlenmemiş olsa da. Çözdüğün denemeler listesi.
+  Listede her denemenin toplam neti, kaç soruda kaç doğru, yanlış ve boş yaptığı, birden çok ders varsa ders ders neti
+  (velinin isteği, 2026-11-17).
 
 **Yükle sekmesi** [A], gönderme [E]
 - **Soru ekle**: "Yapamadığım sorular" ve "Beğendiğim sorular" fotoğrafları, istenirse not.

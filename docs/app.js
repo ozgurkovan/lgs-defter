@@ -2429,6 +2429,25 @@ function examQuestionContent(r) {
         h('b', {}, k), h('span', {}, qn.choices[k]))))];
 }
 const examNet = (rs) => rs.reduce((s, r) => s + r.correct - r.wrong / 3, 0);
+/* Çözdüğü denemenin kartı (velinin isteği, 2026-11-17: "yalnızca netleri yazıyor, toplam kaç soruda o netleri yapmış? toplam net,
+   ders ders net yazalım mı?"): adı ve tarihi, toplam net, kaç soruda kaç doğru, yanlış, boş; birden çok ders varsa ders ders
+   net (dersler uygulamanın ders sırasıyla). Sonucu okunamayan eski denemede yalnızca ad ve net kalır. */
+function pastExamCard(p) {
+  const order = Object.keys(SUBJECTS);
+  const rs = [...(p.exam_results || [])].sort((a, b) => order.indexOf(a.subject) - order.indexOf(b.subject));
+  const sum = (k) => rs.reduce((s, r) => s + (r[k] || 0), 0);
+  const d = sum('correct'), y = sum('wrong'), b = sum('blank');
+  return h('div', { class: 'card flat stack', style: 'padding: 12px; gap: 8px' },
+    h('div', { class: 'spread' },
+      h('div', {}, h('div', {}, p.name), h('div', { class: 'small muted' }, `${fmtDate(p.exam_date)}${p.time_note ? ' · ' + p.time_note : ''}`)),
+      h('b', { class: 'num' }, `net ${fmtNet(examNet(rs))}`)),
+    rs.length ? h('p', { class: 'small muted num' }, h('span', {}, `${d + y + b} soru · ${d} doğru · ${y} yanlış`), b ? h('span', {}, ` · ${b} boş`) : null) : null,
+    rs.length > 1 ? h('div', { class: 'row', style: 'gap: 6px' }, rs.map((r) => {
+      const tag = subjTag(r.subject);
+      tag.append(' ', h('b', { class: 'num' }, fmtNet(r.correct - r.wrong / 3)));
+      return tag;
+    })) : null);
+}
 
 async function viewExamHub() {
   loading();
@@ -2436,7 +2455,7 @@ async function viewExamHub() {
   const [bookletRows, openTopics, past] = await Promise.all([
     lgs ? q(sb.from('questions').select('booklet, topic_id').in('booklet', BOOKLETS.map((b) => b[0])).eq('active', true)) : [],
     lgs ? q(sb.from('topic_status').select('topic_id').eq('student_id', sid()).in('status', ['active', 'gap'])) : [],
-    q(sb.from('exams').select('id, name, booklet, exam_date, time_note, exam_results(correct, wrong, blank)')
+    q(sb.from('exams').select('id, name, booklet, exam_date, time_note, exam_results(subject, correct, wrong, blank)')
       .eq('student_id', sid()).eq('kind', 'uygulama').order('created_at', { ascending: false }).limit(12)),
   ]);
   // Gerçek LGS bütün yılın konularını kapsar: kitapçık, bütün soruları gelip hepsinin konusu işlenince açılır.
@@ -2493,9 +2512,7 @@ async function viewExamHub() {
       lgs && !booklets.length ? h('p', { class: 'small muted' }, 'Gerçek LGS soruları bütün yılın konularını kapsadığı için konular okulda işlenince açılacak.') : null),
     past.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Çözdüğün denemeler'),
-      past.map((p) => h('div', { class: 'card flat spread', style: 'padding: 12px' },
-        h('div', {}, h('div', {}, p.name), h('div', { class: 'small muted' }, `${fmtDate(p.exam_date)}${p.time_note ? ' · ' + p.time_note : ''}`)),
-        h('b', { class: 'num' }, `net ${fmtNet(examNet(p.exam_results || []))}`)))) : null,
+      past.map(pastExamCard)) : null,
     // Kâğıt deneme yükleme Yükle sekmesinde; buradan da bir dokunuşla gidilir.
     h('p', { class: 'small muted', style: 'text-align: center' }, 'Kâğıt üzerinde bir deneme mi çözdün? ',
       h('a', { href: '#', onclick: (e) => { e.preventDefault(); go('send'); } }, 'Yükle sekmesinden gönder.')));
