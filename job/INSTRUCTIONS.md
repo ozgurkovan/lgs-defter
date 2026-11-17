@@ -32,6 +32,48 @@ hopes they do well in private-school scholarship exams (bursluluk sınavları). 
 - A parent can open the next grade's topics for a strong child (`profiles.extra_grades`, e.g. a
   3rd grader tracking grade-4 topics). Write those questions at the topic's grade, not the child's.
 
+## Content rules for everything you write (velinin isteği, 2026-11-16)
+
+The readers are children. Every question, choice, passage, hint, solution, step and lesson must be
+something a careful parent and teacher would hand to a child:
+- Nothing obscene, sexual or romantic; no swearing, insults or mocking of anyone's body, family,
+  poverty, religion, origin or disability.
+- No alcohol, smoking, drugs, gambling or betting as an everyday context (no "bira", "sigara", "iddaa",
+  "piyango" word problems). They may appear only where the curriculum itself teaches the harm
+  (health, Din Kültürü), stated as harmful.
+- No bad example: characters in stories and word problems do not lie, cheat, copy in exams, steal,
+  bully, skip school, litter or take dangerous risks and come out fine. Such behaviour may appear only
+  as the clearly wrong choice, or in a story that shows why it is wrong and how it is put right.
+- Violence only as the curriculum needs it (history, the immune system), stated plainly and briefly, no
+  gore and no fear. No frightening or hopeless scenarios.
+- No real brands, shops, apps, games, films, songs, celebrities or politicians; use made-up names.
+  Historical figures only where the curriculum teaches them, with facts that are certain.
+- Prefer contexts that do the child good: curiosity, reading, nature, science, helping at home, sport,
+  saving, sharing, honesty, respect, effort that pays off, caring for animals and the environment.
+- If an uploaded question (1a, 1b, 1e) breaks these rules, still process it for the child who sent it,
+  but do not carry its context into the variants and pool questions you write.
+
+## Original questions only (copyright; velinin isteği, 2026-11-16)
+
+The app is going to be sold, so the shared pool may hold only questions that are ours. Uploaded
+questions (MEB, publishers' books and denemeler, anything a child photographs) belong to their
+publishers: they stay with the family that uploaded them and are never the model for a copy.
+The database enforces this (`supabase/private-questions.sql`): `questions.private_students` lists the
+students a question is private to (null = shared pool). Rows you insert with `source` `ogrenci`,
+`kitap`, `meb` or `deneme` are made private to the uploader's family automatically; never clear that
+column, and leave it null on the questions you write yourself (`source=claude`).
+When an uploaded question leads to new questions (1c variants, 1e look-alikes, section 2), take from
+it only what nobody owns: the kazanım, the skill, the question style and the misconception behind the
+distractors. Then write a new question from scratch:
+- a new scenario and setting, new names, new data, new wording; your own table, list or figure layout;
+- never the source's sentences, its characters, its table or figure with other numbers, its order of
+  choices or its distractor texts; "the same question with different numbers" is a copy, not a variant;
+- Türkçe, İngilizce and ELA: never reuse the source's passage, poem or dialogue, not even shortened or
+  paraphrased sentence by sentence; write your own text on a different subject;
+- check before saving: put your question next to the source. If a reader would say "this is that
+  question, changed", rewrite it. What may match is the idea being tested and nothing else.
+Quoted texts in your own questions: only your own writing or works clearly in the public domain.
+
 ## US students (`profiles.curriculum` starts with `us`, e.g. `us-pa` = Pennsylvania)
 
 Some students follow a US state curriculum. Read `profiles.curriculum` for every student you work on;
@@ -213,9 +255,12 @@ For every photo (usually one question each):
    note='Yapamadığı soru (kendi gönderdi)'`). Section 1c then writes its variants (in this run if
    time allows). If her marks showed the wrong idea she followed, give each variant a distractor built on
    that same idea.
-5. `begendim`: write 2 new questions in the same style and on the same skill (new numbers, names and
-   context), `variant_of` = the liked question's id, `source=claude`, `source_note='Beğendiği sorunun
-   benzeri'`. They join the pool and reach her in topic reviews and extra practice.
+5. `begendim`: write 2 new questions in the same style and on the same skill, written from scratch as
+   "Original questions only" (top of this file) says: a new scenario, new data and new wording, not her
+   question with other numbers. `variant_of` = the liked question's id, `source=claude`,
+   `source_note='Beğendiği sorunun benzeri'`. They join the pool and reach her in topic reviews and
+   extra practice. The uploaded question itself (`source='ogrenci'`) is for her alone; what the pool
+   gains from an upload is these original questions and the 1c variants.
 6. Patch the submission `done` with a short, warm Turkish `result_note` to her, for example "2 soru
    eklendi. Çözümleri 'Gönderdiğin sorular'da; yapamadığının benzerleri yarın hata tekrarında."
 
@@ -335,7 +380,10 @@ Each row is one mistake item with fewer than 2 unseen variants for that student;
 write. `student_answer` is the wrong choice she picked. Read the source question
 (`questions?id=eq.<question_id>` or `exam_questions?id=eq.<exam_question_id>`, including its crop
 image and diagnosis) and write `need` variants, a mix of:
-1. The same question with new numbers, names, words or context (same steps to solve).
+1. The same skill and the same steps to solve, in a new scenario with new data and wording. Only when
+   the source is one of our own questions (`source` `claude` or `okuma`) may you keep its frame and
+   change the numbers, names or words. For every other source (`meb`, `kitap`, `ogrenci`, and every
+   `exam_questions` item) follow "Original questions only" above: a new question from scratch.
 2. The same idea asked from another side: reversed question, a "değildir" / "yanlıştır" form, or a
    different choice being correct, so memorising the old answer does not help.
 3. A similar question aimed at the misconception behind her wrong choice (what made `student_answer`
@@ -396,7 +444,12 @@ How to write them:
 - Write with a JSON file: `node tools/sb.mjs patch "questions?id=eq.<id>" <file.json>` where the file is
   `{"steps": [...]}`. Never change `answer`, `solution` or anything else in this step.
 
-## 1d. MEB booklets (every run until all are done)
+## 1d. MEB booklets: STOPPED (velinin kararı, 2026-11-16)
+
+Do not run this section. The app is going to be sold and the pool may hold only our own questions, so
+MEB questions are no longer imported and the existing `source='meb'` rows are being removed. Do not
+import from `.work/meb/`, do not touch the manifest, and never write a question with `source='meb'`.
+The text below is kept only as a record of how the earlier import worked.
 
 The family downloaded MEB's past LGS booklets and sample-question sets for private practice. They
 live only in `.work/meb/lgs/` (git-ignored); their questions go into the private pool with
@@ -512,6 +565,26 @@ For each report, check the question carefully (solve it again from scratch):
 Patch `status=checked, checked_at=now, verdict, response`. `response` is 1–3 Turkish sentences to
 the student: thank them, say plainly whether they were right, and if the question was correct,
 explain the correct answer briefly and kindly. Learn from every report when generating new questions.
+
+## 4b. Question votes (every run, after 4)
+
+After answering, a student can give the question 👍 or 👎 and, with 👎, an optional short reason
+(`question_votes`: one vote per student and question; she can change it). A vote never changes a result
+and never removes a question by itself; it tells you how good the question is. Read the 👎 votes changed
+since the previous run started (`started_at` of the previous `job_runs` row):
+```
+node tools/sb.mjs get "question_votes?vote=eq.-1&updated_at=gt.<previous started_at>&select=question_id,note,updated_at,questions(*)&order=updated_at"
+```
+For each question, also read all its votes: `question_vote_summary?question_id=eq.<id>` (up, down, notes).
+- Solve it again from scratch. If it really is wrong, ambiguous or off-topic, set `active=false` and fix
+  or deactivate your other questions for that topic with the same flaw, as in section 4.
+- If it is correct but a note says it is confusing, or two or more students gave it 👎, improve only the
+  wording of the stem, choices or solution, never the answer. Questions from uploads (`source` other than
+  `claude` or `okuma`) are not yours to rewrite: leave them as they are.
+- Taste only ("çok uzun", "sıkıcı", "çok kolay", "çok zor") → nothing to fix; use it when you write new
+  questions for that topic. Questions with many 👍 and no 👎 are good models for new ones.
+Never write to `question_votes` and never answer the student about a vote. Mention what you changed in the
+run summary (for example "2 beğenilmeyen soruya bakıldı, 1'inin ifadesi düzeltildi").
 
 ## 5. Finish
 

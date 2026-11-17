@@ -1324,6 +1324,7 @@ function showQuestion() {
          question.solution ? solutionBox(question.solution, question.id, { cls: 'note teacher' }) : null,
          confidence === 25 ? h('p', { class: 'small muted' }, 'Tahmin ettiğin için bu soruyu birlikte bakılacaklara ekledim.') : null],
       understoodRow,
+      voteRow(question.id),
       h('button', { class: 'primary block', onclick: () => { ss.index++; showQuestion(); } },
         ss.index + 1 < ss.entries.length ? 'Sonraki soru' : 'Bitir'));
     feedback.hidden = false;
@@ -1874,6 +1875,41 @@ function messageBox() {
     h('label', { class: 'field' }, 'İmza', signature),
     all ? h('label', { class: 'row small', for: 'msg-all' }, all, 'Bütün çocuklara gönder') : null,
     send, list);
+}
+
+/* Soru beğenisi (velinin isteği, 2026-11-16): cevaptan sonra 👍 / 👎; 👎'de nedenini yazabilir. Oy hemen kaydedilir,
+   değiştirilebilir (soru başına bir oy, question_votes). Sonucu ve takvimi etkilemez; "Soruda sorun var"dan ayrıdır.
+   Yalnızca öğrencinin kendi hesabında görünür. */
+function voteRow(questionId) {
+  if (state.profile?.role !== 'student') return null;
+  let vote = 0;
+  const note = h('textarea', { rows: 2, maxlength: 500, placeholder: 'Neden beğenmedin? İstersen yaz.', 'aria-label': 'Neden beğenmedin' });
+  const thanks = h('span', { class: 'small muted', hidden: true }, 'Teşekkürler!');
+  const save = async () => {
+    try {
+      await q(sb.from('question_votes').upsert({
+        student_id: sid(), question_id: questionId, vote,
+        note: vote < 0 ? note.value.trim() || null : null, updated_at: new Date().toISOString(),
+      }));
+      thanks.hidden = false;
+    } catch (e) { console.error(e); toast('Kaydedilemedi, tekrar dene.'); }
+  };
+  const why = h('div', { class: 'stack', style: 'gap: 6px', hidden: true },
+    note, h('div', { class: 'row' }, h('button', { class: 'ghost small', onclick: save }, 'Gönder')));
+  const pick = (v) => {
+    vote = v;
+    up.setAttribute('aria-pressed', String(v === 1));
+    down.setAttribute('aria-pressed', String(v === -1));
+    why.hidden = v !== -1;
+    thanks.hidden = true;
+    save();
+    if (v === -1) note.focus();
+  };
+  const up = h('button', { class: 'chip', 'aria-pressed': 'false', 'aria-label': 'Bu soruyu beğendim', onclick: () => pick(1) }, '👍');
+  const down = h('button', { class: 'chip', 'aria-pressed': 'false', 'aria-label': 'Bu soruyu beğenmedim', onclick: () => pick(-1) }, '👎');
+  return h('div', { class: 'stack vote-row', style: 'gap: 6px' },
+    h('div', { class: 'row' }, h('span', { class: 'small muted' }, 'Bu soru nasıldı?'), up, down, thanks),
+    why);
 }
 
 /* Öğrencinin "Soruda sorun var" bildirimleri: hangi soru, ne dedi (kendi açıklaması), kontrol sonucu.

@@ -305,6 +305,39 @@
         document.querySelector('.ask')?.remove();
       }
     }
+    // Soru beğenisi (velinin isteği, 2026-11-16): öğrencide cevaptan sonra "Bu soru nasıldı? 👍 👎"; dokununca kaydedilir,
+    // değiştirilebilir, 👎'de neden kutusu açılır ve "Gönder" nedeni yazar. Veli ve öğretmende yok. Kayıt sahte: sb.from test
+    // boyunca taklit edilir, veritabanına hiçbir şey gitmez.
+    {
+      const realFrom = sb.from, writes = [];
+      sb.from = (t) => ({ upsert: (row) => { writes.push([t, row]); return Promise.resolve({ data: null, error: null }); } });
+      const qid = '00000000-0000-0000-0000-000000000000';
+      try {
+        const vr = voteRow(qid);
+        if (role !== 'student') check('Soru beğenisi veli ve öğretmende yok', vr === null);
+        else {
+          document.body.append(vr);
+          const [up, down] = vr.querySelectorAll('button.chip');
+          const why = vr.querySelector('textarea')?.parentElement;
+          const startOk = /Bu soru nasıldı/.test(vr.textContent) && !!up && !!down && why?.hidden;
+          up.click(); await wait(150);
+          const upOk = writes.length === 1 && writes[0][0] === 'question_votes' && writes[0][1].vote === 1 && writes[0][1].note === null
+            && writes[0][1].student_id === sid() && writes[0][1].question_id === qid && up.getAttribute('aria-pressed') === 'true'
+            && !vr.querySelector('span.small.muted[hidden]') && why.hidden;
+          down.click(); await wait(150);
+          const downOk = writes.length === 2 && writes[1][1].vote === -1 && !why.hidden && down.getAttribute('aria-pressed') === 'true'
+            && up.getAttribute('aria-pressed') === 'false';
+          vr.querySelector('textarea').value = '  çok uzundu  ';
+          [...vr.querySelectorAll('button')].find((b) => b.textContent === 'Gönder')?.click(); await wait(150);
+          const noteOk = writes.length === 3 && writes[2][1].vote === -1 && writes[2][1].note === 'çok uzundu';
+          vr.remove();
+          check('Soru beğenisi: 👍 hemen kaydedilir, 👎\'ye değiştirilir, neden kutusu açılır ve "Gönder" nedeni yazar',
+            startOk && upOk && downOk && noteOk, [!startOk && 'başlangıç', !upOk && '👍', !downOk && '👎', !noteOk && `neden (${writes.length} kayıt)`].filter(Boolean).join('; '));
+        }
+      } finally {
+        sb.from = realFrom;
+      }
+    }
     // Adım adım çözüm (velinin isteği, 2026-11-16): kısa çözümün altında "Adım adım anlat"; adımlar tek tek açılır, şekil
     // çizilir, sonda "Baştan anlat". Adımlar sayfada verilir (veritabanına bir şey gitmez). Her rolde.
     {

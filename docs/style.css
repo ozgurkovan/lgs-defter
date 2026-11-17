@@ -694,3 +694,8 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .train-say.foe { left: 60%; }
 @keyframes train-pop { from { transform: scale(0.6); } }
 @media (prefers-reduced-motion: reduce) { .train-say.on { animation: none; } .train-stars svg { animation: none; } }
+
+/* Soru beğenisi (app.js, voteRow): cevaptan sonra "Bu soru nasıldı? 👍 👎"; 👎'de neden kutusu. */
+.vote-row { padding-top: 4px; border-top: 1px dashed var(--rule); }
+.vote-row .chip { min-height: 38px; padding: 4px 14px; font-size: 1.15rem; line-height: 1; }
+.vote-row textarea { width: 100%; }

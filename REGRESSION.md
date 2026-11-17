@@ -139,6 +139,11 @@ Her maddenin yanında nasıl denendiği yazar:
   işlenmemiş olsa da hata tekrarına girer); kitap soruları ve konu çalışmasında yok. Konu "işlendi" olunca sorular geri gelir.
 - "Soruda sorun var": cevap yanlış, soru hatalı ya da anlaşılmıyor seçilirse açıklama yazmak zorunlu. "Gönder" önce sorar:
   ne bildirdiğini ve sonucunu söyler ("Soru kontrol edilecek ve sana sayılmayacak"); "Evet, bildir" ya da "Vazgeç". [A]
+- Soru beğenisi (velinin isteği, 2026-11-16): cevaptan sonra "Bu soru nasıldı? 👍 👎". Dokununca hemen kaydedilir
+  ("Teşekkürler!"), oy değiştirilebilir; 👎'de "Neden beğenmedin?" kutusu açılır, yazmak isteğe bağlı. Sonucu, takvimi
+  ve bronzu etkilemez; yalnızca öğrencinin kendi hesabında görünür (veli/öğretmen denerken yok). `question_votes`; öğrenci
+  yalnızca kendi oyunu yazar, veli görür, yazamaz (test-question-votes.sql). Saatlik görev 👎'leri okur, soruyu yeniden
+  çözer; hatalıysa kapatır, kafa karıştırıyorsa yalnızca ifadesini düzeltir (INSTRUCTIONS 4b). [A] sahte kayıtla, yetki [O]
 - Konu tekrarında ya da ek çalışmada yanlış yapılan soru hata tekrarına girer.
 - "Ara ver" düğmesi. Oturum sonunda sonuç, birlikte bakılacaklar ve çoğu zaman bir mola kartı. [A]
 
