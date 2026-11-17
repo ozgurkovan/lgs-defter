@@ -570,21 +570,55 @@ explain the correct answer briefly and kindly. Learn from every report when gene
 
 After answering, a student can give the question 👍 or 👎 and, with 👎, an optional short reason
 (`question_votes`: one vote per student and question; she can change it). A vote never changes a result
-and never removes a question by itself; it tells you how good the question is. Read the 👎 votes changed
-since the previous run started (`started_at` of the previous `job_runs` row):
+and never removes a question by itself; it tells you how good the question may be. A 👎 is a claim to
+check, not a verdict: children also press 👎 because the question was hard or they got it wrong.
+Read the 👎 votes changed since the previous run started (`started_at` of the previous `job_runs` row):
 ```
-node tools/sb.mjs get "question_votes?vote=eq.-1&updated_at=gt.<previous started_at>&select=question_id,note,updated_at,questions(*)&order=updated_at"
+node tools/sb.mjs get "question_votes?vote=eq.-1&updated_at=gt.<previous started_at>&select=question_id,student_id,note,updated_at,questions(*)&order=updated_at"
 ```
-For each question, also read all its votes: `question_vote_summary?question_id=eq.<id>` (up, down, notes).
-- Solve it again from scratch. If it really is wrong, ambiguous or off-topic, set `active=false` and fix
-  or deactivate your other questions for that topic with the same flaw, as in section 4.
-- If it is correct but a note says it is confusing, or two or more students gave it 👎, improve only the
-  wording of the stem, choices or solution, never the answer. Questions from uploads (`source` other than
-  `claude` or `okuma`) are not yours to rewrite: leave them as they are.
+For each question, read all its votes (`question_votes?question_id=eq.<id>&select=student_id,vote,note`).
+Leave out votes from test accounts (the student ids in `tools/test-accounts.mjs`) in everything below.
+
+**Every 👎 question:** solve it again from scratch and read the notes.
+- It really is wrong, ambiguous or off-topic → set `active=false` and fix or deactivate your other
+  questions for that topic with the same flaw, as in section 4.
+- It is correct but a note points to a real problem in the wording (unclear stem, two choices that read
+  alike, a figure that is hard to read) → improve only the wording of the stem, choices or solution, never
+  the answer.
 - Taste only ("çok uzun", "sıkıcı", "çok kolay", "çok zor") → nothing to fix; use it when you write new
   questions for that topic. Questions with many 👍 and no 👎 are good models for new ones.
-Never write to `question_votes` and never answer the student about a vote. Mention what you changed in the
-run summary (for example "2 beğenilmeyen soruya bakıldı, 1'inin ifadesi düzeltildi").
+
+**Heavily disliked question: 3 or more different students gave 👎 and 👎 are at least as many as 👍.**
+Do a full review and decide whether the dislike is justified:
+1. The question itself: answer key, exactly one defensible choice, wording, figure or table, fit to the
+   grade and the kazanım (and the US standard for US students), length against `target_seconds`, and the
+   content rules at the top of this file.
+2. Who disliked it: for each 👎 student, did she answer it correctly?
+   `reviews?question_id=eq.<id>&student_id=in.(<ids>)&voided=eq.false&select=student_id,correct,answer,duration_sec`
+   👎 from students who answered it correctly, or several notes naming the same concrete problem, are
+   strong evidence. 👎 only from students who got it wrong, with no note or only "zor", are weak evidence:
+   often frustration, not a flaw.
+3. How everyone did on it: `reviews?question_id=eq.<id>&voided=eq.false&select=correct,answer`. Compare the
+   correct rate with other questions of the same topic and grade. A very low rate with one wrong choice
+   picked again and again → check whether that choice can also be defended (then it is ambiguous).
+Then decide and act:
+- **A flaw found** → `active=false`, as in the first bullet above.
+- **Feedback justified, no plain error** (strong evidence: confusing, misleading, off-level, far too long
+  for its time) and a wording fix would solve it → fix the wording, answer unchanged.
+- **Feedback justified and a wording fix would not solve it** → take the question out of the pool
+  (`active=false`; never delete it) and write one new question from scratch for the same kazanım, as
+  "Original questions only" says, so the topic does not lose a question.
+- **Feedback not justified** (weak evidence only, the question is correct, clear and its correct rate is
+  normal for the topic) → keep it as it is. A hard but fair question stays: LGS has them too.
+- If you reviewed it before and nothing new came in (no new note, the same picture), keep the earlier
+  decision and move on.
+Questions from uploads (`source` other than `claude` or `okuma`) belong to the family that sent them: never
+rewrite or deactivate them because of votes; if your answer key or solution for one is wrong, fix that.
+
+Never write to `question_votes` and never answer the student about a vote. Write each decision in the run
+summary, for example "3 beğenilmeyen soruya bakıldı: 1'i hatalıydı, kapatıldı; 1'inin ifadesi düzeltildi;
+1'indeki 👎'ler zorluktan, soru kaldı." When a question was taken out because of votes, add its first words
+so the parent can find it.
 
 ## 5. Finish
 

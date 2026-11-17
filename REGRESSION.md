@@ -143,7 +143,12 @@ Her maddenin yanında nasıl denendiği yazar:
   ("Teşekkürler!"), oy değiştirilebilir; 👎'de "Neden beğenmedin?" kutusu açılır, yazmak isteğe bağlı. Sonucu, takvimi
   ve bronzu etkilemez; yalnızca öğrencinin kendi hesabında görünür (veli/öğretmen denerken yok). `question_votes`; öğrenci
   yalnızca kendi oyunu yazar, veli görür, yazamaz (test-question-votes.sql). Saatlik görev 👎'leri okur, soruyu yeniden
-  çözer; hatalıysa kapatır, kafa karıştırıyorsa yalnızca ifadesini düzeltir (INSTRUCTIONS 4b). [A] sahte kayıtla, yetki [O]
+  çözer; hatalıysa kapatır, kafa karıştırıyorsa yalnızca ifadesini düzeltir (INSTRUCTIONS 4b). Çok beğenilmeyen soru
+  (velinin isteği, 2026-11-17: en az 3 öğrenci 👎 ve 👎 en az 👍 kadar; test hesapları sayılmaz) baştan incelenir: 👎
+  verenler soruyu doğru mu yanlış mı yaptı, notlar aynı sorunu mu söylüyor, herkesin doğru oranı konunun öteki sorularına
+  göre nasıl. Haklı çıkarsa ifade düzeltilir ya da soru havuzdan çıkarılır (`active=false`, silinmez) ve yerine aynı
+  kazanımdan yeni soru yazılır; yalnızca zorluktan gelen 👎'de soru kalır. Yüklenen sorular oy yüzünden çıkarılmaz.
+  Kararlar görev özetine yazılır. [A] sahte kayıtla, yetki [O]
 - Konu tekrarında ya da ek çalışmada yanlış yapılan soru hata tekrarına girer.
 - "Ara ver" düğmesi. Oturum sonunda sonuç, birlikte bakılacaklar ve çoğu zaman bir mola kartı. [A]
 
