@@ -676,13 +676,17 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .train { position: relative; height: 132px; margin: 6px 0 2px; border-radius: 14px; overflow: hidden; background: linear-gradient(#F3F7FF, #E3ECFA); }
 .train::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: #4C8DF6; opacity: 0.85; }
 .train-hero { position: absolute; left: 14%; bottom: 10px; width: 82px; height: 90px; transform-origin: 50% 100%; z-index: 2; }
-.train-hero svg, .train-foe svg, .train-glove svg, .train-swoosh svg, .train-stars svg { width: 100%; height: 100%; display: block; }
-.train-foe { position: absolute; left: 58%; top: 0; width: 48px; height: 118px; transform-origin: 50% 0; z-index: 1; }
-.train-alien .train-foe { top: auto; bottom: 8px; width: 62px; height: 94px; transform-origin: 50% 100%; }
+.train-hero svg, .train-foe svg, .train-glove svg, .train-boot svg, .train-swoosh svg, .train-stars svg { width: 100%; height: 100%; display: block; }
+.train-foe { position: absolute; left: calc(14% + 138px); top: 0; width: 48px; height: 118px; transform-origin: 50% 0; z-index: 1; }
+.train-alien .train-foe { left: calc(14% + 130px); top: auto; bottom: 8px; width: 62px; height: 94px; transform-origin: 50% 60%; }
+.train-pic { width: 100%; height: 100%; }
+.train-mark { position: absolute; left: 3px; width: 24px; height: 19px; }
+.train-mark:nth-of-type(even) { left: 14px; }
+.train-boot { position: absolute; left: calc(14% + 54px); bottom: 28px; width: 42px; height: 25px; transform-origin: 0 50%; }
 .train-fx { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 .train-glove { position: absolute; left: calc(14% + 58px); bottom: 50px; width: 34px; height: 26px; }
 .train-glove.high { bottom: 64px; }
-.train-pow { position: absolute; left: calc(58% - 2px); top: 34px; width: 48px; height: 48px; display: grid; place-items: center; }
+.train-pow { position: absolute; left: calc(14% + 128px); top: 34px; width: 48px; height: 48px; display: grid; place-items: center; }
 .train-pow svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .train-pow b { position: relative; font: 900 11px/1 var(--font-body, sans-serif); color: #C2185B; }
 .train-swoosh { position: absolute; left: calc(14% + 18px); bottom: 44px; width: 96px; height: 60px; }
@@ -691,7 +695,8 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .train-say { position: absolute; left: 30%; top: 8px; padding: 3px 10px; border-radius: 12px; background: #fff; color: #1D2A4D; font: 800 0.85rem/1.3 var(--font-body, sans-serif);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); opacity: 0; z-index: 4; white-space: nowrap; }
 .train-say.on { opacity: 1; animation: train-pop 0.3s ease-out; }
-.train-say.foe { left: 60%; }
+.train-say { left: calc(14% + 20px); }
+.train-say.foe { left: calc(14% + 150px); }
 @keyframes train-pop { from { transform: scale(0.6); } }
 @media (prefers-reduced-motion: reduce) { .train-say.on { animation: none; } .train-stars svg { animation: none; } }
 

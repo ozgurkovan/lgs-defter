@@ -304,10 +304,13 @@ Her maddenin yanında nasıl denendiği yazar:
   askerken sağda künyenin üstünde). Kahramanın sözünde son madalya ve sıradakine kalan; kartın satırında madalya sayısı;
   kahramanın sayfasında madalya rafı (kazanılan renkli, sıradaki işaretli, kalanlar gri ve numaralı), askerken de. [O], ekran [A]
 - **Antrenman** (velinin isteği, 2026-11-16: asker olana kadar; `army.js`, trainScene/trainSlot): oturumda her cevabın
-  altında ("Doğru"/"Yanlış" satırının hemen altı) kısa sahne. Doğruda kahraman kum torbasına yumruk atar ("POF!"), 3 doğru
-  üst üste döner tekme ("Döner tekme!", "BAM!"), 5 ve üstü kombo ("Kombo ×5!": iki yumruk ve tekme). Yanlışta komik düşer,
-  başında yıldızlar, kalkar ve sırayla "Hadi bir daha deneyelim!", "Düştüm ama kalktım!", "Bir dahakine olacak!", "Hata
-  yapmak öğrenmektir!". 70 numaradan sonra torba yerine eldivenli sevimli uzaylı partner (vurulunca sendeler, gülüp
+  altında ("Doğru"/"Yanlış" satırının hemen altı) 2-4 saniyelik sahne; üst üste doğrularla büyür (velinin isteği,
+  2026-11-17). 1. doğru: birkaç yumruk, sonuncusunda torba çok uzağa savrulur, geri gelirken kahraman eliyle tutar ("Tuttum!").
+  2: sağdan soldan kroşeler, torbada el izleri kalır ("Sağ, sol!"). 3: tekme ("Tekme!"). 4: yumruk tekme kombosu. 5: kroşe ve
+  döner tekme, torba tam tur atar. 6 ve üstü: seri yumruk, tekme, döner tekme ("Kombo ×6!") ile 4. ve 5. sahneler sırayla.
+  Yanlışta kahraman vurur, torba geri gelip kahramanı devirir; başında yıldızlar, kalkar ve sırayla "Hadi bir daha
+  deneyelim!", "Düştüm ama kalktım!", "Bir dahakine olacak!", "Hata yapmak öğrenmektir!"; seri baştan başlar.
+  70 numaradan sonra torba yerine eldivenli sevimli uzaylı partner (vurulunca sendeler, gülüp
   eldivenlerini kaldırır; yanlışta kahramanı hafifçe iter, "Hihi!"). Boş geçilen soruda sahne yok, seri sıfırlanır. Asker
   olunca (100 ya da kol seçildi), asker kahraman kapalıysa, hareket azaltılmışsa ve denemede yok. Hiçbir şey kaydetmez.
   İngilizce öğrencide sözler İngilizce. [O] hesap ve çizimler, [A] ekran
