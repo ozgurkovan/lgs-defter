@@ -1,0 +1,115 @@
+/* Telafio görünüşü (velinin isteği, 2026-11-17: "bizim app modern gözükmüyor, duolingo tarzında güzelleştirebilir miyiz?").
+   style.css ve typing.css'ten sonra yüklenir; yalnızca görünüşü değiştirir, hiçbir ekranın içeriğine dokunmaz.
+   Kendi tarzımız: düz açık zemin (kareli kâğıt yok), kalın kenarlı yuvarlak kartlar, kabartmalı ana düğmeler, mavi ana renk,
+   sarı "başla" rengi. Renkler yine değişkenlerde; koyu tema aşağıda.
+   1. aşama: renkler, yazı, düğmeler, kartlar, alt menü, üst çubuktaki logo, öğrencinin ana sayfası. */
+:root {
+  --paper: #f4f6fb;
+  --card: #ffffff;
+  --rule: #dfe5f0;
+  --grid: transparent;
+  --accent-deep: #183287;
+  --sun: #ffc531;
+  --sun-deep: #d99a00;
+  --sun-ink: #3b2a00;
+  --radius: 20px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12151d;
+    --card: #1b1f2a;
+    --rule: #2e3546;
+    --accent-deep: #4f6fd6;
+    --sun: #ffc531;
+    --sun-deep: #b98200;
+    --sun-ink: #2e2000;
+  }
+}
+
+body { background-image: none; }
+h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-weight: 800; }
+
+/* Kartlar ve kutular: kalın kenar, büyük köşe */
+.card { border-width: 2px; }
+.tile { border-width: 2px; }
+.note { border-radius: 14px; }
+.toast { border-radius: 14px; }
+input, select, textarea { border-width: 2px; border-radius: 14px; }
+
+/* Düğmeler: kalın kenar; ana düğme kabartmalı (alt gölge), basınca iner */
+button, .btn { border-width: 2px; border-radius: 16px; font-weight: 700; }
+button.primary, .btn.primary {
+  border-color: transparent; font-family: var(--font-display); font-weight: 800; font-size: 1.05rem;
+  box-shadow: 0 4px 0 var(--accent-deep); transition: transform 0.06s ease-out, box-shadow 0.06s ease-out;
+}
+button.primary.small, .btn.primary.small { font-size: 0.95rem; }
+button.primary:active:not(:disabled), .btn.primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--accent-deep); }
+/* "Başla" düğmesi: günün asıl işi, sarı */
+button.primary.go { background: var(--sun); color: var(--sun-ink); box-shadow: 0 4px 0 var(--sun-deep); }
+button.primary.go:active:not(:disabled) { box-shadow: 0 1px 0 var(--sun-deep); }
+
+/* Şıklar: alt kenarı kalın, dokunmaya davet eder */
+.choice { border-bottom-width: 4px; border-radius: 16px; }
+.choice b { border-width: 2px; }
+.word-opt { border-bottom-width: 4px; }
+
+/* Üst çubuk: ilk sayfada logo ve ad */
+.brand { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; letter-spacing: -0.02em; line-height: 1; color: var(--ink); }
+.brand svg { width: 30px; height: 30px; flex: none; display: block; }
+.topbar-left { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Alt menü: seçili sekme renkli zeminle */
+nav.tabs { background: var(--card); backdrop-filter: none; -webkit-backdrop-filter: none; border-top-width: 2px; }
+nav.tabs button { font-weight: 700; border-radius: 14px; margin: 5px 2px; min-height: 52px; }
+nav.tabs button[aria-current="page"] { background: color-mix(in srgb, var(--accent) 13%, transparent); }
+nav.tabs svg { stroke-width: 2.2; }
+
+/* Ana sayfa: görev kartları (Hata tekrarı, Konu tekrarı) */
+.card.task { border-bottom-width: 5px; }
+.task > .spread:first-child > .label {
+  display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 1.15rem; font-weight: 800;
+  letter-spacing: -0.01em; text-transform: none; color: var(--ink);
+}
+.task[data-track="mistake"] > .spread:first-child > .label::before,
+.task[data-track="topic"] > .spread:first-child > .label::before {
+  display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 13px; font-size: 20px; line-height: 1;
+}
+.task[data-track="mistake"] > .spread:first-child > .label::before { content: '🎯'; background: var(--red-soft); }
+.task[data-track="topic"] > .spread:first-child > .label::before { content: '📚'; background: var(--green-soft); }
+.task .big { font-size: 2.4rem; font-weight: 800; color: var(--accent); }
+
+/* Ana sayfa: kahramanın kartı mavi zeminde */
+.card.feed-home { background: var(--accent); border-color: transparent; color: var(--accent-ink); box-shadow: 0 5px 0 var(--accent-deep); margin-bottom: 5px; }
+.feed-home .feed-face { border-radius: 18px; }
+.feed-home .feed-bar { height: 12px; background: color-mix(in srgb, var(--accent-ink) 28%, transparent); }
+.feed-home .feed-bar i { background: #7cf0a9; }
+.feed-home .feed-bar.ac i { background: var(--sun); }
+.feed-home .feed-bar.cokac i { background: #ff9d94; }
+.feed-home .army-bar i { background: var(--sun); }
+.feed-home .muted { color: inherit; opacity: 0.85; }
+.feed-home button { background: var(--card); color: var(--ink); border-color: transparent; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2); }
+.feed-home button.primary { background: var(--sun); color: var(--sun-ink); box-shadow: 0 3px 0 var(--sun-deep); }
+.feed-home button.primary:active:not(:disabled) { box-shadow: 0 1px 0 var(--sun-deep); }
+
+/* Ana sayfa: mesaj, fıkra ve cevap kartları sarı kenarlı */
+.msg-card { border-color: color-mix(in srgb, var(--sun) 70%, var(--rule)); border-left-width: 6px; background: color-mix(in srgb, var(--sun) 7%, var(--card)); }
+
+/* 2. aşama: soru ekranı. İlerleme çubuğu kalın ve yuvarlak; şık harfi dolu yuvarlak içinde. */
+.progress { height: 10px; border-radius: 999px; }
+.progress > i { border-radius: 999px; }
+.timer { font-weight: 500; }
+.choice b { border-color: transparent; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.choice.help b { border-color: var(--ink-soft); background: transparent; color: inherit; }
+.choice:disabled:not(.right):not(.wrong) b { background: color-mix(in srgb, var(--ink-soft) 12%, transparent); color: var(--ink-soft); }
+.verdict { font-weight: 800; }
+
+/* Üst çubuk dar telefonda: düğme yazıları bölünmez, çocuk seçme kutusu daralır. */
+.topbar button { white-space: nowrap; }
+.topbar select.switch { flex: 0 1 auto; min-width: 0; text-overflow: ellipsis; }
+
+/* Giriş ekranı: büyük logo ve ad; açılışta yalnızca logo. */
+.brand-title { margin: 0; }
+.brand-title .brand { font-size: 2.6rem; gap: 12px; }
+.brand-title .brand svg { width: 56px; height: 56px; }
+.boot img { border-radius: 16px; }

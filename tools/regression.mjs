@@ -30,8 +30,8 @@ const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing
 report(!checked.trim(), 'app.js, typing.js, feed.js, army.js, steps.js ve dil dosyaları sözdizimi', checked.trim().split('\n')[0]);
 const html = readFileSync('docs/index.html', 'utf8');
 const v = JSON.parse(readFileSync('docs/version.json', 'utf8')).v;
-const inHtml = [...html.matchAll(/(?:app\.js|style\.css|typing\.js|typing\.css|feed\.js|army\.js|steps\.js|i18n\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
-report(inHtml.length === 8 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
+const inHtml = [...html.matchAll(/(?:app\.js|style\.css|theme\.css|typing\.js|typing\.css|feed\.js|army\.js|steps\.js|i18n\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
+report(inHtml.length === 9 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
 // Başka bir adres reddedilmeli. Deneme kapalı bir porta gider: koruma bozulsa bile Supabase'e ulaşmaz, hesap açılmaz.
 // Giriş bağlantısı üreten her araç adresi test-accounts.mjs'ten almalı.
 const refused = await testAccountEmail('velitest@hotmail.com', 'http://127.0.0.1:9', {}).then(() => 'kabul edildi', (e) => e.message);

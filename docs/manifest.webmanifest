@@ -1,11 +1,11 @@
 {
-  "name": "LGS Defter",
-  "short_name": "Defter",
+  "name": "Telafio",
+  "short_name": "Telafio",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f6f3ea",
-  "theme_color": "#f6f3ea",
+  "background_color": "#f4f6fb",
+  "theme_color": "#f4f6fb",
   "lang": "tr",
   "icons": [
     { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },

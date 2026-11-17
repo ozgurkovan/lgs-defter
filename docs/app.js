@@ -299,12 +299,23 @@ function render(...nodes) {
   const canBack = navDepth() > 0 || state.tab !== rootTab();
   const bar = state.profile && !state.session && !state.exam
     ? h('div', { class: 'topbar' },
-        canBack ? h('button', { class: 'ghost small back', onclick: goBack }, '← Geri') : null,
+        h('span', { class: 'topbar-left' }, brandMark(canBack), canBack ? h('button', { class: 'ghost small back', onclick: goBack }, '← Geri') : null),
         studentSwitcher(),
         h('button', { class: 'ghost small', onclick: signOut }, 'Çıkış yap'))
     : null;
   fill(app, bar, ...nodes);
   renderTabs();
+}
+// Üst çubuktaki logo ve ad (velinin isteği, 2026-11-17: "güzel bir logomuz olsa… app'e yerleştirsek"): ilk sayfada simge ve
+// ad, "← Geri" görünen sayfalarda yalnızca simge (iconOnly). Simge docs/logo.svg ile aynı çizim: halkanın eksik parçası sarı
+// parçayla tamamlanıyor.
+const BRAND_SVG = '<svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#2448b8"/>'
+  + '<circle cx="256" cy="256" r="130" fill="none" stroke="#fffdf7" stroke-width="64" stroke-dasharray="650 166.8"/>'
+  + '<circle cx="256" cy="256" r="130" fill="none" stroke="#ffc531" stroke-width="64" stroke-dasharray="130 686.8" stroke-dashoffset="-668.4" transform="translate(14 -14)"/></svg>';
+function brandMark(iconOnly) {
+  const el = h('span', { class: 'brand', translate: 'no', 'aria-label': 'telafio' });
+  el.innerHTML = BRAND_SVG + (iconOnly ? '' : '<span>telafio</span>');
+  return el;
 }
 // Seçili öğrenci: öğrencinin kendisi ya da velinin baktığı çocuk.
 const sid = () => state.student?.id;
@@ -684,8 +695,8 @@ function viewLogin() {
     } }, 'Şifremi unuttum'));
   render(
     h('div', { class: 'stack', style: 'padding-top: 12vh' },
-      h('p', { class: 'label' }, 'LGS 2027'),
-      h('h1', {}, 'Defter'),
+      // Giriş ekranının başlığı: logo ve ad (eskiden "LGS 2027" etiketi ve "Defter" başlığı; ad değişti, 2026-11-17).
+      h('h1', { class: 'brand-title' }, brandMark()),
       h('p', { class: 'muted' }, 'Yanlışların nereden geldiğini bul, öğrendiğini unutma.')),
     form);
 }
@@ -1075,13 +1086,14 @@ async function viewHome() {
   const sessionCard = (track, title, s, { lead = null, tail = null } = {}) => {
     const n = s.entries.length;
     const doneToday = todayCount.filter((r) => r.track === track).length;
-    return h('section', { class: 'card task' + (n || lead || tail ? '' : ' done') },
+    // data-track: kartın başlığındaki simge (theme.css); "go": günün asıl "Başla" düğmesi sarı.
+    return h('section', { class: 'card task' + (n || lead || tail ? '' : ' done'), 'data-track': track },
       h('div', { class: 'spread' }, h('p', { class: 'label' }, title),
         doneToday ? h('span', { class: 'tag green' }, `Bugün ${doneToday} soru çözdün`) : null),
       lead,
       n
         ? [h('div', { class: 'row' }, h('span', { class: 'big num' }, n), h('span', { class: 'muted' }, `soru · yaklaşık ${Math.max(1, Math.round(s.seconds / 60))} dakika`)),
-           h('button', { class: lead ? 'block' : 'primary block', onclick: () => runSession(track, s) }, 'Başla')]
+           h('button', { class: lead ? 'block' : 'primary go block', onclick: () => runSession(track, s) }, 'Başla')]
         : h('p', { class: 'muted' }, doneToday ? 'Bugünlük bu kadar. Aferin.' : 'Bugün tekrar edilecek soru yok.'),
       s.shortage ? h('p', { class: 'small muted' }, `${s.shortage} konu için yeni soru hazırlanıyor, yarın gelecek.`) : null,
       s.shortened ? h('p', { class: 'small muted' }, `Bugün yoğun gün: ${s.shortened} tekrar kısa tutuldu, destek soruları sonraki günlere kaldı.`) : null,

@@ -3,27 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>LGS Defter</title>
-  <meta name="theme-color" content="#f6f3ea" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
+  <title>Telafio</title>
+  <meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#12151d" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Defter">
+  <meta name="apple-mobile-web-app-title" content="Telafio">
   <meta name="robots" content="noindex, nofollow">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="icon" href="icon-180.png">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
   <!-- Güncellemede sürüm numarasını artır ki telefonlar eski dosyayı önbellekten okumasın. -->
   <link rel="stylesheet" href="style.css?v=129">
   <link rel="stylesheet" href="typing.css?v=129">
+  <!-- Telafio görünüşü: öteki stillerden sonra yüklenir (theme.css). -->
+  <link rel="stylesheet" href="theme.css?v=129">
 </head>
 <body>
   <main id="app" aria-live="polite">
-    <p class="boot">Defter açılıyor…</p>
+    <p class="boot"><img src="logo.svg" width="72" height="72" alt="Telafio"></p>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script src="config.js?v=9"></script>
