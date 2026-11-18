@@ -1050,9 +1050,48 @@ const TRAIN_ALIEN_AT = 70; // bu numaradan sonra kum torbası yerine uzaylı par
 // Hareket (velinin isteği, 2026-11-17): üst üste doğru sayısına göre sahne büyür. 1: birkaç yumruk, torba uzağa gider, kahraman
 // tutar ('jabs'); 2: sağdan soldan kroşe, torbada el izi ('hooks'); 3: tekme ('kick'); 4: yumruk tekme ('mix'); 5: döner tekme
 // ('spin'); 6 ve üstü: büyük kombo ile öncekiler sırayla ('super', 'mix', 'spin'). Yanlışta 'fall' ve seri baştan başlar.
-const TRAIN_MOVES = ['jabs', 'hooks', 'kick', 'mix', 'spin'];
-const trainMove = (correct, streak) => (!correct ? 'fall' : streak >= 6 ? ['super', 'mix', 'spin'][(Math.trunc(streak) - 6) % 3]
-  : TRAIN_MOVES[Math.max(1, Math.trunc(streak) || 1) - 1]);
+// Kombolar (velinin isteği, 2026-11-18: "tekme ve yumruk kombolarını kickboks, taekwondo vb. sporlardan alabilirsin, kombolar
+// hep aynı olunca sıkıcı oluyor"): her basamakta birkaç kombo var, oturumda her basamak kendi sırasıyla döner (k; başlangıcı
+// oturuma göre değişir, trainSlot). Basamaklar büyümeyi korur: önce yumruklar, sonra diz ve ön tekme, tekmeler, kombolar,
+// havada dönen tekmeler. Eski beş hareket her basamağın ilki olarak duruyor.
+const TRAIN_TIERS = [
+  ['jabs', 'onetwo', 'uppercut'], // 1: yumruklar, bir-iki, aparkat (boks)
+  ['hooks', 'knee', 'front'], // 2: kroşeler (boks), diz (muay thai), ön tekme ve ters yumruk (karate)
+  ['kick', 'axe', 'back'], // 3: tekme (kickboks), balta tekmesi (taekwondo), geri tekme (karate)
+  ['mix', 'lowkick', 'double'], // 4: yumruk tekme, bir-iki alçak tekme (kickboks), havada çift tekme (taekwondo)
+  ['spin', 'tornado', 'flying'], // 5: döner tekme, tornado tekme, uçan tekme (taekwondo)
+  ['super', 'tornado', 'lowkick', 'flying', 'mix', 'double', 'spin', 'axe'], // 6 ve üstü: büyük kombo ve öncekiler
+];
+const TRAIN_MOVES = [...new Set(TRAIN_TIERS.flat())];
+const trainTier = (streak) => Math.min(TRAIN_TIERS.length, Math.max(1, Math.trunc(streak) || 1)) - 1;
+const trainMove = (correct, streak, k = 0) => {
+  if (!correct) return 'fall';
+  const pool = TRAIN_TIERS[trainTier(streak)];
+  return pool[(Math.abs(Math.trunc(k)) || 0) % pool.length];
+};
+// Kombonun sporu: sahnenin salonu (arka plan, zemin, ring ipleri) ve köşedeki adı.
+const TRAIN_SPORT = { jabs: 'boks', onetwo: 'boks', uppercut: 'boks', hooks: 'boks', knee: 'muaythai', front: 'karate', back: 'karate',
+  kick: 'kickboks', mix: 'kickboks', lowkick: 'kickboks', axe: 'taekwondo', double: 'taekwondo', spin: 'taekwondo', tornado: 'taekwondo',
+  flying: 'taekwondo', super: 'kombo' };
+const trainSport = (move) => TRAIN_SPORT[move] || null;
+function trainSportName(sport) {
+  if (sport === 'boks') return trEn('🥊 Boks', '🥊 Boxing');
+  if (sport === 'kickboks') return trEn('🥊 Kickboks', '🥊 Kickboxing');
+  if (sport === 'muaythai') return trEn('🥊 Muay Thai', '🥊 Muay Thai');
+  if (sport === 'taekwondo') return trEn('🥋 Taekwondo', '🥋 Taekwondo');
+  if (sport === 'karate') return trEn('🥋 Karate', '🥋 Karate');
+  if (sport === 'kombo') return trEn('⭐ Süper kombo', '⭐ Super combo');
+  return '';
+}
+// Torbanın eskimesi (velinin isteği, 2026-11-18: "kum torbasına vurdukça kum torbası iyice eskisin, çalışmanın sonuna
+// yaklaşılıyorsa kum da dökülmeye başlayabilir"): n oturumdaki kaçıncı torba sahnesi, progress oturumun ne kadarı bitti
+// (0-1). stage 0 yeni, 1 sürtük, 2 yamalı, 3 bantlı; spill 0 yok, 1 yırtıktan kum sızıyor, 2 kum dökülüyor. Her oturum yeni
+// torbayla başlar; kum dökülürken torba en az yamalıdır.
+const bagWear = (n, progress) => {
+  const p = Math.min(1, Math.max(0, Number(progress) || 0)), k = Math.max(0, Number(n) || 0);
+  const spill = p >= 0.85 ? 2 : p >= 0.7 ? 1 : 0;
+  return { stage: Math.min(3, Math.max(Math.floor(Math.max((k - 1) / 2, p * 3.4)), spill ? spill + 1 : 0)), spill };
+};
 // Antrenman açık mı: asker kahraman açık ve henüz asker değil (numara bilinmiyorsa da açık; kol seçildiyse kapalı).
 const trainOn = (p, st) => armyOn(p) && !(st && (armyCorps(st.corps) || st.points >= ARMY_SOLDIER));
 // Kahramanın sözü: düşünce cesaret, kombo ve tekmede sevinç (n: kaçıncı sahne; sözler sırayla döner).
@@ -1067,16 +1106,71 @@ function trainSay(move, streak, n = 0) {
   if (move === 'kick') return trEn('Tekme!', 'Kick!');
   if (move === 'mix') return trEn('Yumruk, tekme!', 'Punch and kick!');
   if (move === 'spin') return trEn('Döner tekme!', 'Spinning kick!');
+  if (move === 'onetwo') return trEn('Bir-iki!', 'One-two!');
+  if (move === 'uppercut') return trEn('Aparkat!', 'Uppercut!');
+  if (move === 'knee') return trEn('Diz, diz!', 'Knee, knee!');
+  if (move === 'front') return trEn('Ön tekme, yumruk!', 'Front kick, punch!');
+  if (move === 'axe') return trEn('Balta tekmesi!', 'Axe kick!');
+  if (move === 'back') return trEn('Geri tekme!', 'Back kick!');
+  if (move === 'lowkick') return trEn('Alçak tekme!', 'Low kick!');
+  if (move === 'double') return trEn('Çift tekme!', 'Double kick!');
+  if (move === 'tornado') return trEn('Tornado tekme!', 'Tornado kick!');
+  if (move === 'flying') return trEn('Uçan tekme!', 'Flying kick!');
   return '';
 }
+// Kum ilk dökülmeye başladığında kahramanın sözü.
+const trainSandSay = () => trEn('Eyvah, kum dökülüyor!', 'Uh-oh, the sand is spilling!');
 
 /* Antrenman: çizimler (sabit SVG; kullanıcı metni yok) */
 
-// Kum torbası: tavandan zincirle asılı, kırmızı, beyaz şeritli.
-const TRAIN_BAG = '<svg viewBox="0 0 60 120" aria-hidden="true"><path d="M30 0 V22" stroke="#8A93A3" stroke-width="3" stroke-dasharray="4 3"/>'
-  + '<path d="M18 22 H42 L44 30 H16 Z" fill="#5E6672"/><rect x="12" y="30" width="36" height="80" rx="16" fill="#E63946" stroke="#B02A35" stroke-width="2"/>'
-  + '<rect x="12" y="52" width="36" height="7" fill="#fff" opacity=".9"/><rect x="12" y="86" width="36" height="7" fill="#fff" opacity=".9"/>'
-  + '<path d="M19 38 Q17 70 20 102" stroke="#fff" stroke-width="3" fill="none" opacity=".35" stroke-linecap="round"/></svg>';
+// Kum torbası: tavandan zincirle asılı, kırmızı, beyaz şeritli. Oturumda eskir (bagWear): stage 1 sürtük ve çizik, 2 rengi
+// solmuş, turuncu yama dikilmiş, 3 gri bantla çarpı yapıştırılmış, dikişi atmış, şeridi kalkmış; spill 1 sağ altta küçük
+// yırtık (içinde kum), 2 büyük yırtık.
+function trainBag(stage = 0, spill = 0) {
+  const s = Math.min(3, Math.max(0, Math.trunc(stage) || 0)), sp = Math.min(2, Math.max(0, Math.trunc(spill) || 0));
+  const [body, edge] = [['#E63946', '#B02A35'], ['#E0434F', '#AE2D38'], ['#D24E58', '#A2333D'], ['#C25A62', '#933A42']][s];
+  const stripe = ['.9', '.82', '.7', '.58'][s];
+  let out = '<svg viewBox="0 0 60 120" aria-hidden="true"><path d="M30 0 V22" stroke="#8A93A3" stroke-width="3" stroke-dasharray="4 3"/>'
+    + `<path d="M18 22 H42 L44 30 H16 Z" fill="#5E6672"/><rect x="12" y="30" width="36" height="80" rx="16" fill="${body}" stroke="${edge}" stroke-width="2"/>`
+    + `<rect x="12" y="52" width="36" height="7" fill="#fff" opacity="${stripe}"/><rect x="12" y="86" width="36" height="7" fill="#fff" opacity="${stripe}"/>`
+    + '<path d="M19 38 Q17 70 20 102" stroke="#fff" stroke-width="3" fill="none" opacity=".35" stroke-linecap="round"/>';
+  if (s >= 1) {
+    out += '<g fill="#6E1A22" opacity=".28"><ellipse cx="27" cy="44" rx="5" ry="3.2"/><ellipse cx="37" cy="73" rx="4.2" ry="3"/><ellipse cx="24" cy="100" rx="4" ry="2.4"/></g>'
+      + '<path d="M33 39 l5 3 M30 79 l6 2 M36 98 l4 -2" stroke="#fff" stroke-width="1" opacity=".45" stroke-linecap="round"/>';
+  }
+  if (s >= 2) {
+    out += '<g fill="#6E1A22" opacity=".25"><ellipse cx="39" cy="47" rx="3.4" ry="2.4"/><ellipse cx="20" cy="66" rx="3" ry="4"/></g>'
+      + '<g transform="rotate(-8 31 70)"><rect x="25" y="64" width="13" height="12" rx="2" fill="#F4A261" stroke="#C77A3A" stroke-width="1"/>'
+      + '<rect x="26.6" y="65.6" width="9.8" height="8.8" rx="1.2" fill="none" stroke="#6B3E14" stroke-width=".8" stroke-dasharray="1.6 1.4"/></g>';
+  }
+  if (s >= 3) {
+    out += '<g transform="rotate(32 30 42)"><rect x="17" y="39" width="26" height="6" rx="1" fill="#B8BEC8"/><path d="M19 41 H41" stroke="#fff" stroke-width=".8" opacity=".6"/></g>'
+      + '<g transform="rotate(-32 30 42)"><rect x="17" y="39" width="26" height="6" rx="1" fill="#C9CED6"/><path d="M19 43 H41" stroke="#8A93A3" stroke-width=".7" opacity=".6"/></g>'
+      + `<path d="M15 95 l3 2.4 l3 -2.4 l3 2.4" stroke="#4A161B" stroke-width="1.2" fill="none" stroke-linejoin="round"/><path d="M42 86 H48 V93 Z" fill="${body}"/>`;
+  }
+  if (sp === 1) out += '<path d="M38 100 l2 -3 l2 3 l2 -2 l1 4 l-3 3 l-3 -1 Z" fill="#4A161B"/><circle cx="41.4" cy="101.6" r="1.5" fill="#E3C27A"/>';
+  if (sp === 2) {
+    out += '<path d="M35 99 l3 -4 l2 3 l3 -4 l2 4 l2 -1 v6 l-4 4 l-5 -1 l-3 -3 Z" fill="#4A161B"/>'
+      + '<path d="M37 102 q3 3 7 1" stroke="#E3C27A" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="21" cy="106" r="1.6" fill="#4A161B"/>';
+  }
+  return out + '</svg>';
+}
+const TRAIN_BAG = trainBag(0, 0);
+// Yerde biriken kum yığını.
+const TRAIN_PILE = '<svg viewBox="0 0 46 14" aria-hidden="true"><path d="M1 14 Q10 4 23 2 Q36 4 45 14 Z" fill="#E3C27A"/>'
+  + '<path d="M9 12 Q16 6 23 5" stroke="#F6E2AE" stroke-width="1.6" fill="none" stroke-linecap="round"/>'
+  + '<g fill="#C9A45C"><circle cx="18" cy="10" r=".9"/><circle cx="27" cy="8" r=".9"/><circle cx="33" cy="11" r=".9"/></g></svg>';
+// Diz (muay thai): uyluk ve kırmızı dizlik.
+const TRAIN_KNEE = '<svg viewBox="0 0 40 30" aria-hidden="true"><path d="M3 27 Q14 22 25 11" stroke="#3D5A99" stroke-width="10" stroke-linecap="round" fill="none"/>'
+  + '<circle cx="27" cy="10" r="7.5" fill="#E63946" stroke="#B02A35" stroke-width="1.4"/><path d="M23 7 q4 -2.5 7.5 .5" stroke="#fff" stroke-width="1.5" fill="none" opacity=".6" stroke-linecap="round"/></svg>';
+// Tornado tekmede kahramanın çevresinde dönen hava.
+const TRAIN_SWIRL = '<svg viewBox="0 0 100 60" aria-hidden="true"><ellipse cx="50" cy="34" rx="46" ry="16" stroke="#4FB3E6" stroke-width="4" fill="none" stroke-dasharray="60 30" stroke-linecap="round" opacity=".6"/>'
+  + '<ellipse cx="50" cy="30" rx="36" ry="11" stroke="#BDE8FF" stroke-width="3" fill="none" stroke-dasharray="40 26" stroke-linecap="round" opacity=".85"/></svg>';
+// Uçan tekmede hız çizgileri.
+const TRAIN_SPEED = '<svg viewBox="0 0 44 30" aria-hidden="true"><path d="M2 6 H30 M8 15 H42 M4 24 H28" stroke="#9AA7BF" stroke-width="2.4" stroke-linecap="round" opacity=".75"/></svg>';
+// Eski torbadan çıkan toz.
+const TRAIN_DUST = '<svg viewBox="0 0 40 30" aria-hidden="true"><g fill="#C9B79A"><circle cx="10" cy="18" r="7" opacity=".5"/><circle cx="22" cy="12" r="9" opacity=".45"/>'
+  + '<circle cx="31" cy="20" r="6" opacity=".5"/></g></svg>';
 // Boks eldiveni (sağa bakar): yumrukta kahramanın elinden torbaya uzanır.
 const TRAIN_GLOVE = '<svg viewBox="0 0 40 30" aria-hidden="true"><rect x="2" y="8" width="10" height="14" rx="3" fill="#fff" stroke="#C9CED6"/>'
   + '<path d="M10 6 Q30 0 37 12 Q40 24 26 27 Q14 28 10 22 Z" fill="#E63946" stroke="#B02A35" stroke-width="1.5"/>'
@@ -1119,31 +1213,57 @@ const TRAIN_SWOOSH = '<svg viewBox="0 0 80 50" aria-hidden="true"><path d="M6 40
 /* Antrenman: sahne */
 
 // Antrenman sahnesi: move (trainMove), streak, p (görünüş), level, opts.army (armyView), opts.partner ('bag' ya da 'alien'),
-// opts.n (söz sırası). Kutu döner; play() oynatır. Hareket azaltılmışsa durağan. Sahneler 2-4 saniye sürer (velinin isteği,
-// 2026-11-17: "çok hızlı geçti"); torbada yumruk izleri sahne boyunca kalır, uzaylıda iz yoktur (kimse yaralanmaz).
+// opts.n (söz sırası), opts.wear (bagWear: torbanın eskiliği ve kum), opts.sand (oturumda kaçıncı kumlu sahne). Kutu döner;
+// play() oynatır. Hareket azaltılmışsa durağan. Sahneler 2-4 saniye sürer (velinin isteği, 2026-11-17: "çok hızlı geçti");
+// torbada yumruk izleri sahne boyunca kalır, uzaylıda iz yoktur (kimse yaralanmaz). Kombo kendi sporunun salonunda oynar
+// (sınıf s-<spor>; köşede sporun adı), iki ve daha çok vuruşta vuruş sayısı görünür. Eski torbada vuruşta toz çıkar; kum
+// dökülürken yırtıktan kum akar (torba sallanırken akış gizlenir), vuruşta kum saçılır, yerdeki yığın büyür.
 function trainScene(move, streak, p, level, opts = {}) {
   const partner = opts.partner === 'alien' ? 'alien' : 'bag', bag = partner === 'bag';
-  const box = h('div', { class: `train train-${partner}`, 'aria-hidden': 'true' });
+  const sport = trainSport(move);
+  const wear = bag ? { stage: opts.wear?.stage || 0, spill: opts.wear?.spill || 0 } : { stage: 0, spill: 0 };
+  const box = h('div', { class: `train train-${partner}${sport ? ` s-${sport}` : ''}`, 'aria-hidden': 'true' });
   const hero = h('div', { class: 'train-hero' });
   hero.innerHTML = heroSvg(p?.avatar, level, p?.hero_look, undefined, opts.army);
   const foe = h('div', { class: 'train-foe' });
   const pic = h('div', { class: 'train-pic' });
   foe.append(pic);
-  const draw = (mood) => { pic.innerHTML = bag ? TRAIN_BAG : trainAlien(mood); };
+  const draw = (mood) => { pic.innerHTML = bag ? trainBag(wear.stage, wear.spill) : trainAlien(mood); };
   draw('guard');
   const fx = h('div', { class: 'train-fx' });
   const bubble = h('span', { class: 'train-say' });
-  fill(box, hero, foe, fx, bubble);
+  const chip = sport ? h('span', { class: 'train-sport' }, trainSportName(sport)) : null;
+  const counter = h('span', { class: 'train-count' });
+  // Kum: yırtıktan akan kum (sızarken seyrek, dökülürken sürekli) ve yerdeki yığın.
+  const sand = wear.spill ? h('span', { class: 'train-sand' + (wear.spill > 1 ? ' pour' : '') }, Array.from({ length: wear.spill > 1 ? 6 : 3 }, () => h('i'))) : null;
+  const pile = wear.spill ? h('span', { class: 'train-pile' }) : null;
+  if (pile) pile.innerHTML = TRAIN_PILE;
+  let pileSize = Math.min(1, 0.32 + 0.17 * Math.max(0, (opts.sand || 1) - 1));
+  if (pile) pile.style.scale = String(pileSize);
+  fill(box, pile, hero, foe, sand, fx, bubble, chip, counter);
   const anim = (el, frames, ms, o = {}) => (el.animate ? el.animate(frames, { duration: ms, easing: o.easing || 'ease-out', fill: 'forwards', delay: o.delay || 0 }).finished.catch(() => {}) : Promise.resolve());
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const say = (t, who = 'hero') => { if (!t) return; bubble.textContent = t; bubble.className = `train-say on ${who}`; };
   const line = () => say(trainSay(move, streak, opts.n));
   let reach = 50; // eldivenin ve ayağın partnere kadar gideceği yol (play başında ölçülür)
-  const pow = (word) => {
-    const el = h('span', { class: 'train-pow' }, word ? h('b', {}, word) : null);
+  let hits = 0;
+  // Vuruş yıldızı; at: 'up' (yukarıda), 'low' (aşağıda), 'top' (torbanın tepesinde). Doğru sahnelerde vuruşlar sayılır.
+  const pow = (word, at = '') => {
+    const el = h('span', { class: 'train-pow' + (at ? ' ' + at : '') }, word ? h('b', {}, word) : null);
     el.insertAdjacentHTML('afterbegin', TRAIN_POW);
     fx.append(el);
     anim(el, [{ scale: '0.3', opacity: 1 }, { scale: '1.15', opacity: 1, offset: 0.4 }, { scale: '1.3', opacity: 0 }], 620).then(() => el.remove());
+    if (move === 'fall') return;
+    hits++;
+    if (hits < 2) return;
+    counter.textContent = `×${hits}`;
+    anim(counter, [{ scale: '1.6' }, { scale: '1' }], 260);
+  };
+  // Güçlü vuruşta halka.
+  const ring = (at = '') => {
+    const el = h('span', { class: 'train-ring' + (at ? ' ' + at : '') });
+    fx.append(el);
+    anim(el, [{ scale: '0.3', opacity: 0.9 }, { scale: '1.7', opacity: 0 }], 520).then(() => el.remove());
   };
   // Torbada eldiven izi (y: torbanın üstünden yüzde); sahne bitene kadar kalır.
   const mark = (y) => {
@@ -1154,29 +1274,72 @@ function trainScene(move, streak, p, level, opts = {}) {
     foe.append(m);
     anim(m, [{ opacity: 0, scale: '1.5' }, { opacity: 1, scale: '1' }], 220);
   };
+  // Eski torbadan toz; kum dökülürken yırtıktan kum saçılır ve yığın büyür.
+  const dust = () => {
+    if (!bag || wear.stage < 2) return;
+    const d = h('span', { class: 'train-dust' });
+    d.innerHTML = TRAIN_DUST;
+    fx.append(d);
+    anim(d, [{ scale: '0.5', opacity: 0.9, translate: '0 0' }, { scale: '1.3', opacity: 0, translate: '10px -10px' }], 700).then(() => d.remove());
+  };
+  const spill = (count) => {
+    if (!bag || !wear.spill) return;
+    for (let i = 0; i < count; i++) {
+      const g = h('i', { class: 'train-grain' });
+      fx.append(g);
+      const dx = 4 + ((i * 7) % 17);
+      anim(g, [{ translate: '0 0', opacity: 1 }, { translate: `${Math.round(dx * 0.6)}px ${-3 - (i % 3) * 3}px`, opacity: 1, offset: 0.3 },
+        { translate: `${dx}px ${24 + (i % 3) * 2}px`, opacity: 0.8 }], 520 + i * 45, { easing: 'ease-in' }).then(() => g.remove());
+    }
+    pileSize = Math.min(1.15, pileSize + 0.03 * count);
+    setTimeout(() => { if (pile) pile.style.scale = String(pileSize); }, 520);
+  };
+  // Torba sallanırken yırtıktan akan kum gizlenir (kum torbayla birlikte dönmesin).
+  let swings = 0;
+  const foeMove = (frames, ms, o) => {
+    swings++;
+    box.classList.add('swing');
+    return anim(foe, frames, ms, o).then(() => { swings = Math.max(0, swings - 1); if (!swings) box.classList.remove('swing'); });
+  };
   // Torba sallanır (eksi açı: kahramandan uzağa); uzaylı sendeler, sonra gülümser.
-  const rot = (degs, ms, easing = 'ease-in-out') => anim(foe, degs.map((d) => ({ rotate: `${d}deg` })), ms, { easing });
+  const rot = (degs, ms, easing = 'ease-in-out') => foeMove(degs.map((d) => ({ rotate: `${d}deg` })), ms, { easing });
   const stumble = async (dx, deg, ms) => {
     draw('hit');
     await anim(foe, [{ translate: '0 0', rotate: '0deg' }, { translate: `${dx}px ${dx > 20 ? -6 : 0}px`, rotate: `${deg}deg`, offset: 0.4 }, { translate: '0 0', rotate: '0deg' }], ms);
     draw('cheer');
   };
-  // kind: 'jolt' (hafif), 'big' (güçlü), 'loop' (torba tavanın üstünden tam tur atar; uzaylı takla atar).
+  // kind: 'jolt' (hafif), 'big' (güçlü), 'loop' (torba tavanın üstünden tam tur atar; uzaylı takla atar), 'up' (aparkat ve
+  // diz: torba havaya kalkar), 'down' (balta tekmesi: torba yukarıdan ezilir), 'low' (alçak tekme: torbanın altı savrulur).
   const hitFoe = (kind = 'jolt', markY = null) => {
-    pow(kind === 'jolt' ? 'POF!' : 'BAM!');
+    pow(kind === 'jolt' ? (hits % 2 ? trEn('PAT!', 'PAT!') : 'POF!') : kind === 'down' ? trEn('GÜM!', 'BOOM!') : kind === 'low' ? trEn('ŞAK!', 'WHACK!') : 'BAM!',
+      kind === 'up' ? 'up' : kind === 'low' ? 'low' : kind === 'down' ? 'top' : '');
+    if (kind !== 'jolt') ring(kind === 'low' ? 'low' : kind === 'down' ? 'top' : '');
     if (markY != null) mark(markY);
+    if (kind !== 'jolt') dust();
+    spill(kind === 'jolt' ? 3 : 6);
     if (!bag) {
       if (kind === 'loop') {
         draw('hit');
         return anim(foe, [{ rotate: '0deg', translate: '0 0' }, { rotate: '180deg', translate: '18px -30px', offset: 0.5 }, { rotate: '360deg', translate: '0 0' }], 1000, { easing: 'ease-in-out' }).then(() => draw('cheer'));
       }
+      if (kind === 'up' || kind === 'low') {
+        draw('hit');
+        return anim(foe, [{ translate: '0 0', rotate: '0deg' }, { translate: '6px -16px', rotate: kind === 'up' ? '-10deg' : '12deg', offset: 0.4 }, { translate: '0 0', rotate: '0deg' }], 760).then(() => draw('cheer'));
+      }
+      if (kind === 'down') {
+        draw('hit');
+        return anim(foe, [{ scale: '1 1' }, { scale: '1.14 0.84', offset: 0.3 }, { scale: '0.95 1.05', offset: 0.6 }, { scale: '1 1' }], 760).then(() => draw('cheer'));
+      }
       return kind === 'big' ? stumble(18, 14, 900) : stumble(8, 8, 620);
     }
     if (kind === 'loop') return rot([0, -360], 1000).then(() => rot([0, -22, 10, -4, 0], 900));
+    if (kind === 'up') return foeMove([{ translate: '0 0', rotate: '0deg' }, { translate: '0 -14px', rotate: '-10deg', offset: 0.35 }, { translate: '0 2px', rotate: '4deg', offset: 0.7 }, { translate: '0 0', rotate: '0deg' }], 820);
+    if (kind === 'down') return foeMove([{ scale: '1 1' }, { scale: '1.12 0.9', offset: 0.3 }, { scale: '0.97 1.03', offset: 0.6 }, { scale: '1 1' }], 760);
+    if (kind === 'low') return rot([0, -34, 16, -6, 0], 1000, 'ease-out');
     return kind === 'big' ? rot([0, -52, 24, -11, 4, 0], 1400) : rot([0, -15, 7, -3, 0], 700);
   };
   const glove = (high) => {
-    const g = h('span', { class: 'train-glove' + (high ? ' high' : '') });
+    const g = h('span', { class: 'train-glove' + (high === 'low' ? ' low' : high ? ' high' : '') });
     g.innerHTML = TRAIN_GLOVE;
     fx.append(g);
     return g;
@@ -1221,14 +1384,147 @@ function trainScene(move, streak, p, level, opts = {}) {
     sw.innerHTML = TRAIN_SWOOSH;
     fx.append(sw);
     anim(sw, [{ opacity: 0, scale: '0.6' }, { opacity: 1, scale: '1', offset: 0.5 }, { opacity: 0, scale: '1.1' }], ms).then(() => sw.remove());
-    await anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '0 4px', rotate: '0deg', offset: 0.12 }, { translate: '14px -22px', rotate: '200deg', offset: 0.55 }, { translate: '16px -8px', rotate: '330deg', offset: 0.82 }, { translate: '0 0', rotate: '360deg' }], ms, { easing: 'ease-in-out' });
+    // Gövdesinin ortasında döner (2026-11-18: ayaklarının çevresinde dönünce başı bir an yere giriyordu).
+    await anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '0 4px', rotate: '0deg', offset: 0.12 }, { translate: '14px -22px', rotate: '200deg', offset: 0.55 }, { translate: '16px -8px', rotate: '330deg', offset: 0.82 }, { translate: '0 0', rotate: '360deg' }]
+      .map((f) => ({ ...f, transformOrigin: '50% 50%' })), ms, { easing: 'ease-in-out' });
   };
-  const hop = (times = 2, high = 12) => anim(hero, Array.from({ length: times * 2 + 1 }, (_, i) => ({ rotate: '0deg', translate: `0 ${i % 2 ? -high : 0}px` })), times * 300, { easing: 'ease-in-out' });
+  // Kombolar için yeni hareketler (2026-11-18). Ayak ve eldiven, öteki hareketlerdeki gibi kahramanın yanından partnere uzanır.
+  const boot = (cls = '') => {
+    const b = h('span', { class: 'train-boot' + (cls ? ' ' + cls : '') });
+    b.innerHTML = TRAIN_BOOT;
+    fx.append(b);
+    return b;
+  };
+  // Arka elle güçlü düz yumruk (boks, "iki"): gövde daha çok döner, eldiven büyür.
+  const cross = async (onHit = null, ms = 560) => {
+    const g = glove(true);
+    lean(ms, 10, 18);
+    if (onHit) setTimeout(onHit, ms * 0.48);
+    await anim(g, [{ translate: '0 0', rotate: '0deg', scale: '0.6', opacity: 0.9 }, { translate: `${reach}px -2px`, rotate: '-6deg', scale: '1.2', opacity: 1, offset: 0.5 },
+      { translate: '0 0', rotate: '0deg', scale: '0.6', opacity: 0 }], ms, { easing: 'ease-in-out' });
+    g.remove();
+  };
+  // Aparkat (boks): kahraman çömelir, eldiven aşağıdan yukarı yay çizer.
+  const upper = async (onHit = null, ms = 720) => {
+    const g = glove('low');
+    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '2px 6px', rotate: '5deg', offset: 0.3 }, { translate: '10px -12px', rotate: '-6deg', offset: 0.55 }, { translate: '0 0', rotate: '0deg' }], ms, { easing: 'ease-in-out' });
+    if (onHit) setTimeout(onHit, ms * 0.52);
+    await anim(g, [{ translate: '0 6px', rotate: '50deg', scale: '0.6', opacity: 0.9 }, { translate: `${Math.round(reach * 0.6)}px 8px`, rotate: '30deg', scale: '0.9', opacity: 1, offset: 0.3 },
+      { translate: `${reach}px -34px`, rotate: '-55deg', scale: '1.15', opacity: 1, offset: 0.52 }, { translate: `${reach}px -34px`, rotate: '-55deg', scale: '1.15', opacity: 1, offset: 0.62 },
+      { translate: '0 0', rotate: '0deg', scale: '0.6', opacity: 0 }], ms, { easing: 'ease-in-out' });
+    g.remove();
+  };
+  // Diz (muay thai): kahraman öne atılıp dizini kaldırır.
+  const kneeUp = async (onHit = null, ms = 760) => {
+    const k = h('span', { class: 'train-knee' });
+    k.innerHTML = TRAIN_KNEE;
+    fx.append(k);
+    const fwd = Math.round(reach * 0.35);
+    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: `${fwd}px -12px`, rotate: '9deg', offset: 0.45 }, { translate: `${fwd}px -12px`, rotate: '9deg', offset: 0.6 }, { translate: '0 0', rotate: '0deg' }], ms, { easing: 'ease-in-out' });
+    if (onHit) setTimeout(onHit, ms * 0.45);
+    await anim(k, [{ translate: '0 10px', rotate: '20deg', scale: '0.6', opacity: 0 }, { translate: `${reach + 6}px -14px`, rotate: '-8deg', scale: '1.1', opacity: 1, offset: 0.45 },
+      { translate: `${reach + 6}px -14px`, rotate: '-8deg', scale: '1.1', opacity: 1, offset: 0.6 }, { translate: '0 10px', rotate: '20deg', scale: '0.6', opacity: 0 }], ms, { easing: 'ease-in-out' });
+    k.remove();
+  };
+  // Ön tekme (karate, mae geri): diz önce göğse çekilir, ayak düz bir çizgide ileri itilir.
+  const frontKick = async (onHit = null, ms = 900) => {
+    const b = boot();
+    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '-2px -4px', rotate: '-4deg', offset: 0.3 }, { translate: '4px -2px', rotate: '-12deg', offset: 0.5 },
+      { translate: '4px -2px', rotate: '-12deg', offset: 0.66 }, { translate: '0 0', rotate: '0deg' }], ms, { easing: 'ease-in-out' });
+    if (onHit) setTimeout(onHit, ms * 0.5);
+    await anim(b, [{ translate: '0 6px', rotate: '0deg', scale: '0.5', opacity: 0 }, { translate: `${Math.round(reach * 0.25)}px -16px`, rotate: '-30deg', scale: '0.75', opacity: 1, offset: 0.3 },
+      { translate: `${reach}px -4px`, rotate: '0deg', scale: '1.1', opacity: 1, offset: 0.5 }, { translate: `${reach}px -4px`, rotate: '0deg', scale: '1.1', opacity: 1, offset: 0.66 },
+      { translate: '0 6px', rotate: '0deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' });
+    b.remove();
+  };
+  // Balta tekmesi (taekwondo, naeryo chagi): ayak düz bacakla tepeye kalkar, torbanın üstüne iner.
+  const axeKick = async (onHit = null, ms = 1150) => {
+    const b = boot();
+    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '-4px -2px', rotate: '-10deg', offset: 0.3 }, { translate: '-4px -6px', rotate: '-20deg', offset: 0.5 },
+      { translate: '8px 2px', rotate: '6deg', offset: 0.66 }, { translate: '8px 2px', rotate: '6deg', offset: 0.76 }, { translate: '0 0', rotate: '0deg' }], ms, { easing: 'ease-in-out' });
+    if (onHit) setTimeout(onHit, ms * 0.66);
+    await anim(b, [{ translate: '0 0', rotate: '20deg', scale: '0.5', opacity: 0 }, { translate: `${Math.round(reach * 0.3)}px -38px`, rotate: '-60deg', scale: '0.85', opacity: 1, offset: 0.3 },
+      { translate: `${Math.round(reach * 0.75)}px -66px`, rotate: '-90deg', scale: '1', opacity: 1, offset: 0.5 }, { translate: `${reach}px -30px`, rotate: '50deg', scale: '1.15', opacity: 1, offset: 0.66 },
+      { translate: `${reach}px -30px`, rotate: '50deg', scale: '1.15', opacity: 1, offset: 0.76 }, { translate: '0 0', rotate: '20deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' });
+    b.remove();
+  };
+  // Geri tekme (karate, ushiro geri): kahraman arkasını döner, tabanını düz bir çizgide geriye, torbaya iter, yeniden döner.
+  const backKick = async (onHit = null, ms = 1150) => {
+    const b = boot();
+    anim(hero, [{ translate: '0 0', rotate: '0deg', scale: '1 1' }, { translate: '-2px 0', rotate: '0deg', scale: '-1 1', offset: 0.3 }, { translate: '6px -4px', rotate: '14deg', scale: '-1 1', offset: 0.52 },
+      { translate: '6px -4px', rotate: '14deg', scale: '-1 1', offset: 0.68 }, { translate: '0 0', rotate: '0deg', scale: '1 1' }], ms, { easing: 'ease-in-out' });
+    if (onHit) setTimeout(onHit, ms * 0.52);
+    await anim(b, [{ translate: '0 0', rotate: '-90deg', scale: '0.5', opacity: 0 }, { translate: '0 -4px', rotate: '-90deg', scale: '0.6', opacity: 0, offset: 0.3 },
+      { translate: `${reach}px -6px`, rotate: '-80deg', scale: '1.15', opacity: 1, offset: 0.52 }, { translate: `${reach}px -6px`, rotate: '-80deg', scale: '1.15', opacity: 1, offset: 0.68 },
+      { translate: '0 0', rotate: '-90deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' });
+    b.remove();
+  };
+  // Alçak tekme (kickboks): ayak yerden torbanın altına süpürür.
+  const lowKick = async (onHit = null, ms = 900) => {
+    const b = boot('low');
+    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '-4px 2px', rotate: '-6deg', offset: 0.28 }, { translate: '6px -2px', rotate: '-16deg', offset: 0.5 },
+      { translate: '6px -2px', rotate: '-16deg', offset: 0.64 }, { translate: '0 0', rotate: '0deg' }], ms, { easing: 'ease-in-out' });
+    if (onHit) setTimeout(onHit, ms * 0.5);
+    await anim(b, [{ translate: '0 0', rotate: '40deg', scale: '0.5', opacity: 0 }, { translate: '-6px -2px', rotate: '30deg', scale: '0.7', opacity: 1, offset: 0.28 },
+      { translate: `${reach}px 0`, rotate: '0deg', scale: '1.1', opacity: 1, offset: 0.5 }, { translate: `${reach}px 0`, rotate: '0deg', scale: '1.1', opacity: 1, offset: 0.64 },
+      { translate: '0 0', rotate: '20deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' });
+    b.remove();
+  };
+  // Havada çift tekme (taekwondo, dubal dollyo chagi): kahraman zıplar, havadayken iki ayakla art arda vurur.
+  const doubleKick = async (onHit1 = null, onHit2 = null, ms = 1200) => {
+    const b1 = boot(), b2 = boot();
+    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '0 4px', rotate: '0deg', offset: 0.1 }, { translate: '6px -20px', rotate: '-12deg', offset: 0.32 },
+      { translate: '10px -26px', rotate: '-20deg', offset: 0.62 }, { translate: '0 0', rotate: '0deg' }], ms, { easing: 'ease-in-out' });
+    if (onHit1) setTimeout(onHit1, ms * 0.32);
+    if (onHit2) setTimeout(onHit2, ms * 0.62);
+    await Promise.all([
+      anim(b1, [{ translate: '0 0', rotate: '30deg', scale: '0.5', opacity: 0 }, { translate: `${reach}px -14px`, rotate: '-10deg', scale: '1.1', opacity: 1, offset: 0.32 },
+        { translate: '0 -10px', rotate: '20deg', scale: '0.5', opacity: 0, offset: 0.5 }, { translate: '0 -10px', rotate: '20deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' }),
+      anim(b2, [{ translate: '0 -10px', rotate: '30deg', scale: '0.5', opacity: 0 }, { translate: '0 -16px', rotate: '30deg', scale: '0.5', opacity: 0, offset: 0.36 },
+        { translate: `${reach}px -34px`, rotate: '-16deg', scale: '1.15', opacity: 1, offset: 0.62 }, { translate: `${reach}px -34px`, rotate: '-16deg', scale: '1.15', opacity: 1, offset: 0.72 },
+        { translate: '0 0', rotate: '20deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' }),
+    ]);
+    b1.remove(); b2.remove();
+  };
+  // Tornado tekme (taekwondo): kahraman yükseğe zıplayıp havada iki tur döner, çevresinde hava döner; dönüşün sonunda ayak torbada.
+  const tornadoKick = async (onHit = null, ms = 1400) => {
+    const sw = h('span', { class: 'train-swirl' });
+    sw.innerHTML = TRAIN_SWIRL;
+    fx.append(sw);
+    anim(sw, [{ opacity: 0, translate: '0 0', scale: '0.6' }, { opacity: 1, translate: '10px -26px', scale: '1', offset: 0.45 }, { opacity: 0, translate: '14px -12px', scale: '1.1' }], ms).then(() => sw.remove());
+    const b = boot();
+    if (onHit) setTimeout(onHit, ms * 0.74);
+    anim(b, [{ translate: '0 -20px', rotate: '0deg', scale: '0.5', opacity: 0 }, { translate: '10px -26px', rotate: '0deg', scale: '0.6', opacity: 0, offset: 0.62 },
+      { translate: `${reach}px -24px`, rotate: '-14deg', scale: '1.2', opacity: 1, offset: 0.74 }, { translate: `${reach}px -24px`, rotate: '-14deg', scale: '1.2', opacity: 1, offset: 0.82 },
+      { translate: '0 0', rotate: '0deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' }).then(() => b.remove());
+    // Gövdesinin ortasında döner (ayaklarının çevresinde dönünce başı yere giriyordu).
+    await anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '0 5px', rotate: '0deg', offset: 0.1 }, { translate: '10px -30px', rotate: '300deg', offset: 0.45 },
+      { translate: '16px -22px', rotate: '600deg', offset: 0.74 }, { translate: '0 0', rotate: '720deg' }].map((f) => ({ ...f, transformOrigin: '50% 50%' })), ms, { easing: 'ease-in-out' });
+  };
+  // Uçan tekme (taekwondo, twimyo yeop chagi): kahraman geri çekilip atılır, havada uçarak yan tekme atar; arkasında hız çizgileri.
+  const flyingKick = async (onHit = null, ms = 1400) => {
+    const fwd = Math.round(reach * 0.55);
+    const sp = h('span', { class: 'train-speed' });
+    sp.innerHTML = TRAIN_SPEED;
+    fx.append(sp);
+    anim(sp, [{ translate: '0 0', opacity: 0 }, { translate: '-12px 0', opacity: 0, offset: 0.22 }, { translate: `${fwd}px -26px`, opacity: 1, offset: 0.55 },
+      { translate: `${fwd}px -26px`, opacity: 1, offset: 0.64 }, { translate: '0 0', opacity: 0 }], ms, { easing: 'ease-in-out' }).then(() => sp.remove());
+    const b = boot();
+    if (onHit) setTimeout(onHit, ms * 0.55);
+    anim(b, [{ translate: '0 0', rotate: '0deg', scale: '0.5', opacity: 0 }, { translate: '-12px 0', rotate: '0deg', scale: '0.5', opacity: 0, offset: 0.22 },
+      { translate: `${reach}px -30px`, rotate: '-6deg', scale: '1.25', opacity: 1, offset: 0.55 }, { translate: `${reach}px -30px`, rotate: '-6deg', scale: '1.25', opacity: 1, offset: 0.64 },
+      { translate: '0 0', rotate: '0deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' }).then(() => b.remove());
+    await anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '-12px 0', rotate: '4deg', offset: 0.22 }, { translate: `${fwd}px -26px`, rotate: '-28deg', offset: 0.55 },
+      { translate: `${fwd}px -26px`, rotate: '-28deg', offset: 0.64 }, { translate: '0 0', rotate: '0deg' }], ms, { easing: 'ease-in-out' });
+  };
+  const hop =(times = 2, high = 12) => anim(hero, Array.from({ length: times * 2 + 1 }, (_, i) => ({ rotate: '0deg', translate: `0 ${i % 2 ? -high : 0}px` })), times * 300, { easing: 'ease-in-out' });
   // Son yumrukla torba çok uzağa savrulur; geri gelirken kahraman eliyle tutar. Uzaylı geriye kayar, gülerek döner.
   // Tutunca söz yok; kahraman zıplayıp sevinir (seq.jabs; velinin isteği, 2026-11-17).
   const farAndCatch = async () => {
     pow('BAM!');
     if (!bag) { await stumble(46, 22, 1300); return; }
+    dust();
+    spill(6);
     await rot([0, -86], 560, 'ease-out');
     await wait(280);
     const g = glove(false);
@@ -1242,7 +1538,7 @@ function trainScene(move, streak, p, level, opts = {}) {
   // Yanlış: kahraman vurur, torba geri gelip kahramanı devirir; uzaylı hafifçe iter. Kahraman yıldızları sayar, kalkar.
   const fall = async () => {
     if (bag) {
-      jab(false, () => pow('POF!'), 460);
+      jab(false, () => { pow('POF!'); spill(3); }, 460);
       await wait(220);
       await rot([0, -46], 480, 'ease-out');
       await rot([-46, 44], 520, 'ease-in');
@@ -1308,6 +1604,42 @@ function trainScene(move, streak, p, level, opts = {}) {
       await last;
       await hop(3);
     },
+    // Kombolar (2026-11-18; TRAIN_TIERS). Bir-iki (boks): düz yumruk ve arka elle güçlü yumruk.
+    onetwo: async () => { let last; line(); await jab(false, () => hitFoe('jolt', 40)); await cross(() => { last = hitFoe('big', 30); }); await last; await hop(2, 16); },
+    // Aparkat (boks): düz yumruk, sonra aşağıdan yukarı aparkat; torba havaya kalkar.
+    uppercut: async () => { let last; line(); await jab(false, () => hitFoe('jolt', 44)); await wait(80); await upper(() => { last = hitFoe('up', 26); }); await last; await hop(2, 16); },
+    // Diz (muay thai): iki diz art arda.
+    knee: async () => { let last; line(); await kneeUp(() => hitFoe('up', 62)); await wait(120); await kneeUp(() => { last = hitFoe('up', 56); }); await last; await hop(1); },
+    // Ön tekme ve ters yumruk (karate, mae geri ve gyaku zuki).
+    front: async () => { let last; line(); await frontKick(() => hitFoe('big')); await wait(100); await cross(() => { last = hitFoe('jolt', 36); }); await last; await hop(2); },
+    // Düz yumruk ve balta tekmesi (taekwondo): ayak tepeden torbaya iner.
+    axe: async () => { let last; line(); await jab(false, () => hitFoe('jolt', 46)); await axeKick(() => { last = hitFoe('down'); }); await last; await hop(1); },
+    // Düz yumruk ve geri tekme (karate): kahraman arkasını dönüp tabanıyla vurur.
+    back: async () => { let last; line(); await jab(true, () => hitFoe('jolt', 30)); await backKick(() => { last = hitFoe('big'); }); await last; await hop(1); },
+    // Bir-iki ve alçak tekme (kickboks): torbanın altı savrulur.
+    lowkick: async () => {
+      let last;
+      line();
+      await jab(false, () => hitFoe('jolt', 40));
+      await cross(() => hitFoe('jolt', 28));
+      await lowKick(() => { last = hitFoe('low'); });
+      await last;
+      await hop(2);
+    },
+    // Havada çift tekme (taekwondo).
+    double: async () => { let last; line(); await doubleKick(() => hitFoe('jolt', 56), () => { last = hitFoe('big'); }); await last; await hop(1); },
+    // Düz yumruk ve tornado tekme (taekwondo); torba tam tur atar.
+    tornado: async () => { let last; line(); await jab(false, () => hitFoe('jolt', 40)); await tornadoKick(() => { last = hitFoe('loop'); }); await last; await hop(2); },
+    // İki yumruk ve uçan tekme (taekwondo); torba tam tur atar.
+    flying: async () => {
+      let last;
+      line();
+      await jab(false, () => hitFoe('jolt', 44));
+      await jab(true, () => hitFoe('jolt', 30));
+      await flyingKick(() => { last = hitFoe('loop'); });
+      await last;
+      await hop(3);
+    },
   };
   let busy = false;
   box.play = async () => {
@@ -1316,7 +1648,12 @@ function trainScene(move, streak, p, level, opts = {}) {
     bubble.className = 'train-say';
     reach = Math.max(24, foe.offsetLeft - hero.offsetLeft - 82);
     if (move === 'fall') { await fall(); line(); }
-    else { await (seq[move] || seq.jabs)(); await wait(300); }
+    else {
+      await (seq[move] || seq.jabs)();
+      // Kum ilk kez döküldüğü sahnenin sonunda kahraman şaşırır.
+      if (wear.spill && opts.sand === 1) say(trainSandSay());
+      await wait(300);
+    }
     busy = false;
   };
   return box;
@@ -1333,11 +1670,21 @@ function trainSlot(ss, correct) {
   const ballet = trainStyle(p) === 'balerin';
   ss.train ??= Promise.all([loadArmy(p), ballet ? 1 : armyHeroLevel(p)]).catch(() => [null, 1]);
   const streak = ss.streak || 0, n = correct ? 0 : Math.max(0, (ss.falls || 1) - 1);
+  // Kombo sırası: oturumda her basamak kendi sırasıyla döner, başlangıcı her oturumda değişir (2026-11-18).
+  ss.trainSeed ??= Math.floor(Math.random() * 24);
+  ss.trainSeen ??= {};
+  const tier = trainTier(streak);
+  const k = correct ? ss.trainSeed + (ss.trainSeen[tier] = (ss.trainSeen[tier] ?? -1) + 1) : 0;
+  // Torbanın eskimesi: oturumdaki sahne sayısı ve oturumun ne kadarının bittiği; kumlu sahneler sayılır (yığın büyür).
+  ss.bagN = (ss.bagN || 0) + 1;
+  const wear = bagWear(ss.bagN, ss.entries?.length ? (ss.index + 1) / ss.entries.length : 0);
+  if (wear.spill) ss.sandN = (ss.sandN || 0) + 1;
+  const sand = ss.sandN || 0;
   ss.train.then(([st, level]) => {
     if (!st || !trainOn(p, st) || !slot.isConnected) return;
     const alien = st.points >= TRAIN_ALIEN_AT;
     const sc = ballet ? balletScene(balletMove(correct, streak), streak, p, { partner: alien ? 'alien' : 'solo', n })
-      : trainScene(trainMove(correct, streak), streak, p, level, { partner: alien ? 'alien' : 'bag', army: armyView(p, st), n });
+      : trainScene(trainMove(correct, streak, k), streak, p, level, { partner: alien ? 'alien' : 'bag', army: armyView(p, st), n, wear, sand });
     fill(slot, sc);
     sc.play();
   }).catch(() => {});

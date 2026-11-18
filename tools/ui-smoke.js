@@ -265,6 +265,42 @@
       t1.remove(); t2.remove();
       check('Antrenman: asker olana kadar cevabın altında; doğruda yumruk, yanlışta düşüp "Hadi bir daha deneyelim!", 70\'ten sonra uzaylı',
         trainOk, noTrain ? 'asker ya da hareket azaltılmış: sahne yok' : [!glove && 'yumruk yok', !partnerOk && 'partner yanlış', !fallSay && 'düşüş sözü yok'].filter(Boolean).join('; '));
+      // Kombolar ve eski torba (2026-11-18): yeni kombolar kendi sporunun salonunda (köşede sporun adı), vuruşlar sayılır;
+      // oturumun sonuna doğru torba yamalı ve bantlı, yırtıktan kum akar, vuruşta yığın büyür, kum ilk dökülünce "Eyvah, kum
+      // dökülüyor!". Uzaylıda kum yok. Sahneler sayfada kurulur, animasyonlar ileri sarılır (cevap yazılmaz).
+      if (!reduceMotion()) {
+        const moves = ['onetwo', 'uppercut', 'knee', 'front', 'axe', 'back', 'lowkick', 'double', 'tornado', 'flying'];
+        const scs = moves.map((m, i) => trainScene(m, 3, state.student, 1, { partner: i % 5 === 4 ? 'alien' : 'bag', wear: { stage: 3, spill: 2 }, sand: 1 }));
+        scs.forEach((s, i) => { s.style.cssText = `position: fixed; left: 0; top: ${(i % 5) * 136}px; width: 360px; z-index: 99`; document.body.append(s); });
+        const done = scs.map(() => false);
+        scs.forEach((s, i) => s.play().then(() => { done[i] = true; }));
+        for (let i = 0; i < 160 && !done.every(Boolean); i++) {
+          await wait(50);
+          scs.forEach((s) => s.getAnimations({ subtree: true }).forEach((a) => { try { a.finish(); } catch (e) { /* bitmiş */ } }));
+        }
+        await wait(1200); // ileri sarılan sahnelerde son vuruşlar zamanlayıcıyla gelir
+        const bad = scs.map((s, i) => {
+          const bag = !s.classList.contains('train-alien');
+          const sportOk = !!s.querySelector('.train-sport')?.textContent && [...s.classList].some((c) => c.startsWith('s-'));
+          const countOk = /×[2-9]/.test(s.querySelector('.train-count')?.textContent || '');
+          const sandOk = bag ? !!s.querySelector('.train-sand.pour') && Number(s.querySelector('.train-pile')?.style.scale) > 0.32 : !s.querySelector('.train-sand, .train-pile');
+          const sayOk = !bag || /Eyvah, kum dökülüyor|Uh-oh, the sand is spilling/.test(s.querySelector('.train-say.on')?.textContent || '');
+          return sportOk && countOk && sandOk && sayOk ? null : `${moves[i]}:${[!sportOk && 'spor', !countOk && 'sayı', !sandOk && 'kum', !sayOk && 'söz'].filter(Boolean).join('+')}`;
+        }).filter(Boolean);
+        scs.forEach((s) => s.remove());
+        // Oturumun sonunda (son soru) cevap sahnesi: torba kum döker; kombo sırası sayılır.
+        const ssEnd = { streak: 2, entries: Array(10).fill(0), index: 9 };
+        const t3 = trainSlot(ssEnd, true);
+        t3.style.cssText = 'position: fixed; left: 0; top: 0; width: 360px; z-index: 99';
+        document.body.append(t3);
+        for (let i = 0; i < 30 && !noTrain && !t3.querySelector('.train'); i++) await wait(100);
+        const kumBag = !!t3.querySelector('.train-bag');
+        const endOk = noTrain ? !t3.firstChild : ssEnd.trainSeen?.[1] === 0 && ssEnd.bagN === 1 && ssEnd.sandN === 1 && !!t3.querySelector('.train')
+          && (!kumBag || (!!t3.querySelector('.train-sand.pour') && !!t3.querySelector('.train-pile') && !!t3.querySelector('.train-sport')));
+        t3.remove();
+        check('Antrenman kombolar ve eski torba: her kombo kendi sporunun salonunda, vuruşlar sayılır; oturum sonunda torbadan kum akar, yığın büyür, "Eyvah, kum dökülüyor!"',
+          !bad.length && endOk, [bad.join(', '), !endOk && 'oturum sonu sahnesi'].filter(Boolean).join('; '));
+      }
       // Bale (2026-11-18): sahne sayfada kurulur (kahramanın görünüşüyle): yalnızken bar, piruet; uzaylıyla sıçrama ve düşüşte
       // "Hihi!", kalkınca "Hadi bir daha deneyelim!". Dans oyunu: uzaylı gösterir, yanlış tuşta yeniden gösterir, yön tuşlarıyla
       // doğru sıra turu bitirir. Hiçbir şey yazılmaz; çocuğun kendi dans kartı 70'ten önce ya da kum torbasında gizli.

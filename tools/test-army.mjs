@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const app = readFileSync(join(root, 'docs', 'app.js'), 'utf8');
 const src = readFileSync(join(root, 'docs', 'army.js'), 'utf8');
+const css = readFileSync(join(root, 'docs', 'style.css'), 'utf8');
 const sql = readFileSync(join(root, 'supabase', 'hero-army.sql'), 'utf8');
 const pick = (text, from, to) => {
   const a = text.indexOf(from), b = text.indexOf(to, a);
@@ -184,12 +185,43 @@ const R = new Function([
   "const trEn = (tr, en) => (this.lang() === 'en' ? en : tr);",
   pick(src, '/* Asker: saf kısım', '/* Asker: ekran */'),
   pick(src, '/* Antrenman: saf kısım */', '/* Antrenman: sahne */'),
-  'return { TRAIN_ALIEN_AT, trainMove, trainOn, trainSay, trainAlien, TRAIN_BAG, TRAIN_GLOVE, TRAIN_POW, TRAIN_SWOOSH, TRAIN_BOOT, TRAIN_MARK };',
+  'return { TRAIN_ALIEN_AT, TRAIN_TIERS, TRAIN_MOVES, trainTier, trainMove, trainSport, trainSportName, bagWear, trainOn, trainSay, trainSandSay, trainAlien, trainBag,'
+  + ' TRAIN_BAG, TRAIN_GLOVE, TRAIN_POW, TRAIN_SWOOSH, TRAIN_BOOT, TRAIN_MARK, TRAIN_PILE, TRAIN_KNEE, TRAIN_SWIRL, TRAIN_SPEED, TRAIN_DUST };',
 ].join('\n')).call({ lang: () => lang });
-check('antrenman hareketi: yanlışta düşüş; doğruda sırayla yumruklar, kroşeler, tekme, yumruk tekme, döner tekme; 6 ve üstünde kombolar sırayla',
-  R.trainMove(false, 0) === 'fall' && R.trainMove(false, 7) === 'fall'
-  && [1, 2, 3, 4, 5, 6, 7, 8, 9, 12].map((n) => R.trainMove(true, n)).join() === 'jabs,hooks,kick,mix,spin,super,mix,spin,super,super'
-  && R.trainMove(true, 0) === 'jabs' && R.trainMove(true, undefined) === 'jabs' && R.trainMove(true, 40) !== undefined);
+check('antrenman hareketi: yanlışta düşüş; doğruda basamak basamak yumruklar, kroşe/diz/ön tekme, tekmeler, kombolar, havada tekmeler; 6 ve üstünde büyük kombo ve öncekiler',
+  R.trainMove(false, 0) === 'fall' && R.trainMove(false, 7, 3) === 'fall'
+  && [1, 2, 3, 4, 5, 6, 7, 9, 12].map((n) => R.trainMove(true, n)).join() === 'jabs,hooks,kick,mix,spin,super,super,super,super'
+  && R.trainMove(true, 0) === 'jabs' && R.trainMove(true, undefined) === 'jabs' && R.trainMove(true, 40) === 'super' && R.trainMove(true, 3, NaN) === 'kick'
+  && R.trainTier(1) === 0 && R.trainTier(6) === 5 && R.trainTier(99) === 5 && R.trainTier(-3) === 0);
+// Kombolar (velinin isteği, 2026-11-18: "kombolar hep aynı olunca sıkıcı oluyor"): her basamak sırayla döner, eski hareketler duruyor
+const pools = R.TRAIN_TIERS.map((pool, i) => pool.map((_, k) => R.trainMove(true, i + 1, k)));
+check('kombolar sırayla döner: her basamakta en az üç farklı kombo, k arttıkça sırayla ve başa döner; eski hareketler (yumruk, kroşe, tekme, yumruk tekme, döner tekme, süper) duruyor',
+  pools.every((p) => p.length >= 3 && new Set(p).size === p.length) && R.trainMove(true, 1, 1) === 'onetwo' && R.trainMove(true, 1, 2) === 'uppercut'
+  && R.trainMove(true, 1, 3) === 'jabs' && R.trainMove(true, 2, 1) === 'knee' && R.trainMove(true, 3, 2) === 'back' && R.trainMove(true, 5, 1) === 'tornado'
+  && R.trainMove(true, 8, 1) === 'tornado' && pools[5].length >= 6 && ['jabs', 'hooks', 'kick', 'mix', 'spin', 'super'].every((m) => R.TRAIN_MOVES.includes(m))
+  && R.TRAIN_MOVES.length >= 16);
+const seqSrc = pick(src, '  const seq = {', '  let busy = false;');
+check('her kombonun sporu (boks, kickboks, muay thai, taekwondo, karate, süper kombo), salonu ve sözü var; sahnede her kombonun hareketi tanımlı',
+  R.TRAIN_MOVES.every((m) => R.trainSport(m) && R.trainSportName(R.trainSport(m)).length > 4 && (m === 'jabs' || R.trainSay(m, m === 'super' ? 6 : 2).length > 3)
+    && seqSrc.includes('\n    ' + m + ': async') && css.includes('.train.s-' + R.trainSport(m) + ' {'))
+  && R.trainSport('fall') === null && R.trainSportName('yok') === ''
+  && new Set(R.TRAIN_MOVES.map(R.trainSport)).size === 6 && R.trainSay('axe', 3) === 'Balta tekmesi!' && R.trainSay('tornado', 5) === 'Tornado tekme!');
+// Torbanın eskimesi (velinin isteği, 2026-11-18): vurdukça eskir, oturumun sonuna doğru kum dökülür
+const W = (n, p) => { const w = R.bagWear(n, p); return w.stage + '/' + w.spill; };
+check('torba eskir: ilk sahnelerde yeni, vurdukça sürtük, yamalı, bantlı; oturumun %70\'inden sonra kum sızar, %85\'ten sonra dökülür; kum dökülürken torba en az yamalı',
+  W(1, 0.05) === '0/0' && W(3, 0.1) === '1/0' && W(5, 0.1) === '2/0' && W(7, 0.1) === '3/0' && W(40, 0) === '3/0' && W(1, 0.3) === '1/0' && W(1, 0.6) === '2/0'
+  && W(1, 0.7) === '2/1' && W(1, 0.85) === '3/2' && W(2, 1) === '3/2' && W(1, 5) === '3/2' && W(NaN, NaN) === '0/0' && W(undefined, -1) === '0/0'
+  && [0, 0.2, 0.5, 0.75, 0.9, 1].every((p) => { const w = R.bagWear(1, p); return !w.spill || w.stage > w.spill; }));
+const bags = [0, 1, 2, 3].flatMap((s) => [0, 1, 2].map((sp) => R.trainBag(s, sp)));
+check('eski torba çizimi: her eskilik ve kum hâli geçerli; yama, bant, yırtık ve kum sırayla gelir; yeni torba eskisiyle aynı',
+  bags.every((s) => s.startsWith('<svg') && s.endsWith('</svg>') && !/NaN|undefined|Infinity/.test(s)) && new Set(bags).size === bags.length
+  && R.TRAIN_BAG === R.trainBag(0, 0) && R.trainBag() === R.TRAIN_BAG && R.trainBag(9, 9) === R.trainBag(3, 2) && R.trainBag(-1, NaN) === R.TRAIN_BAG
+  && !/#F4A261/.test(R.trainBag(1, 0)) && /#F4A261/.test(R.trainBag(2, 0)) && !/#B8BEC8/.test(R.trainBag(2, 0)) && /#B8BEC8/.test(R.trainBag(3, 0))
+  && !/#E3C27A/.test(R.trainBag(3, 0)) && /#E3C27A/.test(R.trainBag(2, 1)) && /#E3C27A/.test(R.trainBag(3, 2)));
+check('torbanın eskimesi bağlı: oturumdaki sahne sayısı ve ilerleme sayılır, kumlu sahneler yığını büyütür; kum ilk dökülünce "Eyvah, kum dökülüyor!"; uzaylıda eskime yok',
+  src.includes('ss.bagN = (ss.bagN || 0) + 1;') && src.includes('bagWear(ss.bagN, ss.entries?.length ? (ss.index + 1) / ss.entries.length : 0)')
+  && src.includes('trainMove(correct, streak, k)') && src.includes('ss.trainSeed ??= ') && src.includes('n, wear, sand })')
+  && src.includes('const wear = bag ?') && src.includes('if (wear.spill && opts.sand === 1) say(trainSandSay());') && R.trainSandSay() === 'Eyvah, kum dökülüyor!');
 check('antrenman asker olana kadar: asker kahraman açıkken var, 100\'e ulaşınca ya da kol seçince yok; 70\'ten sonra uzaylı partner',
   R.trainOn({ grade: 4 }, { points: 50 }) && R.trainOn({ grade: 4 }, null) && R.trainOn({ grade: 4 }, { points: 99 })
   && !R.trainOn({ grade: 4 }, { points: 100 }) && !R.trainOn({ grade: 4 }, { points: 20, corps: 'kara' }) && !R.trainOn({ grade: 8 }, { points: 10 })
@@ -202,10 +234,13 @@ check('antrenman sözü: düşünce "Hadi bir daha deneyelim!" ve sırayla ötek
 lang = 'en';
 check('antrenman sözü İngilizce öğrencide İngilizce (Türkçe harfsiz sözler de)',
   R.trainSay('fall', 0, 0) === 'Let\'s try again!' && R.trainSay('fall', 0, 2) === 'I\'ll get it next time!' && R.trainSay('super', 6) === 'Combo ×6!'
-  && R.trainSay('spin', 5) === 'Spinning kick!' && R.trainSay('jabs', 1) === '' && R.trainSay('hooks', 2) === 'Left, right!' && R.trainSay('mix', 4) === 'Punch and kick!');
+  && R.trainSay('spin', 5) === 'Spinning kick!' && R.trainSay('jabs', 1) === '' && R.trainSay('hooks', 2) === 'Left, right!' && R.trainSay('mix', 4) === 'Punch and kick!'
+  && R.trainSay('axe', 3) === 'Axe kick!' && R.trainSportName('boks') === '🥊 Boxing' && R.trainSportName('kombo') === '⭐ Super combo' && R.trainSandSay() === 'Uh-oh, the sand is spilling!'
+  && R.TRAIN_MOVES.every((m) => !/[çğıöşüÇĞİÖŞÜ]/.test(R.trainSay(m, 3) + R.trainSportName(R.trainSport(m)))));
 lang = 'tr';
-const trainPics = [...['guard', 'hit', 'cheer', 'push', 'başka'].map((m) => R.trainAlien(m)), R.trainAlien(), R.TRAIN_BAG, R.TRAIN_GLOVE, R.TRAIN_POW, R.TRAIN_SWOOSH, R.TRAIN_BOOT, R.TRAIN_MARK];
-check('antrenman çizimleri (uzaylı partnerin dört hâli, kum torbası, eldiven, ayakkabı, torbadaki iz, vuruş yıldızı, tekme izi) bozuk sayı taşımıyor',
+const trainPics = [...['guard', 'hit', 'cheer', 'push', 'başka'].map((m) => R.trainAlien(m)), R.trainAlien(), R.TRAIN_BAG, R.TRAIN_GLOVE, R.TRAIN_POW, R.TRAIN_SWOOSH, R.TRAIN_BOOT, R.TRAIN_MARK,
+  R.TRAIN_PILE, R.TRAIN_KNEE, R.TRAIN_SWIRL, R.TRAIN_SPEED, R.TRAIN_DUST];
+check('antrenman çizimleri (uzaylı partnerin dört hâli, kum torbası, eldiven, ayakkabı, torbadaki iz, vuruş yıldızı, tekme izi, kum yığını, diz, tornado havası, hız çizgileri, toz) bozuk sayı taşımıyor',
   trainPics.every((s) => s.startsWith('<svg') && s.endsWith('</svg>') && !/NaN|undefined|Infinity/.test(s)) && R.trainAlien('xyz') === R.trainAlien('guard'));
 check('antrenman bağlı: oturumda cevabın altında; seri ve düşüş sayılır, asker olunca ya da hareket azaltılmışsa yok, hiçbir şey yazmaz',
   /trainSlot\(ss, correct\),/.test(app) && /ss\.streak = correct \? \(ss\.streak \|\| 0\) \+ 1 : 0;/.test(app) && /if \(!correct && !help\) ss\.falls/.test(app)

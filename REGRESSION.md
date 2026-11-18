@@ -314,6 +314,22 @@ Her maddenin yanında nasıl denendiği yazar:
   eldivenlerini kaldırır; yanlışta kahramanı hafifçe iter, "Hihi!"). Boş geçilen soruda sahne yok, seri sıfırlanır. Asker
   olunca (100 ya da kol seçildi), asker kahraman kapalıysa, hareket azaltılmışsa ve denemede yok. Hiçbir şey kaydetmez.
   İngilizce öğrencide sözler İngilizce. [O] hesap ve çizimler, [A] ekran
+  - **Kombolar** (velinin isteği, 2026-11-18: "kombolar hep aynı olunca sıkıcı oluyor", kickboks, taekwondo vb.): her basamakta
+    üç kombo, oturumda sırayla döner (başlangıcı her oturumda değişir); yukarıdakiler her basamağın ilki olarak duruyor.
+    1: yumruklar, bir-iki, aparkat (boks; aparkatta torba havaya kalkar). 2: kroşeler (boks), iki diz (muay thai),
+    ön tekme ve yumruk (karate). 3: tekme (kickboks), balta tekmesi (taekwondo; ayak tepeden iner, torba ezilir, "GÜM!"),
+    geri tekme (karate; kahraman arkasını döner). 4: yumruk tekme, bir-iki ve alçak tekme (kickboks; torbanın altı savrulur,
+    "ŞAK!"), havada çift tekme (taekwondo). 5: döner tekme, tornado tekme (havada iki tur, çevresinde dönen hava), uçan
+    tekme (hız çizgileri). 6 ve üstü: süper kombo ve öncekiler sırayla. Her kombo kendi sporunun salonunda: boks,
+    kickboks ve muay thaide ring ipleri, taekwondoda kırmızı mavi minder, karatede tatami, süper komboda altın zemin;
+    sağ üstte sporun adı (🥊 Boks, 🥋 Taekwondo…), altında vuruş sayısı (×2, ×3…). Güçlü vuruşta halka. Döner ve tornado
+    tekmede kahraman gövdesinin ortasında döner (başı yere girmez). Uzaylı partnerde de aynı kombolar. [O] [A]
+  - **Eskiyen torba** (velinin isteği, 2026-11-18: "vurdukça iyice eskisin, çalışmanın sonuna yaklaşılıyorsa kum da
+    dökülmeye başlayabilir"): her oturum yeni torbayla başlar; sahneler ve oturumun ilerleyişiyle sürtük ve çizik, sonra
+    solmuş ve turuncu yamalı, sonra gri bantla çarpı yapıştırılmış (dikişi atmış, şeridi kalkmış). Oturumun %70'inden sonra
+    sağ altta yırtıktan kum sızar, %85'ten sonra dökülür; vuruşta kum saçılır, yerde yığın büyür (torba sallanırken akış
+    gizli); kum ilk döküldüğü sahnenin sonunda "Eyvah, kum dökülüyor!". Eski torbada güçlü vuruşta toz çıkar. Uzaylıda
+    eskime ve kum yok. [O] [A]
 - **Bale** (velinin isteği, 2026-11-18: kızlar için; `army.js`, balletScene/danceGame, `profiles.train_style`): kum torbasının
   yerine küçük balerin. Kahramanı kız olan çocukta varsayılan, ötekilerde kum torbası; veli Günlük plan → Asker kahraman
   satırında "Cevaptan sonra: Kum torbası / Balerin" seçer (öğrenci değiştiremez, test-train-style.sql). Balerin kahramanın
