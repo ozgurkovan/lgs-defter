@@ -265,6 +265,48 @@
       t1.remove(); t2.remove();
       check('Antrenman: asker olana kadar cevabın altında; doğruda yumruk, yanlışta düşüp "Hadi bir daha deneyelim!", 70\'ten sonra uzaylı',
         trainOk, noTrain ? 'asker ya da hareket azaltılmış: sahne yok' : [!glove && 'yumruk yok', !partnerOk && 'partner yanlış', !fallSay && 'düşüş sözü yok'].filter(Boolean).join('; '));
+      // Bale (2026-11-18): sahne sayfada kurulur (kahramanın görünüşüyle): yalnızken bar, piruet; uzaylıyla sıçrama ve düşüşte
+      // "Hihi!", kalkınca "Hadi bir daha deneyelim!". Dans oyunu: uzaylı gösterir, yanlış tuşta yeniden gösterir, yön tuşlarıyla
+      // doğru sıra turu bitirir. Hiçbir şey yazılmaz; çocuğun kendi dans kartı 70'ten önce ya da kum torbasında gizli.
+      if (!reduceMotion()) {
+        const b1 = balletScene('spin', 1, state.student, { partner: 'solo' }), b2 = balletScene('fall', 0, state.student, { partner: 'alien', n: 0 });
+        const b3 = balletScene('leap', 3, state.student, { partner: 'alien' });
+        [b1, b2, b3].forEach((b, i) => { b.style.cssText = `position: fixed; left: 0; top: ${i * 140}px; width: 360px; z-index: 99`; document.body.append(b); b.play(); });
+        let hihi = false, spun = false;
+        for (let i = 0; i < 60 && !/Hadi bir daha deneyelim|Let's try again/.test(b2.querySelector('.train-say.on')?.textContent || ''); i++) {
+          await wait(100);
+          hihi ||= b2.querySelector('.train-say')?.textContent === 'Hihi!';
+          spun ||= !!b1.querySelector('.ballet-spark');
+        }
+        const sceneOk = !!b1.querySelector('.ballet-hero svg') && !!b1.querySelector('.ballet-barre svg') && spun && hihi
+          && /Hadi bir daha deneyelim|Let's try again/.test(b2.querySelector('.train-say')?.textContent || '') && /Büyük sıçrama|Grand jeté/.test(b3.querySelector('.train-say')?.textContent || '');
+        [b1, b2, b3].forEach((b) => b.remove());
+        const vals = [0.1, 0.6, 0.3];
+        const dg = danceGame(danceSetup(3, 4), state.student, { speed: 0.05, rnd: (() => { let k = 0; return () => vals[k++ % 3]; })() });
+        dg.style.cssText = 'position: fixed; left: 0; top: 0; width: 360px; z-index: 99; background: #fff';
+        document.body.append(dg);
+        const startOk = /3 hareket|tur var|round/.test(dg.textContent) && dg.querySelectorAll('.dance-pad:disabled').length === 4;
+        const until = async (f, n = 150) => { for (let i = 0; i < n && !f(); i++) await wait(100); return f(); };
+        dg.start();
+        const played = await until(() => dg.peekState().phase === 'play');
+        const seq = dg.peekState().seq, wrongKey = ['left', 'up', 'down', 'right'].find((m) => m !== seq[0]);
+        dg.querySelector(`.dance-pad[data-m="${wrongKey}"]`).click();
+        const retried = await until(() => dg.peekState().tries === 1 && dg.peekState().phase === 'play');
+        const key = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' };
+        for (const m of seq) document.dispatchEvent(new KeyboardEvent('keydown', { key: key[m], bubbles: true, cancelable: true }));
+        const finished = await until(() => dg.peekState().over);
+        const endOk = finished && dg.peekState().won === 1 && /Hepsini yaptın|did them all/.test(dg.querySelector('.dance-banner').textContent);
+        dg.remove();
+        const card = danceCard(5);
+        document.body.append(card);
+        await wait(1500);
+        const stNow = armyCache.get(state.student.id);
+        const cardOk = trainStyle(state.student) === 'balerin' && (stNow?.points ?? 0) >= TRAIN_ALIEN_AT && trainOn(state.student, stNow) ? !card.hidden : card.hidden;
+        card.remove();
+        check('Bale: piruet ve bar, uzaylıyla düşüşte "Hihi!" ve "Hadi bir daha deneyelim!"; dans oyunu yanlışta yeniden gösterir, yön tuşlarıyla tur biter; kart yalnız balerinde 70\'ten sonra',
+          sceneOk && startOk && played && retried && endOk && cardOk,
+          [!sceneOk && 'sahne', !startOk && 'başlangıç', !played && 'gösteri bitmedi', !retried && 'yanlışta yeniden gösterme', !endOk && `tur (${JSON.stringify(dg.peekState())})`, !cardOk && 'kart görünürlüğü'].filter(Boolean).join('; '));
+      }
     } else if (role === 'student') {
       go('hero'); await settle();
       check('Asker kahraman kapalıyken asker kartı yok', !document.querySelector('.army-card, .army-line'));
@@ -304,6 +346,17 @@
         state.solver = savedSolver;
         document.querySelector('.ask')?.remove();
       }
+    }
+    // Antrenman türü (2026-11-18): velinin Günlük plan → Asker kahraman satırında "Cevaptan sonra: Kum torbası / Balerin";
+    // varsayılan kahramana göre (kız kahramanda balerin), değiştirince kaydedilecek değer train_style. Kaydetmeden denenir.
+    if (role === 'parent' && state.student) {
+      const row = armySetting(state.student);
+      const sel = row.querySelector('select');
+      const def = !!sel && sel.value === trainStyle(state.student) && !('train_style' in row.value());
+      if (sel) sel.value = sel.value === 'balerin' ? 'torba' : 'balerin';
+      const changed = !!sel && row.value().train_style === sel.value;
+      check('Antrenman türü: velinin asker kahraman satırında kum torbası ya da balerin; varsayılan kahramana göre, değişince kaydedilir', def && changed,
+        [!sel && 'seçim yok', sel && !def && 'varsayılan yanlış', sel && !changed && 'değişiklik kaydedilmiyor'].filter(Boolean).join('; '));
     }
     // Soru beğenisi (velinin isteği, 2026-11-16): öğrencide cevaptan sonra "Bu soru nasıldı? 👍 👎"; dokununca kaydedilir,
     // değiştirilebilir, 👎'de neden kutusu açılır ve "Gönder" nedeni yazar. Veli ve öğretmende yok. Kayıt sahte: sb.from test

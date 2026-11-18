@@ -305,8 +305,8 @@ Her maddenin yanında nasıl denendiği yazar:
   kahramanın sayfasında madalya rafı (kazanılan renkli, sıradaki işaretli, kalanlar gri ve numaralı), askerken de. [O], ekran [A]
 - **Antrenman** (velinin isteği, 2026-11-16: asker olana kadar; `army.js`, trainScene/trainSlot): oturumda her cevabın
   altında ("Doğru"/"Yanlış" satırının hemen altı) 2-4 saniyelik sahne; üst üste doğrularla büyür (velinin isteği,
-  2026-11-17). 1. doğru: birkaç yumruk, sonuncusunda torba çok uzağa savrulur, geri gelirken kahraman eliyle tutar ("Tuttum!").
-  2: sağdan soldan kroşeler, torbada el izleri kalır ("Sağ, sol!"). 3: tekme ("Tekme!"). 4: yumruk tekme kombosu. 5: kroşe ve
+  2026-11-17). 1. doğru: birkaç yumruk, sonuncusunda torba çok uzağa savrulur, geri gelirken kahraman eliyle tutar, söz söylemez, zıplayıp sevinir (velinin isteği, 2026-11-17: "Tuttum demesin").
+  2: sağdan soldan kroşeler, torbada el izleri kalır ("Sağ, sol!"). 3: tekme ("Tekme!"; kahraman önce gerilir, ayağı vuruşta bir an kalır, yaklaşık 1 saniye: velinin isteği, 2026-11-17, "çok hızlı oldu"). 4: yumruk tekme kombosu. 5: kroşe ve
   döner tekme, torba tam tur atar. 6 ve üstü: seri yumruk, tekme, döner tekme ("Kombo ×6!") ile 4. ve 5. sahneler sırayla.
   Yanlışta kahraman vurur, torba geri gelip kahramanı devirir; başında yıldızlar, kalkar ve sırayla "Hadi bir daha
   deneyelim!", "Düştüm ama kalktım!", "Bir dahakine olacak!", "Hata yapmak öğrenmektir!"; seri baştan başlar.
@@ -314,6 +314,21 @@ Her maddenin yanında nasıl denendiği yazar:
   eldivenlerini kaldırır; yanlışta kahramanı hafifçe iter, "Hihi!"). Boş geçilen soruda sahne yok, seri sıfırlanır. Asker
   olunca (100 ya da kol seçildi), asker kahraman kapalıysa, hareket azaltılmışsa ve denemede yok. Hiçbir şey kaydetmez.
   İngilizce öğrencide sözler İngilizce. [O] hesap ve çizimler, [A] ekran
+- **Bale** (velinin isteği, 2026-11-18: kızlar için; `army.js`, balletScene/danceGame, `profiles.train_style`): kum torbasının
+  yerine küçük balerin. Kahramanı kız olan çocukta varsayılan, ötekilerde kum torbası; veli Günlük plan → Asker kahraman
+  satırında "Cevaptan sonra: Kum torbası / Balerin" seçer (öğrenci değiştiremez, test-train-style.sql). Balerin kahramanın
+  ten, saç, göz rengi, gözlüğü ve çilleriyle çizilir; saç topuz, pembe mayo ve tütü, hep sevimli. Cevaptan sonra: doğruda
+  piruet (pırıltılar), 3 doğru üst üste büyük sıçrama ("Büyük sıçrama!"), 5 ve üstü koreografi (piruet, sıçrama, arabesk,
+  reverans; "Muhteşem ×5!"); yanlışta sendeler, pıt diye oturur, başında yıldızlar, kalkar ve "Hadi bir daha deneyelim!"
+  (sırayla öteki sözler). Yalnızken sahnenin sağında bale barı; 70 numaradan sonra tütülü sevimli uzaylı dans partneri
+  (onunla döner, alkışlar; düşüşte kıkırdar "Hihi!", el uzatıp kaldırır). [O] hesap ve çizimler, [A] ekran
+  - **Uzaylıyla dans** (oturum ve uygulamadaki deneme sonunda, balerin çocukta 70'ten sonra, asker olana kadar): her 3 doğru
+    bir tur (en çok 5). Uzaylı dansı gösterir (üstte oklar sırayla yanar), "Sıra sende!": çocuk yön tuşlarıyla ya da ekrandaki
+    dört okla aynı sırayla basar; her doğru tuşta balerin o hareketi yapar (← → piruet, ↑ sıçrama, ↓ reverans), hepsi
+    doğruysa dansın tamamını yapar, reverans eder, uzaylı alkışlar ("Bravo!"). Yanlışta sendeler, "Hadi bir daha
+    deneyelim!", uzaylı yeniden gösterir; turda 3 hak, sonra "Bir dahaki tura!". İlk tur 3 hareket (3. sınıfa kadar 2), her
+    turda bir fazla, en çok 6. Son: "Hepsini yaptın!" ya da "Dans bitti! 4 turun 3 tanesini yaptın."; "Atla". Kum torbasında,
+    70'ten önce ve askerde kart yok. Hiçbir şey yazmaz. [O] hesap, [A] oyun (yanlış tuş, yön tuşları), oynamak [E]
 - Kahramanın sayfasında asker kartı: asker değilken numara çubuğu ve 100'e kalan; askerken rütbe rozeti, sıradaki rütbeye
   kalan, bütün rütbeler; "Numara nasıl artar?". Besleme kapalı, asker kahraman açıksa sayfa kahramanı ve asker kartını
   gösterir (yemek rafı yok). Kahramanın kartında numara ya da rütbe satırı. İngilizce ve Klavye sayfalarındaki kahraman

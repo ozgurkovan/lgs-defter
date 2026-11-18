@@ -1542,6 +1542,7 @@ function showSessionEnd() {
         'Yanlış yaptıkların yakında farklı sorularla tekrar gelecek.'),
       h('button', { class: 'primary block', onclick: () => go(returnTo || 'home') }, track === 'practice' ? 'Konuya dön' : 'Ana sayfa')),
     battleCard(stats.correct, stats.total - stats.correct, hard, 'session', track === 'mistake'),
+    danceCard(stats.correct), // balerin çocukta 70 numaradan sonra uzaylıyla dans (army.js)
     // Besleme açıksa kahraman: doğru cevaplar bronz oldu, şimdi yedirebilir.
     feedHomeCard(),
     // Oturum bitince çoğu zaman ödül gibi bir fıkra, bilmece ya da şiir.
@@ -2792,6 +2793,7 @@ function showExamResult(exam, rows, results, reason, saved) {
     // Asker olmuş çocukta büyük uzaylı savaşı (ana gemiyle; yüzde 80 ve üstü doğruda süper bomba).
     saved ? battleCard(rows.length - missed.length, missed.length,
       rows.filter((r) => r.outcome === 'dogru' && battleHard('deneme', r.qn.target_seconds, state.student?.grade)).length, 'exam') : null,
+    saved ? danceCard(rows.length - missed.length) : null,
     h('div', { class: 'scroll-x' }, h('table', {},
       h('thead', {}, h('tr', {}, h('th', {}, 'Ders'), h('th', {}, 'D'), h('th', {}, 'Y'), h('th', {}, 'B'), h('th', {}, 'Net'))),
       h('tbody', {}, results.map((r) => h('tr', {},

@@ -198,11 +198,11 @@ const says = [0, 1, 2, 3, 4, -1, NaN, 2.5].map((n) => R.trainSay('fall', 0, n));
 check('antrenman sözü: düşünce "Hadi bir daha deneyelim!" ve sırayla öteki cesaret sözleri; her hareketin sözü, 6 ve üstünde kombo sayısı',
   says[0] === 'Hadi bir daha deneyelim!' && says[1] === 'Düştüm ama kalktım!' && says[4] === says[0] && says.every((s) => typeof s === 'string' && s.length > 5)
   && R.trainSay('super', 6) === 'Kombo ×6!' && R.trainSay('mix', 7) === 'Kombo ×7!' && R.trainSay('spin', 5) === 'Döner tekme!' && R.trainSay('kick', 3) === 'Tekme!'
-  && R.trainSay('jabs', 1) === 'Tuttum!' && R.trainSay('hooks', 2) === 'Sağ, sol!' && R.trainSay('mix', 4) === 'Yumruk, tekme!' && R.trainSay('başka', 1) === '');
+  && R.trainSay('jabs', 1) === '' && R.trainSay('hooks', 2) === 'Sağ, sol!' && R.trainSay('mix', 4) === 'Yumruk, tekme!' && R.trainSay('başka', 1) === '');
 lang = 'en';
 check('antrenman sözü İngilizce öğrencide İngilizce (Türkçe harfsiz sözler de)',
   R.trainSay('fall', 0, 0) === 'Let\'s try again!' && R.trainSay('fall', 0, 2) === 'I\'ll get it next time!' && R.trainSay('super', 6) === 'Combo ×6!'
-  && R.trainSay('spin', 5) === 'Spinning kick!' && R.trainSay('jabs', 1) === 'Got it!' && R.trainSay('hooks', 2) === 'Left, right!' && R.trainSay('mix', 4) === 'Punch and kick!');
+  && R.trainSay('spin', 5) === 'Spinning kick!' && R.trainSay('jabs', 1) === '' && R.trainSay('hooks', 2) === 'Left, right!' && R.trainSay('mix', 4) === 'Punch and kick!');
 lang = 'tr';
 const trainPics = [...['guard', 'hit', 'cheer', 'push', 'başka'].map((m) => R.trainAlien(m)), R.trainAlien(), R.TRAIN_BAG, R.TRAIN_GLOVE, R.TRAIN_POW, R.TRAIN_SWOOSH, R.TRAIN_BOOT, R.TRAIN_MARK];
 check('antrenman çizimleri (uzaylı partnerin dört hâli, kum torbası, eldiven, ayakkabı, torbadaki iz, vuruş yıldızı, tekme izi) bozuk sayı taşımıyor',
@@ -211,6 +211,54 @@ check('antrenman bağlı: oturumda cevabın altında; seri ve düşüş sayılı
   /trainSlot\(ss, correct\),/.test(app) && /ss\.streak = correct \? \(ss\.streak \|\| 0\) \+ 1 : 0;/.test(app) && /if \(!correct && !help\) ss\.falls/.test(app)
   && /if \(!st \|\| !trainOn\(p, st\) \|\| !slot\.isConnected\) return;/.test(src) && /if \(!p \|\| !armyOn\(p\) \|\| reduceMotion\(\)\) return slot;/.test(src)
   && !/sb\.from\(/.test(pick(src, 'function trainSlot(', '/* Asker: veli */')));
+
+// Bale (2026-11-18): kız kahramanda kum torbasının yerine balerin; 70'ten sonra uzaylıyla dans ve oturum sonunda dans oyunu
+const tsql = readFileSync(join(root, 'supabase', 'train-style.sql'), 'utf8');
+const D = new Function([
+  "const trEn = (tr, en) => (this.lang() === 'en' ? en : tr);",
+  pick(app, 'const HERO_LOOK = {', '// Yolculuğun yerleri'),
+  pick(src, '/* Antrenman: saf kısım */', '/* Antrenman: çizimler'),
+  pick(src, '/* Bale: saf kısım */', '/* Bale: sahne */'),
+  'return { trainStyle, balletMove, balletSay, BALLET_POSES, ballerinaSvg, danceAlien, BALLET_SPARK, BALLET_BARRE, DANCE_MOVES, DANCE_KEYS, danceSetup, danceSeq, danceJudge, danceSay };',
+].join('\n')).call({ lang: () => lang });
+check('antrenman türü: kahramanı kız olanda balerin, ötekilerde kum torbası; velinin seçimi geçerli',
+  D.trainStyle({ avatar: 'kiz' }) === 'balerin' && D.trainStyle({ avatar: 'erkek' }) === 'torba' && D.trainStyle({}) === 'torba' && D.trainStyle(null) === 'torba'
+  && D.trainStyle({ avatar: 'kiz', train_style: 'torba' }) === 'torba' && D.trainStyle({ avatar: 'erkek', train_style: 'balerin' }) === 'balerin'
+  && D.trainStyle({ avatar: 'kiz', train_style: 'robot' }) === 'balerin');
+check('bale hareketi: doğruda piruet, 3 doğru üst üste büyük sıçrama, 5 ve üstü koreografi, yanlışta sendeleyip oturma',
+  D.balletMove(false, 4) === 'fall' && D.balletMove(true, 1) === 'spin' && D.balletMove(true, 2) === 'spin' && D.balletMove(true, 3) === 'leap'
+  && D.balletMove(true, 4) === 'leap' && D.balletMove(true, 5) === 'combo' && D.balletMove(true, 9) === 'combo');
+lang = 'tr';
+const trSay = [D.balletSay('fall', 0, 0), D.balletSay('combo', 5), D.balletSay('leap', 3), D.balletSay('spin', 1)];
+lang = 'en';
+const enSay = [D.balletSay('fall', 0, 0), D.balletSay('combo', 6), D.balletSay('leap', 3)];
+lang = 'tr';
+check('bale sözleri: düşünce "Hadi bir daha deneyelim!", koreografide "Muhteşem ×5!", sıçramada "Büyük sıçrama!"; İngilizcede İngilizce',
+  trSay.join('|') === 'Hadi bir daha deneyelim!|Muhteşem ×5!|Büyük sıçrama!|' && enSay.join('|') === 'Let\'s try again!|Bravo ×6!|Grand jeté!');
+const looks = [undefined, {}, { ten: 5, sac: 7, goz: 4, gozluk: 'koseli', cil: true }, { ten: 99, sac: -1, goz: 'x', gozluk: 'yuvarlak' }];
+const ballet = [...looks.flatMap((lk) => [...Object.keys(D.BALLET_POSES), 'yok'].map((k) => D.ballerinaSvg(lk, k))),
+  ...['idle', 'left', 'right', 'up', 'bow', 'clap', 'giggle', 'help', 'yok'].map((m) => D.danceAlien(m)), D.danceAlien(), D.BALLET_SPARK, D.BALLET_BARRE];
+check('bale çizimleri (balerinin sekiz duruşu, her görünüşte; uzaylı dans partneri, pırıltı, bar) bozuk sayı taşımıyor; balerin hep pembe yanaklı',
+  ballet.every((s) => s.startsWith('<svg') && s.endsWith('</svg>') && !/NaN|undefined|Infinity/.test(s)) && Object.keys(D.BALLET_POSES).length === 8
+  && looks.every((lk) => Object.keys(D.BALLET_POSES).every((k) => D.ballerinaSvg(lk, k).includes('#F79E9E'))) && D.ballerinaSvg({}, 'yok') === D.ballerinaSvg({}, 'stand')
+  && D.ballerinaSvg(looks[2], 'stand').includes('#7B4B2E') && D.ballerinaSvg(looks[2], 'stand').includes('stroke="#2D2A32"'));
+const s0 = D.danceSetup(0, 5), s1 = D.danceSetup(1, 5), s4 = D.danceSetup(4, 5), s15 = D.danceSetup(15, 7), s99 = D.danceSetup(99, 3);
+check('dans oyunu: her 3 doğru bir tur (en çok 5); ilk tur 3 hareket (3. sınıfa kadar 2), her turda bir fazla, en çok 6; turda 3 hak',
+  s0.rounds === 0 && s1.rounds === 1 && s1.lens.join() === '3' && s4.lens.join() === '3,4' && s15.lens.join() === '3,4,5,6,6'
+  && s99.rounds === 5 && s99.lens.join() === '2,3,4,5,6' && D.danceSetup(NaN, 4).rounds === 0 && s15.tries === 3);
+const seqs = [() => 0, () => 0.999, () => 0.5, () => NaN, () => 7, Math.random].map((r) => D.danceSeq(6, r));
+const noTriple = (q) => q.every((m, i) => i < 2 || !(m === q[i - 1] && m === q[i - 2]));
+check('uzaylının dansı: istenen uzunlukta, yalnızca dört hareket, aynı hareket üst üste en çok iki; dört yön tuşu',
+  seqs.every((q) => q.length === 6 && q.every((m) => D.DANCE_MOVES.includes(m)) && noTriple(q)) && D.danceSeq(50).length === 12 && D.danceSeq(-3).length === 0
+  && Object.values(D.DANCE_KEYS).sort().join() === 'down,left,right,up');
+check('dans oyunu: tuşlar sırayla doğruysa devam, hepsi doğruysa bitti, biri yanlışsa yanlış; son söz',
+  D.danceJudge(['left', 'up'], ['left']) === 'next' && D.danceJudge(['left', 'up'], ['left', 'up']) === 'done' && D.danceJudge(['left', 'up'], ['up']) === 'wrong'
+  && D.danceJudge(['left', 'up', 'down'], ['left', 'down']) === 'wrong' && /Hepsini yaptın/.test(D.danceSay(3, 3)) && /3 turun 2 tanesini/.test(D.danceSay(2, 3))
+  && /atladın/.test(D.danceSay(0, 3, true)));
+check('bale bağlı: cevap sahnesi türe göre balerin ya da kum torbası; dans kartı oturum ve deneme sonunda, balerinde 70\'ten sonra; veli seçer, öğrenci değiştiremez',
+  /ballet \? balletScene\(balletMove\(correct, streak\)/.test(src) && /danceCard\(stats\.correct\)/.test(app) && /saved \? danceCard\(rows\.length - missed\.length\)/.test(app)
+  && /trainStyle\(p\) !== 'balerin'/.test(src) && /st\.points < TRAIN_ALIEN_AT/.test(src) && /upd\.train_style = style\.value/.test(src)
+  && /train_style in \('torba', 'balerin'\)/.test(tsql) && /Bu ayarı veli değiştirir/.test(tsql) && !/sb\.from\(/.test(pick(src, '/* Bale: sahne */', '/* Asker: veli */')));
 
 console.log(fails ? `${fails} kontrol başarısız` : '');
 process.exit(fails ? 1 : 0);

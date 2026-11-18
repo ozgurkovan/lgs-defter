@@ -704,3 +704,30 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .vote-row { padding-top: 4px; border-top: 1px dashed var(--rule); }
 .vote-row .chip { min-height: 38px; padding: 4px 14px; font-size: 1.15rem; line-height: 1; }
 .vote-row textarea { width: 100%; }
+
+/* Bale (army.js, balletScene, danceGame): kum torbasının yerine balerin; pembe-lila sahne, ışık, ahşap zemin. */
+.train-ballet { background: radial-gradient(ellipse 60% 90% at 30% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%), linear-gradient(#FDF0F7, #EFE6FF); }
+.train-ballet::after { background: #E9B7A1; opacity: 0.9; }
+.ballet-hero { position: absolute; left: 14%; bottom: 4px; width: 80px; height: 114px; transform-origin: 50% 100%; z-index: 2; }
+.ballet-hero svg, .ballet-spark svg { width: 100%; height: 100%; display: block; }
+.ballet-hero .ballet-stars { top: 28%; }
+.ballet-spark { position: absolute; width: 16px; height: 16px; pointer-events: none; }
+.train-ballet .train-say.foe { left: 56%; }
+.dance-stage { height: 168px; }
+.dance-stage .ballet-hero { bottom: 6px; width: 92px; height: 131px; }
+.dance-stage .train-foe { left: 62%; }
+.dance-slots { position: absolute; left: 0; right: 0; top: 6px; display: flex; justify-content: center; gap: 4px; z-index: 4; }
+.dance-slot { min-width: 26px; height: 26px; padding: 0 4px; border-radius: 8px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #E7C6DA; color: #8A4A70; font: 800 1rem/1 var(--font-body, sans-serif); }
+.dance-slot.now { background: #FF8FB8; color: #fff; border-color: #E0628F; transform: scale(1.15); }
+.dance-slot.ok { background: #7ED957; color: #fff; border-color: #4CAF50; }
+.dance-slot.bad { background: #F25C54; color: #fff; border-color: #C9433C; }
+.dance-banner { margin: 0; text-align: center; font-weight: 700; }
+.dance-pads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.dance-pad { min-height: 52px; font-size: 1.6rem; font-weight: 800; border-radius: 14px; background: #FFF0F6; border: 2px solid #F7A1C4; color: #B03A72; }
+.dance-pad:not(:disabled):active { background: #FF8FB8; color: #fff; }
+.dance-under { justify-content: center; }
+@media (prefers-reduced-motion: reduce) { .dance-slot.now { transform: none; } }
+.ballet-barre { position: absolute; left: 50%; bottom: 10px; width: 132px; height: 77px; z-index: 1; }
+.ballet-barre svg { width: 100%; height: 100%; display: block; }
+.dance-card .label, .dance-wrap .dance-banner { margin: 0; }

@@ -1062,7 +1062,7 @@ const TRAIN_FALL_SAYS = [['Hadi bir daha deneyelim!', 'Let\'s try again!'], ['D�
 function trainSay(move, streak, n = 0) {
   if (move === 'fall') return trEn(...TRAIN_FALL_SAYS[(Math.abs(Math.trunc(n)) || 0) % TRAIN_FALL_SAYS.length]);
   if (streak >= 6) return trEn(`Kombo ×${streak}!`, `Combo ×${streak}!`);
-  if (move === 'jabs') return trEn('Tuttum!', 'Got it!');
+  // 'jabs': söz yok (velinin isteği, 2026-11-17: "Tuttum demesin onun yerine zıplayıp sevinsin").
   if (move === 'hooks') return trEn('Sağ, sol!', 'Left, right!');
   if (move === 'kick') return trEn('Tekme!', 'Kick!');
   if (move === 'mix') return trEn('Yumruk, tekme!', 'Punch and kick!');
@@ -1199,19 +1199,23 @@ function trainScene(move, streak, p, level, opts = {}) {
       { translate: `${reach}px 0`, rotate: `${25 * dir}deg`, scale: '1.1', opacity: 1, offset: 0.52 }, { translate: '0 0', rotate: '0deg', scale: '0.6', opacity: 0 }], ms, { easing: 'ease-in-out' });
     g.remove();
   };
-  // Tekme: kahraman geriye yaslanır, ayağı partnere uzanır.
-  const kick = async (onHit = null, ms = 640) => {
+  // Tekme: kahraman önce gerilir (dizini çeker), geriye yaslanır, ayağı partnere uzanır, bir an orada kalır, sonra toplar.
+  // Velinin isteği, 2026-11-17: "Tekmeyi biraz daha güzel atamaz mı, çok hızlı oldu": süre 640'tan 1150 ms'ye, gerilme ve
+  // vuruşta duruş eklendi.
+  const kick = async (onHit = null, ms = 1150) => {
     const b = h('span', { class: 'train-boot' });
     b.innerHTML = TRAIN_BOOT;
     fx.append(b);
-    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '-4px 0', rotate: '-8deg', offset: 0.2 }, { translate: '8px -6px', rotate: '-20deg', offset: 0.5 }, { translate: '0 0', rotate: '0deg' }], ms);
+    anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '-6px 3px', rotate: '-6deg', offset: 0.26 }, { translate: '8px -8px', rotate: '-22deg', offset: 0.5 },
+      { translate: '8px -8px', rotate: '-22deg', offset: 0.7 }, { translate: '0 0', rotate: '0deg' }], ms, { easing: 'ease-in-out' });
     if (onHit) setTimeout(onHit, ms * 0.5);
-    await anim(b, [{ translate: '0 0', rotate: '30deg', scale: '0.5', opacity: 0 }, { translate: '0 0', rotate: '30deg', scale: '0.6', opacity: 1, offset: 0.2 }, { translate: `${reach}px -8px`, rotate: '-12deg', scale: '1.1', opacity: 1, offset: 0.5 },
-      { translate: `${reach}px -8px`, rotate: '-12deg', scale: '1.1', opacity: 1, offset: 0.62 }, { translate: '0 0', rotate: '20deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' });
+    await anim(b, [{ translate: '0 0', rotate: '30deg', scale: '0.5', opacity: 0 }, { translate: '-8px -4px', rotate: '46deg', scale: '0.7', opacity: 1, offset: 0.26 },
+      { translate: `${reach}px -10px`, rotate: '-12deg', scale: '1.15', opacity: 1, offset: 0.5 }, { translate: `${reach}px -10px`, rotate: '-12deg', scale: '1.15', opacity: 1, offset: 0.7 },
+      { translate: '0 0', rotate: '20deg', scale: '0.5', opacity: 0 }], ms, { easing: 'ease-in-out' });
     b.remove();
   };
   // Döner tekme: kahraman havada tam tur döner, arkasında iz.
-  const spinKick = async (onHit = null, ms = 820) => {
+  const spinKick = async (onHit = null, ms = 1050) => { // 820'den yavaşlatıldı (velinin isteği, 2026-11-17: tekme çok hızlı)
     if (onHit) setTimeout(onHit, ms * 0.55);
     const sw = h('span', { class: 'train-swoosh' });
     sw.innerHTML = TRAIN_SWOOSH;
@@ -1219,8 +1223,9 @@ function trainScene(move, streak, p, level, opts = {}) {
     anim(sw, [{ opacity: 0, scale: '0.6' }, { opacity: 1, scale: '1', offset: 0.5 }, { opacity: 0, scale: '1.1' }], ms).then(() => sw.remove());
     await anim(hero, [{ translate: '0 0', rotate: '0deg' }, { translate: '0 4px', rotate: '0deg', offset: 0.12 }, { translate: '14px -22px', rotate: '200deg', offset: 0.55 }, { translate: '16px -8px', rotate: '330deg', offset: 0.82 }, { translate: '0 0', rotate: '360deg' }], ms, { easing: 'ease-in-out' });
   };
-  const hop = (times = 2) => anim(hero, Array.from({ length: times * 2 + 1 }, (_, i) => ({ rotate: '0deg', translate: `0 ${i % 2 ? -12 : 0}px` })), times * 300, { easing: 'ease-in-out' });
+  const hop = (times = 2, high = 12) => anim(hero, Array.from({ length: times * 2 + 1 }, (_, i) => ({ rotate: '0deg', translate: `0 ${i % 2 ? -high : 0}px` })), times * 300, { easing: 'ease-in-out' });
   // Son yumrukla torba çok uzağa savrulur; geri gelirken kahraman eliyle tutar. Uzaylı geriye kayar, gülerek döner.
+  // Tutunca söz yok; kahraman zıplayıp sevinir (seq.jabs; velinin isteği, 2026-11-17).
   const farAndCatch = async () => {
     pow('BAM!');
     if (!bag) { await stumble(46, 22, 1300); return; }
@@ -1229,9 +1234,8 @@ function trainScene(move, streak, p, level, opts = {}) {
     const g = glove(false);
     anim(g, [{ translate: '0 0', scale: '0.6', opacity: 0.9 }, { translate: `${reach - 6}px 0`, scale: '1.1', opacity: 1 }], 420);
     await rot([-86, 8], 560, 'ease-in');
-    line();
     await rot([8, -3, 0], 420);
-    await wait(650);
+    await wait(250);
     await anim(g, [{ translate: `${reach - 6}px 0`, scale: '1.1', opacity: 1 }, { translate: '0 0', scale: '0.6', opacity: 0 }], 280);
     g.remove();
   };
@@ -1260,7 +1264,7 @@ function trainScene(move, streak, p, level, opts = {}) {
     if (!bag) draw('guard');
   };
   const seq = {
-    // 1. doğru: birkaç yumruk, sonuncusunda torba uzaklara gider, kahraman tutar.
+    // 1. doğru: birkaç yumruk, sonuncusunda torba uzaklara gider, kahraman tutar, sonra zıplayıp sevinir.
     jabs: async () => {
       let far;
       await jab(false, () => hitFoe('jolt'));
@@ -1268,6 +1272,7 @@ function trainScene(move, streak, p, level, opts = {}) {
       await wait(120);
       await jab(false, () => { far = farAndCatch(); }, 520);
       await far;
+      await hop(3, 20);
     },
     // 2. doğru: sağdan soldan kroşeler; torbada el izleri kalır.
     hooks: async () => {
@@ -1298,7 +1303,7 @@ function trainScene(move, streak, p, level, opts = {}) {
       let last;
       line();
       for (let i = 0; i < 5; i++) await jab(i % 2 === 1, () => hitFoe('jolt', 22 + i * 9), 260);
-      await kick(() => hitFoe('big'), 560);
+      await kick(() => hitFoe('big'), 900);
       await spinKick(() => { last = hitFoe('loop'); });
       await last;
       await hop(3);
@@ -1324,15 +1329,432 @@ function trainSlot(ss, correct) {
   const slot = h('div', { class: 'train-slot' });
   const p = state.student;
   if (!p || !armyOn(p) || reduceMotion()) return slot;
-  ss.train ??= Promise.all([loadArmy(p), armyHeroLevel(p)]).catch(() => [null, 1]);
+  // Balerinde kahramanın seviyesi gerekmez (çizimi seviyesiz); kum torbasında okunur.
+  const ballet = trainStyle(p) === 'balerin';
+  ss.train ??= Promise.all([loadArmy(p), ballet ? 1 : armyHeroLevel(p)]).catch(() => [null, 1]);
   const streak = ss.streak || 0, n = correct ? 0 : Math.max(0, (ss.falls || 1) - 1);
   ss.train.then(([st, level]) => {
     if (!st || !trainOn(p, st) || !slot.isConnected) return;
-    const sc = trainScene(trainMove(correct, streak), streak, p, level, { partner: st.points >= TRAIN_ALIEN_AT ? 'alien' : 'bag', army: armyView(p, st), n });
+    const alien = st.points >= TRAIN_ALIEN_AT;
+    const sc = ballet ? balletScene(balletMove(correct, streak), streak, p, { partner: alien ? 'alien' : 'solo', n })
+      : trainScene(trainMove(correct, streak), streak, p, level, { partner: alien ? 'alien' : 'bag', army: armyView(p, st), n });
     fill(slot, sc);
     sc.play();
   }).catch(() => {});
   return slot;
+}
+
+/* Bale (velinin isteği, 2026-11-18: "kızlar için de yapabilir miyiz? sevimli küçük bir balerin kız güzel bir şekilde
+   dönecek, balerinlerin yaptığı koreografileri yapacak; aynı mantıkla 70'ten sonra uzaylı ile dans; uzaylı hareketi yapar,
+   biz yön tuşlarıyla taklit ederiz, doğru basarsak bizim balerin hareketi bitirir ve selam verir"). Kum torbasının yerine
+   balerin: kahramanı kız olan çocukta varsayılan, veli her çocuk için değiştirebilir (profiles.train_style). Cevaptan sonra
+   doğruda piruet, 3 doğru üst üste büyük sıçrama, 5 ve üstü koreografi; yanlışta sendeleyip pıt diye oturur, kalkar,
+   "Hadi bir daha deneyelim!". 70 numaradan sonra eteklikli sevimli uzaylı dans partneri; oturum sonunda uzaylıyla dans
+   oyunu (uzaylı gösterir, çocuk yön tuşlarıyla ya da ekrandaki oklarla aynı sırayla tekrarlar). Hiçbir şey yazmaz. */
+
+/* Bale: saf kısım */
+
+// Antrenmanın türü: veli seçtiyse o ('torba' ya da 'balerin'), seçmediyse kahramanı kız olan çocukta balerin.
+const trainStyle = (p) => (p?.train_style === 'balerin' || p?.train_style === 'torba' ? p.train_style : p?.avatar === 'kiz' ? 'balerin' : 'torba');
+// Bale hareketi: doğruda piruet, 3 doğru üst üste büyük sıçrama, 5 ve üstü koreografi; yanlışta sendeleyip oturma.
+const balletMove = (correct, streak) => (!correct ? 'fall' : streak >= 5 ? 'combo' : streak >= 3 ? 'leap' : 'spin');
+function balletSay(move, streak, n = 0) {
+  if (move === 'fall') return trainSay('fall', 0, n);
+  if (move === 'combo') return trEn(`Muhteşem ×${streak}!`, `Bravo ×${streak}!`);
+  if (move === 'leap') return trEn('Büyük sıçrama!', 'Grand jeté!');
+  return '';
+}
+
+/* Bale: çizimler (sabit SVG; kullanıcı metni yok) */
+
+// Balerinin duruşları. Açılar derece: 0 aşağı, 90 sağa (izleyicinin sağı), -90 sola, ±180 yukarı. la/ra: sol ve sağ kol
+// [üst kol, ön kol]; ll/rl: sol ve sağ bacak [uyluk, baldır]; lift: gövdenin dikey kayması (eksi yukarı); tilt: eğilme;
+// toe: parmak ucunda (relevé); face: 'smile' | 'happy' (gözler kapalı gülüş) | 'oops' (şaşkın "o").
+const BALLET_POSES = {
+  stand: { la: [-22, 34], ra: [22, -34], ll: [-2, -2], rl: [2, 2] },
+  up: { la: [-142, 165], ra: [142, -165], ll: [-1, -1], rl: [1, 1], lift: -3, toe: true },
+  passe: { la: [-142, 165], ra: [142, -165], ll: [0, 0], rl: [72, -78], lift: -3, toe: true },
+  arabesque: { la: [-102, -112], ra: [100, 112], ll: [4, 4], rl: [96, 96], tilt: -8, toe: true, face: 'happy' },
+  leap: { la: [-128, -142], ra: [128, 142], ll: [-82, -98], rl: [82, 98], lift: -16, face: 'happy' },
+  bow: { la: [-52, -24], ra: [52, 24], ll: [-6, -2], rl: [-16, 26], lift: 3, tilt: 4, head: 9, face: 'happy' },
+  wobble: { la: [-150, -118], ra: [128, 172], ll: [-6, -6], rl: [38, 8], tilt: 15, face: 'oops' },
+  sit: { la: [-38, -12], ra: [38, 12], ll: [-80, -96], rl: [80, 96], lift: 30, face: 'oops' },
+};
+// Küçük balerin: kahramanın ten, saç ve göz rengi, gözlüğü ve çilleri; saç topuz, pembe mayo ve tütü, parmak ucu
+// ayakkabıları. look: profiles.hero_look; pose: BALLET_POSES anahtarı. Hep sevimli: yuvarlak yüz, pembe yanak, gülüş.
+function ballerinaSvg(look, pose = 'stand') {
+  const P = BALLET_POSES[pose] || BALLET_POSES.stand;
+  const lk = look && typeof look === 'object' ? look : {};
+  const skin = HERO_LOOK.ten[lk.ten] || '#F5CBA7', hair = HERO_LOOK.sac[lk.sac] || '#6B3E26', eye = HERO_LOOK.goz[lk.goz] || HERO_LOOK.goz[0];
+  const PINK = '#FF8FB8', PINKD = '#E0628F', TIGHT = '#FFD6E5', TUTU = '#FFC4DC';
+  const lift = P.lift || 0, rad = (a) => (a * Math.PI) / 180, r1 = (v) => Math.round(v * 10) / 10;
+  const limb = ([x, y], [a1, a2], l1, l2) => {
+    const e = [x + l1 * Math.sin(rad(a1)), y + l1 * Math.cos(rad(a1))];
+    return [e, [e[0] + l2 * Math.sin(rad(a2)), e[1] + l2 * Math.cos(rad(a2))]];
+  };
+  const line = (a, b, w, c) => `<line x1="${r1(a[0])}" y1="${r1(a[1])}" x2="${r1(b[0])}" y2="${r1(b[1])}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+  const s = [`<ellipse cx="50" cy="123" rx="${pose === 'leap' ? 16 : 22}" ry="3.6" fill="rgba(0,0,0,.12)"/>`];
+  const g = [];
+  // Bacaklar (tütünün altında): uyluk, baldır, parmak ucu ayakkabısı ve kurdelesi
+  for (const [hx, ang] of [[46.5, P.ll], [53.5, P.rl]]) {
+    const hip = [hx, 66 + lift], [knee, foot] = limb(hip, ang, 22, 22);
+    g.push(line(hip, knee, 7, TIGHT), line(knee, foot, 6, TIGHT));
+    const dir = rad(ang[1]), fx = foot[0] + 3.2 * Math.sin(dir), fy = foot[1] + 3.2 * Math.cos(dir);
+    g.push(`<ellipse cx="${r1(fx)}" cy="${r1(fy)}" rx="3.4" ry="${P.toe || pose === 'leap' ? 5 : 4.2}" transform="rotate(${r1(-ang[1])} ${r1(fx)} ${r1(fy)})" fill="${PINK}" stroke="${PINKD}" stroke-width=".8"/>`);
+    g.push(`<path d="M${r1(foot[0] - 3)} ${r1(foot[1] - 4)} l3 2 l3 -2" stroke="${PINKD}" stroke-width=".9" fill="none"/>`);
+  }
+  // Gövde: mayo, kalp, tütü (üç kat, dalgalı kenar)
+  g.push(`<path d="M41.5 ${46 + lift} Q50 ${43 + lift} 58.5 ${46 + lift} L56.5 ${64 + lift} L43.5 ${64 + lift} Z" fill="${PINK}" stroke="${PINKD}" stroke-width="1"/>`);
+  g.push(`<path d="M50 ${55.6 + lift} c-1.4 -1.6 -3.6 -.6 -2.9 1.1 c.4 1 2.9 2.6 2.9 2.6 s2.5 -1.6 2.9 -2.6 c.7 -1.7 -1.5 -2.7 -2.9 -1.1 Z" fill="#fff" opacity=".85"/>`);
+  const tw = pose === 'sit' ? 27 : 24;
+  g.push(`<ellipse cx="50" cy="${66 + lift}" rx="${tw}" ry="6.5" fill="${TUTU}" opacity=".95"/>`);
+  g.push(`<path d="M${50 - tw} ${66 + lift} ${Array.from({ length: 8 }, (_, i) => `q${tw / 8} ${i % 2 ? -4 : 4} ${tw / 4} 0`).join(' ')}" fill="${TUTU}" stroke="#F7A1C4" stroke-width=".9"/>`);
+  g.push(`<ellipse cx="50" cy="${63.5 + lift}" rx="${tw - 6}" ry="4" fill="#FFE3EF"/>`);
+  // Kollar (omuzdan): ten rengi, küçük eller
+  for (const [sx, ang] of [[42, P.la], [58, P.ra]]) {
+    const sh = [sx, 47 + lift], [el, hand] = limb(sh, ang, 15, 14);
+    g.push(line(sh, el, 5, skin), line(el, hand, 4.5, skin), `<circle cx="${r1(hand[0])}" cy="${r1(hand[1])}" r="2.7" fill="${skin}"/>`);
+  }
+  g.push(`<path d="M41 ${45.5 + lift} Q42 ${43 + lift} 45 ${43.4 + lift} M59 ${45.5 + lift} Q58 ${43 + lift} 55 ${43.4 + lift}" stroke="${PINKD}" stroke-width="1.2" fill="none"/>`);
+  // Baş: boyun, topuz (saç rengi, pembe kurdele), yüz, saçın önü, yüz çizgileri, gözlük
+  const hy = 27 + lift, h = [];
+  h.push(`<rect x="47" y="${hy + 9}" width="6" height="7" rx="2.5" fill="${darken(skin, 0.9)}"/>`);
+  h.push(`<circle cx="50" cy="${hy - 14}" r="6.4" fill="${hair}"/><path d="M45.6 ${hy - 9.6} Q50 ${hy - 7.4} 54.4 ${hy - 9.6}" stroke="${PINK}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`);
+  h.push(`<circle cx="50" cy="${hy}" r="12.6" fill="${skin}"/>`);
+  h.push(`<path d="M37.6 ${hy + 1} C36 ${hy - 13} 46 ${hy - 15.4} 50.5 ${hy - 13.2} C57 ${hy - 15} 65 ${hy - 11} 62.4 ${hy + 1} C61 ${hy - 6} 57 ${hy - 8.6} 51 ${hy - 8.4} C45 ${hy - 8.2} 40 ${hy - 6} 37.6 ${hy + 1} Z" fill="${hair}"/>`);
+  for (const x of [45, 55]) {
+    if (P.face === 'happy') h.push(`<path d="M${x - 2.4} ${hy + 1.6} q2.4 -2.6 4.8 0" stroke="#2D2A32" stroke-width="1.5" fill="none" stroke-linecap="round"/>`);
+    else h.push(`<ellipse cx="${x}" cy="${hy + 1.2}" rx="2.1" ry="2.6" fill="${eye}"/><circle cx="${x + 0.8}" cy="${hy + 0.2}" r=".9" fill="#fff"/>`);
+  }
+  for (const x of [41.6, 58.4]) h.push(`<circle cx="${x}" cy="${hy + 5.4}" r="2.6" fill="#F79E9E" opacity=".6"/>`);
+  if (lk.cil) for (const [x, y] of [[41, 3.2], [43, 4.6], [40.6, 5.6], [59, 3.2], [57, 4.6], [59.4, 5.6]]) h.push(`<circle cx="${x}" cy="${hy + y}" r=".55" fill="${darken(skin, 0.62)}"/>`);
+  if (P.face === 'oops') h.push(`<ellipse cx="50" cy="${hy + 7}" rx="1.8" ry="2.2" fill="#9A4A3C"/>`);
+  else h.push(`<path d="M46 ${hy + 5.8} Q50 ${hy + (P.face === 'happy' ? 10.4 : 9.2)} 54 ${hy + 5.8}" stroke="#9A4A3C" stroke-width="1.6" fill="${P.face === 'happy' ? '#C9656B' : 'none'}" stroke-linecap="round"/>`);
+  if (lk.gozluk === 'yuvarlak' || lk.gozluk === 'koseli') {
+    const lens = (x) => (lk.gozluk === 'yuvarlak' ? `<circle cx="${x}" cy="${hy + 1.2}" r="3.9"` : `<rect x="${x - 4.2}" y="${hy - 2.2}" width="8.4" height="6.8" rx="1.8"`) + ' fill="rgba(255,255,255,.18)" stroke="#2D2A32" stroke-width="1.1"/>';
+    h.push(lens(45) + lens(55) + `<path d="M48.9 ${hy + 0.8} Q50 ${hy - 0.4} 51.1 ${hy + 0.8}" stroke="#2D2A32" stroke-width="1.1" fill="none"/>`);
+  }
+  const head = P.head ? `<g transform="rotate(${P.head} 50 ${hy + 10})">${h.join('')}</g>` : h.join('');
+  const body = g.join('') + head;
+  s.push(P.tilt ? `<g transform="rotate(${P.tilt} 50 ${100 + lift})">${body}</g>` : body);
+  return `<svg viewBox="0 -12 100 142" aria-hidden="true">${s.join('')}</svg>`;
+}
+// Uzaylı dans partneri: kum torbası uzaylısının kardeşi, eldiven yerine eller, mor tütü ve pembe papyon. mood: 'idle',
+// 'left' / 'right' (o yana döner), 'up' (zıplar, kollar yukarıda), 'bow' (reverans), 'clap' (alkış), 'giggle' (kıkırdar),
+// 'help' (el uzatır).
+function danceAlien(mood = 'idle') {
+  const G = '#7ED957', GE = '#4CAF50', INK = '#23262B', M = '#2E5E1F', happy = ['clap', 'bow', 'giggle'].includes(mood);
+  const A = { idle: [[-35, -10], [35, 10]], left: [[-95, -110], [-40, -95]], right: [[40, 95], [95, 110]], up: [[-155, -170], [155, 170]],
+    bow: [[-55, -30], [55, 30]], clap: [[-40, 60], [40, -60]], giggle: [[-30, -10], [25, -160]], help: [[-35, -10], [-70, -80]] }[mood] || [[-35, -10], [35, 10]];
+  const rad = (a) => (a * Math.PI) / 180, r1 = (v) => Math.round(v * 10) / 10;
+  const arm = (sx, [a1, a2]) => {
+    const e = [sx + 11 * Math.sin(rad(a1)), 44 + 11 * Math.cos(rad(a1))], hd = [e[0] + 10 * Math.sin(rad(a2)), e[1] + 10 * Math.cos(rad(a2))];
+    return `<path d="M${sx} 44 L${r1(e[0])} ${r1(e[1])} L${r1(hd[0])} ${r1(hd[1])}" stroke="${G}" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${r1(hd[0])}" cy="${r1(hd[1])}" r="3" fill="${G}"/>`;
+  };
+  const tilt = mood === 'left' ? -10 : mood === 'right' ? 10 : mood === 'bow' ? 9 : 0;
+  const s = [`<ellipse cx="30" cy="87" rx="16" ry="2.6" fill="rgba(0,0,0,.12)"/>`];
+  const b = [];
+  b.push(`<path d="M24 66 V80 M36 66 V80" stroke="${G}" stroke-width="5.5" stroke-linecap="round"/><ellipse cx="23" cy="82" rx="5" ry="2.6" fill="#B79CFF"/><ellipse cx="37" cy="82" rx="5" ry="2.6" fill="#B79CFF"/>`);
+  b.push(`<rect x="19" y="38" width="22" height="28" rx="10" fill="#9B8CFF" stroke="#6E5BD9" stroke-width="1.5"/>`);
+  b.push(`<ellipse cx="30" cy="62" rx="17" ry="4.6" fill="#C9B8FF" opacity=".95"/><path d="M13 62 q2.1 3.4 4.25 0 t4.25 0 t4.25 0 t4.25 0 t4.25 0 t4.25 0 t4.25 0 t4.25 0" fill="#C9B8FF" stroke="#A88FF2" stroke-width=".8"/>`);
+  b.push(arm(20, A[0]), arm(40, A[1]));
+  b.push(`<path d="M25 39 L30 42 L25 45 Z M35 39 L30 42 L35 45 Z" fill="#FF6FA8"/><circle cx="30" cy="42" r="1.6" fill="#E84D8A"/>`);
+  b.push(`<path d="M24 13 L19 4 M36 13 L41 4" stroke="${GE}" stroke-width="2" stroke-linecap="round"/><circle cx="19" cy="4" r="2.6" fill="#FFE066"/><circle cx="41" cy="4" r="2.6" fill="#FFE066"/>`);
+  b.push(`<circle cx="30" cy="25" r="14" fill="${G}" stroke="${GE}" stroke-width="1.4"/>`);
+  b.push(happy ? `<path d="M23.5 25.5 q4.5 -5 9 0" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/>`
+    : `<circle cx="28" cy="25" r="6.2" fill="#fff"/><circle cx="${mood === 'left' ? 25.6 : mood === 'right' ? 30.4 : 28}" cy="${mood === 'up' ? 23.6 : 25.4}" r="3.1" fill="${INK}"/><circle cx="${mood === 'left' ? 26.8 : mood === 'right' ? 31.6 : 29.2}" cy="${mood === 'up' ? 22.4 : 24.2}" r="1.1" fill="#fff"/>`);
+  b.push(`<circle cx="19.5" cy="31" r="2" fill="#FF9EB5" opacity=".75"/><circle cx="38.5" cy="31" r="2" fill="#FF9EB5" opacity=".75"/>`);
+  b.push(happy || mood === 'up' ? `<path d="M24 31.5 Q29 38.5 34 31.5 Z" fill="${M}"/>` : `<path d="M24 32.5 Q28.5 35.5 33 32" stroke="${M}" stroke-width="1.4" fill="none" stroke-linecap="round"/>`);
+  s.push(tilt ? `<g transform="rotate(${tilt} 30 82)">${b.join('')}</g>` : b.join(''));
+  return `<svg viewBox="0 0 60 90" aria-hidden="true">${s.join('')}</svg>`;
+}
+// Bale barı (yalnızken sahnenin sağında): iki ayak, ahşap tutamak.
+const BALLET_BARRE = '<svg viewBox="0 0 120 70" aria-hidden="true"><path d="M14 22 V68 M106 22 V68" stroke="#9AA3B2" stroke-width="4" stroke-linecap="round"/>'
+  + '<path d="M6 68 H22 M98 68 H114" stroke="#9AA3B2" stroke-width="4" stroke-linecap="round"/><rect x="4" y="17" width="112" height="8" rx="4" fill="#D49A6A" stroke="#B37A4C" stroke-width="1.2"/>'
+  + '<path d="M10 19.5 H110" stroke="#fff" stroke-width="1.4" opacity=".35" stroke-linecap="round"/></svg>';
+// Piruetin pırıltısı.
+const BALLET_SPARK = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 0 L12.2 7.8 L20 10 L12.2 12.2 L10 20 L7.8 12.2 L0 10 L7.8 7.8 Z" fill="#FFD23F" stroke="#FF9EC4" stroke-width=".8" stroke-linejoin="round"/></svg>';
+
+/* Bale: dans oyunu, saf kısım */
+
+const DANCE_MOVES = ['left', 'up', 'down', 'right'];
+const DANCE_KEYS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+const DANCE_ARROW = { left: '←', right: '→', up: '↑', down: '↓' };
+// Kaç tur ve her turda kaç hareket: her 3 doğru bir tur (en çok 5); ilk tur 3 hareket (3. sınıfa kadar 2), her turda bir
+// fazla, en çok 6. Her turda 3 deneme hakkı.
+function danceSetup(correct, grade) {
+  const rounds = Math.min(5, Math.ceil(Math.max(0, Math.floor(+correct || 0)) / 3));
+  const first = (grade || 8) <= 3 ? 2 : 3;
+  return { rounds, lens: Array.from({ length: rounds }, (_, i) => Math.min(6, first + i)), tries: 3 };
+}
+// Uzaylının dansı: len hareket, aynı hareket üst üste en çok iki kez. rnd: 0–1 arası sayı veren işlev (denemede sabit).
+function danceSeq(len, rnd = Math.random) {
+  const out = [];
+  for (let i = 0; i < Math.min(12, Math.max(0, len | 0)); i++) {
+    let k = Math.floor(Math.min(0.999, Math.max(0, +rnd() || 0)) * 4);
+    if (i >= 2 && out[i - 1] === DANCE_MOVES[k] && out[i - 2] === DANCE_MOVES[k]) k = (k + 1) % 4;
+    out.push(DANCE_MOVES[k]);
+  }
+  return out;
+}
+// Çocuğun bastıkları: 'wrong' (bir tuş yanlış), 'done' (hepsi doğru), 'next' (doğru, devam).
+const danceJudge = (seq, input) => (input.some((m, i) => m !== seq[i]) ? 'wrong' : input.length >= seq.length ? 'done' : 'next');
+// Oyunun son sözü.
+function danceSay(won, rounds, skipped = false) {
+  if (skipped) return 'Dansı atladın.';
+  if (won >= rounds) return 'Hepsini yaptın! Muhteşem bir dans! 🩰';
+  return `Dans bitti! ${rounds} turun ${won} tanesini yaptın. 🩰`;
+}
+
+/* Bale: sahne */
+
+// Bale sahnesi (cevaptan sonra, kum torbasının yerine): move ('spin' | 'leap' | 'combo' | 'fall'), streak, p (görünüş),
+// opts.partner ('solo' ya da 'alien'), opts.n (söz sırası). Kutu döner; play() oynatır. Sıra zamanlayıcıyla yürür:
+// animasyon görünmese de (gizli sekme) sahne sonuna varır. Hareket azaltılmışsa durağan.
+function balletScene(move, streak, p, opts = {}) {
+  const alien = opts.partner === 'alien';
+  const box = h('div', { class: 'train train-ballet' + (alien ? ' train-alien' : ''), 'aria-hidden': 'true' });
+  const hero = h('div', { class: 'ballet-hero' }), foe = h('div', { class: alien ? 'train-foe' : 'ballet-barre' });
+  const fx = h('div', { class: 'train-fx' }), bubble = h('span', { class: 'train-say' });
+  fill(box, hero, foe, fx, bubble);
+  const ctl = balletKit({ hero, foe, fx, bubble, look: p?.hero_look, alien });
+  ctl.pose('stand');
+  if (alien) ctl.mood('idle'); else foe.innerHTML = BALLET_BARRE;
+  let busy = false;
+  box.play = async () => {
+    if (busy || reduceMotion() || !box.isConnected) { if (move === 'fall') ctl.say(balletSay(move, streak, opts.n)); return; }
+    busy = true;
+    bubble.className = 'train-say';
+    if (move === 'spin') { await ctl.dance('right', 740); if (alien) ctl.mood('clap'); }
+    else if (move === 'leap') { ctl.say(balletSay(move, streak, opts.n)); await ctl.dance('up', 640); if (alien) ctl.mood('clap'); }
+    else if (move === 'combo') {
+      ctl.say(balletSay(move, streak, opts.n));
+      await ctl.dance('right', 640);
+      await ctl.dance('up', 600);
+      ctl.pose('arabesque'); ctl.sparkle(3); if (alien) ctl.mood('right');
+      await ctl.wait(520);
+      ctl.pose('bow'); if (alien) ctl.mood('bow');
+      await ctl.wait(620);
+      ctl.pose('stand'); if (alien) ctl.mood('clap');
+    } else { await ctl.fall(); ctl.say(balletSay(move, streak, opts.n)); }
+    busy = false;
+  };
+  return box;
+}
+// Sahnenin ortak hareketleri (cevap sahnesi ve dans oyunu): pose, mood, say, sparkle, dance(m, ms) (balerin; m 'left' |
+// 'right' piruet, 'up' büyük sıçrama, 'down' reverans), alienDance(m, ms), fall(). speed: bekleme çarpanı (deneme için).
+function balletKit({ hero, foe, fx, bubble, look, alien, speed = 1 }) {
+  const still = () => reduceMotion();
+  const anim = (el, frames, ms, easing = 'ease-in-out') => { if (!still() && el.animate) try { el.animate(frames, { duration: ms * speed, easing }); } catch (e) { /* eski tarayıcı */ } };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms * speed));
+  const pose = (k) => { hero.innerHTML = ballerinaSvg(look, k); };
+  const mood = (m) => { if (alien) foe.innerHTML = danceAlien(m); };
+  const say = (t, who = 'hero') => { if (!t) return; bubble.textContent = t; bubble.className = `train-say on ${who}`; };
+  const sparkle = (n = 3) => {
+    if (still()) return;
+    for (let i = 0; i < n; i++) {
+      const el = h('span', { class: 'ballet-spark', style: `left: ${6 + Math.round(Math.random() * 34)}%; top: ${8 + Math.round(Math.random() * 50)}%` });
+      el.innerHTML = BALLET_SPARK;
+      fx.append(el);
+      anim(el, [{ scale: '0.2', opacity: 0 }, { scale: '1', opacity: 1, offset: 0.4 }, { scale: '0.6', opacity: 0 }], 700, 'ease-out');
+      setTimeout(() => el.remove(), 720 * speed);
+    }
+  };
+  let token = 0;
+  const dance = async (m, ms = 600) => {
+    const my = ++token;
+    if (m === 'up') {
+      pose('leap');
+      anim(hero, [{ translate: '0 0' }, { translate: '14px -24px', offset: 0.5 }, { translate: '0 0' }], ms, 'ease-out');
+      sparkle(4);
+    } else if (m === 'down') {
+      pose('bow');
+      anim(hero, [{ translate: '0 0' }, { translate: '0 4px', offset: 0.5 }, { translate: '0 0' }], ms);
+    } else {
+      const d = m === 'left' ? -1 : 1;
+      pose('passe');
+      anim(hero, [{ scale: '1 1', translate: '0 0' }, { scale: '-1 1', translate: `${d * 5}px -4px`, offset: 0.25 }, { scale: '1 1', translate: `${d * 9}px -4px`, offset: 0.5 },
+        { scale: '-1 1', translate: `${d * 5}px -4px`, offset: 0.75 }, { scale: '1 1', translate: '0 0' }], ms);
+      sparkle(3);
+    }
+    if (alien) alienDance(m, ms);
+    await wait(ms);
+    if (my === token) pose('stand');
+  };
+  const alienDance = async (m, ms = 600) => {
+    mood(m === 'down' ? 'bow' : m);
+    if (m === 'up') anim(foe, [{ translate: '0 0' }, { translate: '0 -20px', offset: 0.5 }, { translate: '0 0' }], ms, 'ease-out');
+    else if (m === 'left' || m === 'right') anim(foe, [{ scale: '1 1', translate: '0 0' }, { scale: '-1 1', translate: `${m === 'left' ? -6 : 6}px 0`, offset: 0.5 }, { scale: '1 1', translate: '0 0' }], ms);
+    await wait(ms);
+  };
+  const fall = async () => {
+    token++;
+    pose('wobble');
+    anim(hero, [{ rotate: '0deg' }, { rotate: '8deg', offset: 0.3 }, { rotate: '-6deg', offset: 0.65 }, { rotate: '0deg' }], 420);
+    await wait(440);
+    pose('sit');
+    anim(hero, [{ translate: '0 -8px' }, { translate: '0 2px', offset: 0.6 }, { translate: '0 0' }], 260, 'ease-in');
+    const st = h('span', { class: 'train-stars ballet-stars' });
+    st.innerHTML = BATTLE_DIZZY;
+    hero.append(st);
+    if (alien) { mood('giggle'); say('Hihi!', 'foe'); }
+    await wait(720);
+    if (alien) { mood('help'); await wait(320); }
+    pose('stand');
+    anim(hero, [{ translate: '0 10px' }, { translate: '0 -4px', offset: 0.6 }, { translate: '0 0' }], 360, 'ease-out');
+    await wait(380);
+    if (alien) mood('clap');
+  };
+  return { pose, mood, say, sparkle, dance, alienDance, fall, wait, anim };
+}
+
+/* Bale: dans oyunu */
+
+// Uzaylıyla dans (oturum sonunda, balerin çocukta 70 numaradan sonra): uzaylı bir dans gösterir (oklar sırayla yanar),
+// sonra çocuk aynı sırayla yön tuşlarına ya da ekrandaki oklara basar. Her doğru tuşta balerin o hareketi yapar; hepsi
+// doğruysa dansın tamamını baştan sona yapar ve reverans eder, uzaylı alkışlar. Yanlışta sendeler, "Hadi bir daha
+// deneyelim!", uzaylı yeniden gösterir (turda 3 hak). cfg: danceSetup; opts.speed (bekleme çarpanı), opts.rnd (deneme için).
+// Hiçbir şey yazmaz. start(), skip(), press(m) ve durum için peekState().
+function danceGame(cfg, p, opts = {}) {
+  const wrap = h('div', { class: 'stack dance-wrap', style: 'gap: 8px' });
+  const stage = h('div', { class: 'train train-ballet train-alien dance-stage' });
+  const hero = h('div', { class: 'ballet-hero' }), foe = h('div', { class: 'train-foe' });
+  const fx = h('div', { class: 'train-fx' }), bubble = h('span', { class: 'train-say' }), slots = h('div', { class: 'dance-slots' });
+  fill(stage, hero, foe, fx, bubble, slots);
+  const ctl = balletKit({ hero, foe, fx, bubble, look: p?.hero_look, alien: true, speed: opts.speed || 1 });
+  const banner = h('p', { class: 'dance-banner', 'aria-live': 'polite' });
+  const names = { left: 'Sola dön', right: 'Sağa dön', up: 'Zıpla', down: 'Reverans' };
+  const pads = DANCE_MOVES.map((m) => h('button', { class: 'dance-pad', disabled: true, 'data-m': m, 'aria-label': names[m], onclick: () => press(m) }, DANCE_ARROW[m]));
+  const startBtn = h('button', { class: 'primary small', onclick: () => start() }, 'Dansa başla!');
+  const skipBtn = h('button', { class: 'ghost small', onclick: () => skip() }, 'Atla');
+  fill(wrap, stage, banner, h('div', { class: 'dance-pads' }, pads), h('div', { class: 'row dance-under' }, startBtn, skipBtn));
+  let phase = 'start', round = 0, won = 0, seq = [], input = [], tries = 0, over = false;
+  ctl.pose('stand');
+  ctl.mood('idle');
+  banner.textContent = `Uzaylı dans eder, sen aynı sırayla oklara bas! ${cfg.rounds} tur var.`;
+  const setPads = (on) => pads.forEach((b) => { b.disabled = !on; });
+  // Oklar: gösterirken sırası gelen yanar; çocuğun sırasında basılanlar yeşil, yanlışı kırmızı, kalanlar boş.
+  const paint = (now = -1, hide = false) => {
+    fill(slots, seq.map((m, i) => {
+      const got = input[i], bad = got && got !== m;
+      return h('span', { class: 'dance-slot' + (i === now ? ' now' : '') + (got ? (bad ? ' bad' : ' ok') : '') }, got ? DANCE_ARROW[got] : hide ? '·' : DANCE_ARROW[m]);
+    }));
+  };
+  const onKey = (e) => {
+    if (!wrap.isConnected || over) { document.removeEventListener('keydown', onKey); return; }
+    const m = DANCE_KEYS[e.key];
+    if (!m) return;
+    e.preventDefault();
+    press(m);
+  };
+  const demo = async () => {
+    phase = 'demo';
+    input = [];
+    setPads(false);
+    banner.textContent = `Tur ${round + 1}/${cfg.rounds} · İzle!`;
+    paint();
+    await ctl.wait(450);
+    for (let i = 0; i < seq.length; i++) {
+      if (over) return;
+      paint(i);
+      await ctl.alienDance(seq[i], 620);
+      ctl.mood('idle');
+      await ctl.wait(140);
+    }
+    if (over) return;
+    phase = 'play';
+    paint(-1, true);
+    banner.textContent = 'Sıra sende!';
+    setPads(true);
+  };
+  const nextRound = async () => {
+    if (over) return;
+    if (round >= cfg.rounds) return finish(false);
+    seq = danceSeq(cfg.lens[round], opts.rnd);
+    tries = 0;
+    await demo();
+  };
+  const press = async (m) => {
+    if (phase !== 'play' || over || !DANCE_ARROW[m]) return;
+    input.push(m);
+    const r = danceJudge(seq, input);
+    paint(-1, true);
+    if (r === 'wrong') {
+      phase = 'oops';
+      setPads(false);
+      tries++;
+      ctl.pose('wobble');
+      ctl.mood('giggle');
+      ctl.say(trainSay('fall', 0, 0));
+      await ctl.wait(950);
+      if (over) return;
+      ctl.pose('stand');
+      bubble.className = 'train-say';
+      if (tries >= cfg.tries) {
+        banner.textContent = trEn('Bir dahaki tura!', 'On to the next round!');
+        await ctl.wait(800);
+        round++;
+        return nextRound();
+      }
+      return demo();
+    }
+    if (r === 'next') { ctl.dance(m, 460); return; }
+    // Hepsi doğru: dansın tamamı baştan sona, sonra reverans ve alkış.
+    phase = 'win';
+    setPads(false);
+    await ctl.dance(m, 460);
+    for (const mv of seq) { if (over) return; await ctl.dance(mv, 420); }
+    if (over) return;
+    ctl.pose('bow');
+    ctl.mood('clap');
+    ctl.say('Bravo!', 'foe');
+    won++;
+    round++;
+    await ctl.wait(1100);
+    if (over) return;
+    bubble.className = 'train-say';
+    ctl.pose('stand');
+    nextRound();
+  };
+  const finish = (skipped) => {
+    if (over) return;
+    over = true;
+    phase = 'over';
+    setPads(false);
+    document.removeEventListener('keydown', onKey);
+    banner.textContent = danceSay(won, cfg.rounds, skipped);
+    ctl.pose('bow');
+    ctl.mood('bow');
+    startBtn.hidden = true;
+    skipBtn.hidden = true;
+  };
+  const start = () => {
+    if (phase !== 'start' || over) return;
+    startBtn.hidden = true;
+    document.addEventListener('keydown', onKey);
+    nextRound();
+  };
+  const skip = () => finish(true);
+  wrap.start = start;
+  wrap.skip = skip;
+  wrap.press = press;
+  wrap.peekState = () => ({ phase, round, won, tries, over, seq: [...seq], input: [...input] });
+  return wrap;
+}
+// Oturum ya da deneme sonundaki dans kartı: balerin çocukta, 70 numaradan sonra, asker olana kadar; correct doğru sayısı.
+// Değilse, doğru yoksa ya da numara okunamazsa kart gizli kalır. Hiçbir şey yazmaz.
+function danceCard(correct) {
+  const box = h('section', { class: 'card stack dance-card', hidden: true, style: 'gap: 8px' });
+  const p = state.student;
+  if (!p || !armyOn(p) || trainStyle(p) !== 'balerin' || !(correct > 0)) return box;
+  loadArmy(p).then((st) => {
+    if (!st || !trainOn(p, st) || st.points < TRAIN_ALIEN_AT) return;
+    const cfg = danceSetup(correct, p.grade);
+    if (!cfg.rounds) return;
+    fill(box, h('p', { class: 'label' }, '🩰 Uzaylıyla dans'), danceGame(cfg, p));
+    box.hidden = false;
+  }).catch(() => {});
+  return box;
 }
 
 /* Asker: veli */
@@ -1343,10 +1765,17 @@ function armySetting(p) {
   const on = h('input', { type: 'checkbox', checked: armyOn(p) || null, 'aria-label': 'Asker kahraman açık' });
   const reset = h('input', { type: 'checkbox', 'aria-label': 'Kolunu yeniden seçsin' });
   const resetRow = h('label', { class: 'row small' }, reset, h('span'));
+  // Antrenman (velinin isteği, 2026-11-18): asker olana kadar cevaptan sonra kum torbası ya da balerin; seçilmezse
+  // kahramanı kız olan çocukta balerin (trainStyle).
+  const style = h('select', { 'aria-label': 'Cevaptan sonraki antrenman' },
+    [['torba', 'Kum torbası (yumruk, tekme)'], ['balerin', 'Balerin (piruet, dans)']].map(([v, l]) => h('option', { value: v }, l)));
+  const styleRow = h('label', { class: 'row small' }, h('span', {}, 'Cevaptan sonra:'), style);
   const status = h('p', { class: 'small muted num' });
   const paint = () => {
     const c = armyCorps(p.hero_corps);
     on.checked = armyOn(p);
+    style.value = trainStyle(p);
+    styleRow.hidden = !armyOn(p);
     resetRow.hidden = !c;
     reset.checked = false;
     resetRow.lastChild.textContent = c ? `Kolunu yeniden seçsin (şimdi: ${c.name}); numarası ve rütbesi kaybolmaz` : '';
@@ -1364,11 +1793,13 @@ function armySetting(p) {
     h('label', { class: 'row' }, on, h('b', {}, 'Asker kahraman')),
     h('p', { class: 'small muted' }, 'Kahramanın göğsünde bir forma numarası olur: hata tekrarında her 10 doğru +1, öteki sorularda her 20 doğru +1. '
       + '100 olunca çocuk kendi ülkesinin kollarından birini seçer, üniforması değişir, numara arttıkça rütbe alır. Numara hiç azalmaz; '
-      + 'kapatıp açınca da kaybolmaz. 7. sınıfa kadar açık gelir.'),
-    resetRow, status);
+      + 'kapatıp açınca da kaybolmaz. 7. sınıfa kadar açık gelir. Asker olana kadar her cevaptan sonra kısa bir antrenman: kum torbası '
+      + 'ya da balerin (kahramanı kız olanda balerin gelir; 70\'ten sonra uzaylı partner, balerinde oturum sonunda uzaylıyla dans).'),
+    styleRow, resetRow, status);
   row.value = () => {
     const upd = {};
     if (on.checked !== armyOn(p)) upd.hero_army = on.checked;
+    if (style.value !== trainStyle(p)) upd.train_style = style.value;
     if (reset.checked && p.hero_corps) upd.hero_corps = null;
     return upd;
   };
