@@ -331,8 +331,8 @@ Her maddenin yanında nasıl denendiği yazar:
     gizli); kum ilk döküldüğü sahnenin sonunda "Eyvah, kum dökülüyor!". Eski torbada güçlü vuruşta toz çıkar. Uzaylıda
     eskime ve kum yok. [O] [A]
 - **Bale** (velinin isteği, 2026-11-18: kızlar için; `army.js`, balletScene/danceGame, `profiles.train_style`): kum torbasının
-  yerine küçük balerin. Kahramanı kız olan çocukta varsayılan, ötekilerde kum torbası; veli Günlük plan → Asker kahraman
-  satırında "Cevaptan sonra: Kum torbası / Balerin" seçer (öğrenci değiştiremez, test-train-style.sql). Balerin kahramanın
+  yerine küçük balerin. Kahramanı kız olan çocukta varsayılan, ötekilerde kum torbası; veli Günlük plan → "Kahraman"
+  satırında Asker ya da Balerin seçer (öğrenci değiştiremez, test-train-style.sql). Balerin kahramanın
   ten, saç, göz rengi, gözlüğü ve çilleriyle çizilir; saç topuz, pembe mayo ve tütü, hep sevimli. Cevaptan sonra: doğruda
   piruet (pırıltılar), 3 doğru üst üste büyük sıçrama ("Büyük sıçrama!"), 5 ve üstü koreografi (piruet, sıçrama, arabesk,
   reverans; "Muhteşem ×5!"); yanlışta sendeler, pıt diye oturur, başında yıldızlar, kalkar ve "Hadi bir daha deneyelim!"
@@ -349,9 +349,11 @@ Her maddenin yanında nasıl denendiği yazar:
   kalan, bütün rütbeler; "Numara nasıl artar?". Besleme kapalı, asker kahraman açıksa sayfa kahramanı ve asker kartını
   gösterir (yemek rafı yok). Kahramanın kartında numara ya da rütbe satırı. İngilizce ve Klavye sayfalarındaki kahraman
   da numarasıyla ya da üniformasıyla çizilir. [A]
-- Veli (Ayarlar → Günlük plan, besleme satırının altında): "Asker kahraman" çocuk başına açılır ya da kapanır; 7. sınıfa
-  kadar açık gelir. Kapatıp açmak numarayı silmez. Kol seçildiyse "Kolunu yeniden seçsin" (numara ve rütbe kalır).
-  Altında şimdiki numara, kol ve rütbe. [A], kaydetme [E]
+- Veli (Ayarlar → Günlük plan, besleme satırının altında; velinin isteği, 2026-11-18: "üstte kahraman olacak, içinde
+  dropdownlarla balerin ya da asker seçilecek"): "Kahraman" başlığının yanında Kapalı / Asker / Balerin seçimi, çocuk
+  başına; altında yalnızca seçilenin açıklaması, seçim değişince açıklama da değişir. 7. sınıfa kadar açık gelir (kahramanı
+  kız olanda Balerin, ötekilerde Asker), sonrasında Kapalı. Kapatıp açmak numarayı silmez, kapatmak türü değiştirmez. Kol
+  seçildiyse "Kolunu yeniden seçsin" (numara ve rütbe kalır). Altında şimdiki numara, kol ve rütbe. [A], kaydetme [E]
 - **Uzaylı savaşı** (ikinci aşama, 2026-11-14): yalnızca asker olmuş (kolunu seçmiş) çocukta, oturum sonunda (konu ve
   hata tekrarı, ek çalışma, kitap, konu çalışması) sonuç kartının altında; uygulamadaki deneme bitince Net kartının altında.
   Asker değilken kart görünmez. Hiçbir şey kaydedilmez. [O] hesap, [A] oyun, oynamak [E]

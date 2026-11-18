@@ -292,8 +292,16 @@ check('dans oyunu: tuşlar sırayla doğruysa devam, hepsi doğruysa bitti, biri
   && /atladın/.test(D.danceSay(0, 3, true)));
 check('bale bağlı: cevap sahnesi türe göre balerin ya da kum torbası; dans kartı oturum ve deneme sonunda, balerinde 70\'ten sonra; veli seçer, öğrenci değiştiremez',
   /ballet \? balletScene\(balletMove\(correct, streak\)/.test(src) && /danceCard\(stats\.correct\)/.test(app) && /saved \? danceCard\(rows\.length - missed\.length\)/.test(app)
-  && /trainStyle\(p\) !== 'balerin'/.test(src) && /st\.points < TRAIN_ALIEN_AT/.test(src) && /upd\.train_style = style\.value/.test(src)
+  && /trainStyle\(p\) !== 'balerin'/.test(src) && /st\.points < TRAIN_ALIEN_AT/.test(src) && /upd\.train_style = style;/.test(src)
   && /train_style in \('torba', 'balerin'\)/.test(tsql) && /Bu ayarı veli değiştirir/.test(tsql) && !/sb\.from\(/.test(pick(src, '/* Bale: sahne */', '/* Asker: veli */')));
+// Velinin "Kahraman" seçimi (velinin isteği, 2026-11-18): Kapalı / Asker / Balerin; seçili gelen çocuğun şimdiki ayarı.
+const heroKind = new Function([/^const armyOn = .*$/m, /^const trainStyle = .*$/m, /^const heroKind = .*$/m].map((re) => src.match(re)[0]).concat('return heroKind;').join('\n'))();
+check('kahramanın türü: 7. sınıfa kadar açık (kız kahramanda balerin, ötekilerde asker), sonrasında kapalı; velinin seçimi geçerli; açıklama seçilene göre',
+  heroKind({ grade: 4, avatar: 'kiz' }) === 'balerin' && heroKind({ grade: 4, avatar: 'erkek' }) === 'asker' && heroKind({ grade: 8, avatar: 'kiz' }) === 'kapali'
+  && heroKind({ grade: 8, hero_army: true, avatar: 'kiz' }) === 'balerin' && heroKind({ grade: 8, hero_army: true, avatar: 'kiz', train_style: 'torba' }) === 'asker'
+  && heroKind({ grade: 4, hero_army: false, train_style: 'balerin' }) === 'kapali' && heroKind({ grade: 4, avatar: 'erkek', train_style: 'balerin' }) === 'balerin'
+  && /about\.textContent = HERO_KIND_TEXT\[kind\.value\]/.test(src) && ['kapali', 'asker', 'balerin'].every((k) => new RegExp(`^  ${k}: '`, 'm').test(src))
+  && !/'Asker kahraman açık'/.test(src));
 
 console.log(fails ? `${fails} kontrol başarısız` : '');
 process.exit(fails ? 1 : 0);

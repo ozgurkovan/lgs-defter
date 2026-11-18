@@ -2106,23 +2106,38 @@ function danceCard(correct) {
 
 /* Asker: veli */
 
-// Günlük plandaki satır: "Asker kahraman" (çocuk başına açık ya da kapalı) ve seçtiyse "kolunu yeniden seçsin".
+// Kahramanın türü (velinin ayarı): 'kapali', 'asker' (kum torbası) ya da 'balerin'. Veritabanında iki alan: hero_army
+// (açık mı) ve train_style ('torba' | 'balerin'); seçilmediyse 7. sınıfa kadar açık, kahramanı kız olanda balerin.
+const heroKind = (p) => (!armyOn(p) ? 'kapali' : trainStyle(p) === 'balerin' ? 'balerin' : 'asker');
+// Seçilen türün açıklaması (velinin isteği, 2026-11-18: "hangisi seçildiyse onun açıklaması").
+const HERO_KIND_TEXT = {
+  kapali: 'Kahramanın forma numarası, cevaptan sonraki antrenmanı ve dansı görünmez. Numarası silinmez; yeniden açınca kaldığı yerden sürer.',
+  asker: 'Kahramanın göğsünde bir forma numarası olur: hata tekrarında her 10 doğru +1, öteki sorularda her 20 doğru +1. '
+    + 'Her cevaptan sonra kum torbasında kısa bir antrenman yapar (yumruk, tekme, kombo); 70\'ten sonra torbanın yerine uzaylı partner gelir. '
+    + '100 olunca çocuk kendi ülkesinin kollarından birini seçer, üniforması değişir, numara arttıkça rütbe alır. Numara hiç azalmaz. '
+    + '7. sınıfa kadar açık gelir.',
+  balerin: 'Her cevaptan sonra küçük bir balerin dans eder: doğruda piruet, üst üste doğrularda büyük sıçrama ve koreografi. '
+    + 'Forma numarası askerdeki gibi artar (hata tekrarında her 10 doğru +1, öteki sorularda her 20 doğru +1, hiç azalmaz); '
+    + '70\'ten sonra uzaylı dans partneri gelir ve oturum sonunda uzaylıyla dans oyunu açılır. '
+    + '100 olunca çocuk kolunu seçip asker olur, bale biter. Kahramanı kız olan çocukta balerin seçili gelir.',
+};
+// Günlük plandaki satır (velinin isteği, 2026-11-18: "Asker kahramanın altından balerin ayarı yapılması doğru değil, üstte
+// kahraman olacak, içinde dropdownlarla balerin ya da asker seçilecek"): "Kahraman" başlığı, yanında Kapalı / Asker /
+// Balerin seçimi, altında seçilenin açıklaması; kol seçildiyse "kolunu yeniden seçsin".
 // value(): kaydedilecek değişiklikler; show(): kaydedilen profili yeniden gösterir. Altında numarası, kolu ve rütbesi.
 function armySetting(p) {
-  const on = h('input', { type: 'checkbox', checked: armyOn(p) || null, 'aria-label': 'Asker kahraman açık' });
+  const kind = h('select', { 'aria-label': 'Kahraman' },
+    [['kapali', 'Kapalı'], ['asker', 'Asker'], ['balerin', 'Balerin']].map(([v, l]) => h('option', { value: v }, l)));
+  const about = h('p', { class: 'small muted' });
+  const describe = () => { about.textContent = HERO_KIND_TEXT[kind.value] || ''; };
+  kind.addEventListener('change', describe);
   const reset = h('input', { type: 'checkbox', 'aria-label': 'Kolunu yeniden seçsin' });
   const resetRow = h('label', { class: 'row small' }, reset, h('span'));
-  // Antrenman (velinin isteği, 2026-11-18): asker olana kadar cevaptan sonra kum torbası ya da balerin; seçilmezse
-  // kahramanı kız olan çocukta balerin (trainStyle).
-  const style = h('select', { 'aria-label': 'Cevaptan sonraki antrenman' },
-    [['torba', 'Kum torbası (yumruk, tekme)'], ['balerin', 'Balerin (piruet, dans)']].map(([v, l]) => h('option', { value: v }, l)));
-  const styleRow = h('label', { class: 'row small' }, h('span', {}, 'Cevaptan sonra:'), style);
   const status = h('p', { class: 'small muted num' });
   const paint = () => {
     const c = armyCorps(p.hero_corps);
-    on.checked = armyOn(p);
-    style.value = trainStyle(p);
-    styleRow.hidden = !armyOn(p);
+    kind.value = heroKind(p);
+    describe();
     resetRow.hidden = !c;
     reset.checked = false;
     resetRow.lastChild.textContent = c ? `Kolunu yeniden seçsin (şimdi: ${c.name}); numarası ve rütbesi kaybolmaz` : '';
@@ -2137,16 +2152,14 @@ function armySetting(p) {
   };
   paint();
   const row = h('div', { class: 'stack', style: 'gap: 4px; padding: 10px 0 4px; border-top: 1px solid var(--rule)' },
-    h('label', { class: 'row' }, on, h('b', {}, 'Asker kahraman')),
-    h('p', { class: 'small muted' }, 'Kahramanın göğsünde bir forma numarası olur: hata tekrarında her 10 doğru +1, öteki sorularda her 20 doğru +1. '
-      + '100 olunca çocuk kendi ülkesinin kollarından birini seçer, üniforması değişir, numara arttıkça rütbe alır. Numara hiç azalmaz; '
-      + 'kapatıp açınca da kaybolmaz. 7. sınıfa kadar açık gelir. Asker olana kadar her cevaptan sonra kısa bir antrenman: kum torbası '
-      + 'ya da balerin (kahramanı kız olanda balerin gelir; 70\'ten sonra uzaylı partner, balerinde oturum sonunda uzaylıyla dans).'),
-    styleRow, resetRow, status);
+    h('label', { class: 'row' }, h('b', {}, 'Kahraman'), kind),
+    about, resetRow, status);
   row.value = () => {
     const upd = {};
-    if (on.checked !== armyOn(p)) upd.hero_army = on.checked;
-    if (style.value !== trainStyle(p)) upd.train_style = style.value;
+    if (kind.value === heroKind(p)) { if (reset.checked && p.hero_corps) upd.hero_corps = null; return upd; }
+    const on = kind.value !== 'kapali', style = kind.value === 'balerin' ? 'balerin' : 'torba';
+    if (on !== armyOn(p)) upd.hero_army = on;
+    if (on && style !== trainStyle(p)) upd.train_style = style; // kapatırken tür olduğu gibi kalır
     if (reset.checked && p.hero_corps) upd.hero_corps = null;
     return upd;
   };

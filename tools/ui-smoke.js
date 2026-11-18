@@ -104,7 +104,7 @@
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
         ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
-            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı', 'kahramanı besleme', 'açlığı dondur', 'asker kahraman', 'tatilde günlük soru'], together: ['birlikte bakılacaklar'] }
+            book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı', 'kahramanı besleme', 'açlığı dondur', 'forma numarası', 'tatilde günlük soru'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
     if (role === 'student' && wordsPerDay(state.student) > 0) {
       pages.words = ['kelime kartları', 'güç', 'mağaza'];
@@ -383,16 +383,23 @@
         document.querySelector('.ask')?.remove();
       }
     }
-    // Antrenman türü (2026-11-18): velinin Günlük plan → Asker kahraman satırında "Cevaptan sonra: Kum torbası / Balerin";
-    // varsayılan kahramana göre (kız kahramanda balerin), değiştirince kaydedilecek değer train_style. Kaydetmeden denenir.
+    // Kahramanın türü (velinin isteği, 2026-11-18): velinin Günlük plan → "Kahraman" satırında Kapalı / Asker / Balerin;
+    // seçili gelen çocuğun şimdiki ayarı (kız kahramanda balerin), altında seçilenin açıklaması. Değiştirince kaydedilecek
+    // değerler hero_army ve train_style. Kaydetmeden denenir.
     if (role === 'parent' && state.student) {
-      const row = armySetting(state.student);
-      const sel = row.querySelector('select');
-      const def = !!sel && sel.value === trainStyle(state.student) && !('train_style' in row.value());
-      if (sel) sel.value = sel.value === 'balerin' ? 'torba' : 'balerin';
-      const changed = !!sel && row.value().train_style === sel.value;
-      check('Antrenman türü: velinin asker kahraman satırında kum torbası ya da balerin; varsayılan kahramana göre, değişince kaydedilir', def && changed,
-        [!sel && 'seçim yok', sel && !def && 'varsayılan yanlış', sel && !changed && 'değişiklik kaydedilmiyor'].filter(Boolean).join('; '));
+      const s = state.student, row = armySetting(s);
+      const sel = row.querySelector('select[aria-label]'), about = () => row.querySelector('p')?.textContent || '';
+      const pick = (v) => { sel.value = v; sel.dispatchEvent(new Event('change')); return row.value(); };
+      const def = !!sel && sel.value === heroKind(s) && !Object.keys(row.value()).length && about().length > 20;
+      const was = about();
+      const other = sel && (heroKind(s) === 'balerin' ? 'asker' : 'balerin');
+      const up = sel ? pick(other) : {};
+      const changed = !!sel && up.train_style === (other === 'balerin' ? 'balerin' : 'torba') && (armyOn(s) ? !('hero_army' in up) : up.hero_army === true) && about() !== was;
+      const off = sel ? pick('kapali') : {};
+      const closed = !!sel && (armyOn(s) ? off.hero_army === false : !('hero_army' in off)) && !('train_style' in off);
+      if (sel) pick(heroKind(s));
+      check('Kahraman: velinin satırında Kapalı / Asker / Balerin; seçili gelen şimdiki ayar, açıklama seçime göre, değişince kaydedilir', def && changed && closed,
+        [!sel && 'seçim yok', sel && !def && 'varsayılan yanlış', sel && !changed && 'tür değişikliği kaydedilmiyor', sel && !closed && 'kapatma yanlış'].filter(Boolean).join('; '));
     }
     // Soru beğenisi (velinin isteği, 2026-11-16): öğrencide cevaptan sonra "Bu soru nasıldı? 👍 👎"; dokununca kaydedilir,
     // değiştirilebilir, 👎'de neden kutusu açılır ve "Gönder" nedeni yazar. Veli ve öğretmende yok. Kayıt sahte: sb.from test
@@ -448,8 +455,8 @@
       const on = document.querySelector('#app input[aria-label="Kahramanı besleme açık"]'), pause = document.querySelector('#app input[aria-label="Açlığı dondur"]');
       check('Kahramanı besleme: velinin Günlük planında açma kutusu ve "Açlığı dondur"; kapalıyken dondurma seçilemez',
         !!on && !!pause && on.checked === feedOn(state.student) && pause.disabled === !on.checked);
-      const army = document.querySelector('#app input[aria-label="Asker kahraman açık"]');
-      check('Asker kahraman: velinin Günlük planında açma kutusu (çocuğun şimdiki ayarıyla)', !!army && army.checked === armyOn(state.student));
+      const army = document.querySelector('#app select[aria-label="Kahraman"]');
+      check('Kahraman: velinin Günlük planında Kapalı / Asker / Balerin seçimi (çocuğun şimdiki ayarıyla)', !!army && army.value === heroKind(state.student));
     }
 
     // Klavye sekmesi yalnızca dersleri açık öğrencide (ilkokulda varsayılan açık, sonrasında veli açar).

@@ -4323,7 +4323,8 @@ function planSection(p) {
     const holidayRow = holidaySetting(p);
     // Kahramanı besleme (velinin isteği): çocuk başına açılır, hastalıkta ve tatilde açlık dondurulur (feed.js).
     const feedRow = feedSetting(p);
-    // Asker kahraman (velinin isteği, 2026-11-13): çocuk başına açılır; seçtiği kol sıfırlanabilir (army.js).
+    // Kahraman (velinin isteği, 2026-11-13; 2026-11-18'den beri Kapalı / Asker / Balerin seçimi): çocuk başına; seçtiği kol
+    // sıfırlanabilir (army.js).
     const armyRow = armySetting(p);
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
