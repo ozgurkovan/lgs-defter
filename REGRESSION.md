@@ -566,7 +566,12 @@ Her maddenin yanında nasıl denendiği yazar:
 ## Veli
 
 **Rapor** [A], içindekiler [E]
-- Üstte her zaman: deneme kutusu, mesaj kutusu, birlikte bakılacaklar.
+- Sekmeye dokununca yalnızca o sekmenin bölümleri görünür; sekmelerle bölüm arasında başka kart yok (velinin isteği,
+  2026-11-20: "Gün gün çalışmaya basınca yalnızca o görünsün"). Önceden sekmelerin üstünde her zaman duran kartlar taşındı:
+  deneme kutusu Denemeler sekmesinin en üstünde; mesaj kutusu "Mesaj" sekmesinde (yalnız veli); birlikte bakılacaklar,
+  soru varsa "Birlikte bakılacaklar (N)" sekmesinde (sarı çerçeveli). Sekme sırası: Gün gün çalışma · Birlikte
+  bakılacaklar · Mesaj · Bildirdiği sorular · Denemeler · Zayıf konular · Son 14 gün · Yüklemeler · Kelime, Klavye, Kitap.
+  Açılışta Gün gün çalışma (ya da en son seçilen sekme; o sekme artık yoksa Gün gün çalışma). [A]
   - Deneme kutusu (velinin isteği, 2026-11-10; dört özet kutusunun yerine): en son deneme açık gelir, açılır listeden öbür
     denemelere geçilir. Net, toplam doğru/yanlış/boş ve derse göre tablo; yanlış ya da boş sayısına dokununca o dersin o
     denemedeki soruları açılır (soru, cevabı ve doğrusu, çözüm, "Benzer sorularla dene"), yeniden dokununca kapanır.
@@ -575,8 +580,8 @@ Her maddenin yanında nasıl denendiği yazar:
   derslere ve soru tipine göre, kavram yanılgıları) · Zayıf konular (özel derste çalışılacaklar, derse göre gruplu zayıf
   konular ve "Yanlışlar nereden geliyor?") · Son 14 gün (ve önümüzdeki 7 gün) · Yüklemeler (ve saatlik görevin son çalışması) · Kelime, Klavye,
   Kitap. Seçilen sekme bu tarayıcıda hatırlanır. Hiçbir bölüm kaldırılmadı, yalnızca sekmelere taşındı. [A]
-  Sekme düğmeleri başlığın hemen altında (velinin isteği, 2026-11-16: "en üste getir"); bölümün kendisi özet, mesaj ve
-  birlikte bakılacaklardan sonra gelir, sekmeye dokununca sayfa oraya kayar. [A]
+  Sekme düğmeleri başlığın hemen altında (velinin isteği, 2026-11-16: "en üste getir"), seçili sekmenin bölümleri hemen
+  altlarında; sayfa aşağı kaymışken sekmeye dokununca sekmeler yeniden görünür. [A]
 - Özet kutuları.
 - "… mesaj bırak":
   - tatlı söz ya da şaka önerisi, imza;

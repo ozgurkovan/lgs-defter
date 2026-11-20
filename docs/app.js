@@ -5329,29 +5329,34 @@ async function viewReport() {
     runs[0] ? h('p', { class: 'small muted' }, `Saatlik görev en son ${new Date(runs[0].started_at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })} çalıştı.`) : null);
 
   // Rapor bölümleri sekmelerde (velinin isteği, 2026-11-10): sayfa çok uzamıştı. Seçilen sekme bu tarayıcıda hatırlanır.
+  // Sekmeye dokununca yalnızca o sekmenin bölümleri görünür (velinin isteği, 2026-11-20: "Gün gün çalışmaya basınca yalnızca
+  // o görünsün"): önceden sekmelerin üstünde her zaman duran deneme kutusu Denemeler'e, mesaj kutusu kendi sekmesine,
+  // birlikte bakılacaklar (soru varsa, sayısıyla) kendi sekmesine taşındı.
   const tabs = reportTabs([
     ['gun', 'Gün gün çalışma', () => [dayReport(reviews30, items, topicName)]],
+    togetherRows.length ? ['birlikte', `Birlikte bakılacaklar (${togetherRows.length})`, () => [togetherBox(togetherRows)]] : null,
+    state.profile.role === 'parent' ? ['mesaj', 'Mesaj', () => [messageBox()]] : null,
     ['bildirdikleri', 'Bildirdiği sorular', () => [reportedBox(), poemBox()]],
-    ['denemeler', 'Denemeler', () => [h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable), subjects, styles, misconceptions]],
+    ['denemeler', 'Denemeler', () => [tiles, h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable), subjects, styles, misconceptions]],
     ['zayif', 'Zayıf konular', () => [gapCards, weakCards, causes, pastNoteCards]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
     ['son14', 'Son 14 gün', () => [perf, load]],
     ['yuklemeler', 'Yüklemeler', () => [job]],
     ['diger', 'Kelime · Klavye · Kitap', () => [wordBox(), typingBox(), booksBox()]],
-  ]);
+  ].filter(Boolean));
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, isTeacherView() ? 'Öğretmen görünümü' : 'Veli raporu'), h('h1', {}, studentName ? `${studentName} nasıl gidiyor?` : 'Nasıl gidiyor?'),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(today, (state.student || state.profile).lgs_date)} gün var.`)
         : h('p', { class: 'muted' }, `${state.student.grade}. sınıf · pratik`)),
-    // Sekmeler başlığın hemen altında (velinin isteği, 2026-11-16: "en üste getir, görünmüyor altlarda"); bölümün kendisi
-    // özet, mesaj ve birlikte bakılacaklardan sonra gelir, sekmeye dokununca oraya kayar.
+    // Sekmeler başlığın hemen altında (velinin isteği, 2026-11-16: "en üste getir, görünmüyor altlarda"), seçili sekmenin
+    // bölümleri hemen sekmelerin altında; aralarında başka kart yok.
     tabs.bar,
-    tiles, state.profile.role === 'parent' ? messageBox() : null, togetherBox(togetherRows),
     tabs.body);
 }
 // Rapor sekmeleri: [kimlik, başlık, bölümleri üreten işlev]. Bölümler ilk açılışta üretilir (hepsi bir kez), yalnızca seçili
-// sekmeninki görünür. Seçim localStorage'da (defter.reportTab) durur. { bar: sekme düğmeleri, body: bölümler } döner; düğmeye
-// dokununca bölüm görünür ve sayfa oraya kayar.
+// sekmeninki görünür. Seçim localStorage'da (defter.reportTab) durur; o sekme artık yoksa (ör. birlikte bakılacak soru
+// kalmadıysa) ilk sekme açılır. { bar: sekme düğmeleri, body: bölümler } döner; düğmeye dokununca bölüm görünür, sekmeler
+// ekranın üstünden taşmışsa sayfa sekmelere kayar.
 function reportTabs(tabs) {
   let current = 'gun';
   try { current = localStorage.getItem('defter.reportTab') || 'gun'; } catch (e) { /* önemli değil */ }
@@ -5362,10 +5367,11 @@ function reportTabs(tabs) {
     try { localStorage.setItem('defter.reportTab', id); } catch (e) { /* önemli değil */ }
     chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.tab === id)));
     Object.entries(panels).forEach(([k, p]) => { p.hidden = k !== id; });
-    body.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
+    if (bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
   } }, label));
   const body = h('div', { class: 'stack report-tabs' }, ...Object.values(panels));
-  return { bar: h('div', { class: 'chips report-bar', role: 'tablist', 'aria-label': 'Rapor bölümleri' }, chips), body };
+  const bar = h('div', { class: 'chips report-bar', role: 'tablist', 'aria-label': 'Rapor bölümleri' }, chips);
+  return { bar, body };
 }
 
 /* Gün gün çalışma (son 30 gün): seçili günde konu konu kaç soru, kaçı doğru, kaçı yanlış, ne kadar sürdü.

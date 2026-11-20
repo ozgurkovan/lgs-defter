@@ -103,7 +103,7 @@
           topics: ['hangi konuyu çalışmak istersin', 'işlendi'],
           ask: ['yapamadığım sorular', 'beğendiğim sorular', 'kalemle'], paper: ['hangi deneme?'], settings: [], together: ['birlikte bakılacaklar'] }
       : role === 'parent'
-        ? { report: ['gün gün çalışma', 'denemeler', 'mesaj bırak'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
+        ? { report: ['gün gün çalışma', 'denemeler', 'mesaj'], questions: [], topics: [], upload: ['hangi deneme?', 'kitap sayfası ekle'],
             book: ['kitap sayfası ekle', 'sayfalar'], settings: ['günlük plan', 'aile', 'kelime kartları', 'klavye dersleri', 'kelime kahramanı', 'kahramanı besleme', 'açlığı dondur', 'forma numarası', 'tatilde günlük soru'], together: ['birlikte bakılacaklar'] }
         : { report: ['gün gün çalışma', 'denemeler'], questions: [], topics: [], settings: [], together: ['birlikte bakılacaklar'] };
     if (role === 'student' && wordsPerDay(state.student) > 0) {
@@ -124,7 +124,8 @@
     // Öğretmen mesaj bırakamaz, aileyi yönetemez.
     if (role === 'teacher') {
       go('report'); await settle();
-      check('Öğretmende mesaj kutusu yok', !pageText().includes('mesaj bırak'));
+      check('Öğretmende mesaj kutusu yok', !pageText().includes('mesaj bırak') && !document.getElementById('msg-body')
+        && ![...document.querySelectorAll('#app .report-bar .chip')].some((c) => c.dataset.tab === 'mesaj'));
     }
     for (const [tab, must] of Object.entries(pages)) {
       go(tab); await settle();
@@ -820,6 +821,8 @@
     // dersin soruları açılır, yeniden dokununca kapanır. Salt okunur.
     if (role !== 'student') {
       go('report'); await settle();
+      // Deneme kutusu Denemeler sekmesinde (2026-11-20).
+      [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'denemeler')?.click(); await wait(100);
       const sel = document.querySelector('#app select[aria-label="Hangi deneme"]');
       if (sel) {
         const card = sel.closest('section');
@@ -841,30 +844,50 @@
     }
 
     // Rapor sekmeleri (2026-11-10): yedi sekme; yalnızca seçili sekmenin bölümleri görünür, seçim hatırlanır. Salt okunur.
+    // 2026-11-20: sekmelerle bölüm arasında kart yok; deneme kutusu Denemeler'de, mesaj kutusu "Mesaj" sekmesinde (yalnız
+    // veli), birlikte bakılacaklar soru varsa kendi sekmesinde, sayısıyla. Gün gün çalışmada yalnızca o görünür.
     if (role !== 'student') {
       go('report'); await settle();
       const chips = () => [...document.querySelectorAll('#app .report-bar .chip')];
       const visible = () => [...document.querySelectorAll('#app .report-panel')].filter((p) => !p.hidden).map((p) => p.dataset.tab);
       const names = chips().map((c) => c.textContent);
+      const ids = chips().map((c) => c.dataset.tab);
+      const together = (await loadTogether()).length;
+      const want = ['gun', together ? 'birlikte' : null, role === 'parent' ? 'mesaj' : null, 'bildirdikleri', 'denemeler', 'zayif', 'son14', 'yuklemeler', 'diger'].filter(Boolean);
+      const togetherLabel = !together || /\(\d+\)$/.test(chips().find((c) => c.dataset.tab === 'birlikte')?.textContent || '');
       chips().find((c) => c.dataset.tab === 'denemeler')?.click(); await wait(100);
-      const afterClick = visible().join() === 'denemeler' && pageText().includes('derslere göre yanlış') && ![...document.querySelectorAll('#app h2')].some((x) => x.textContent === 'Gün gün çalışma' && x.offsetParent);
+      const shownEl = (el) => !!el && !!el.offsetParent;
+      const afterClick = visible().join() === 'denemeler' && pageText().includes('derslere göre yanlış') && ![...document.querySelectorAll('#app h2')].some((x) => x.textContent === 'Gün gün çalışma' && x.offsetParent)
+        && shownEl(document.querySelector('#app select[aria-label="Hangi deneme"]'));
       go(role === 'parent' ? 'questions' : 'topics'); await settle(); go('report'); await settle();
       const remembered = visible().join() === 'denemeler';
       chips().find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
-      // Sekmeler başlığın hemen altında (2026-11-16).
-      const top = document.querySelector('#app header')?.nextElementSibling?.classList.contains('report-bar');
-      check('Rapor sekmeleri: yedi sekme, başlığın hemen altında; seçili olanın bölümleri görünür, seçim hatırlanır',
-        names.length === 7 && top && afterClick && remembered && visible().join() === 'gun',
-        `${names.length} sekme: ${names.join(' | ')}; görünen ${visible().join()}${top ? '' : '; sekmeler üstte değil'}`);
+      // Sekmeler başlığın hemen altında (2026-11-16), bölümler sekmelerin hemen altında (2026-11-20).
+      const bar = document.querySelector('#app header')?.nextElementSibling;
+      const top = !!bar?.classList.contains('report-bar') && !!bar.nextElementSibling?.classList.contains('report-tabs');
+      const onlyDay = visible().join() === 'gun' && !shownEl(document.querySelector('#app select[aria-label="Hangi deneme"]'))
+        && !shownEl(document.getElementById('msg-body')) && ![...document.querySelectorAll('#app h2')].some((x) => /^Birlikte bakılacak \d/.test(x.textContent) && x.offsetParent);
+      check('Rapor sekmeleri: başlığın hemen altında, bölüm hemen altlarında; Gün gün çalışmada yalnızca o görünür; deneme kutusu Denemeler\'de; seçim hatırlanır',
+        ids.join() === want.join() && togetherLabel && top && afterClick && remembered && onlyDay,
+        `${names.length} sekme: ${names.join(' | ')}; görünen ${visible().join()}${top ? '' : '; düzen bozuk'}${onlyDay ? '' : '; Gün gün sekmesinde başka kart görünüyor'}`);
+      if (together) {
+        chips().find((c) => c.dataset.tab === 'birlikte')?.click(); await wait(100);
+        check('Rapor: birlikte bakılacaklar kendi sekmesinde, "Soruları aç" düğmesiyle', visible().join() === 'birlikte'
+          && [...document.querySelectorAll('#app button')].some((b) => b.textContent === 'Soruları aç' && b.offsetParent));
+        chips().find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
+      }
     }
 
     // Mesaj kutusu (2026-11-10): yalnızca son mesaj görünür, okudu ya da okumadı etiketiyle. Salt okunur.
     if (role === 'parent') {
       go('report'); await settle();
+      // Mesaj kutusu kendi sekmesinde (2026-11-20).
+      [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'mesaj')?.click(); await wait(100);
       for (let i = 0; i < 40 && !pageText().includes('mesaj bırak'); i++) await wait(150);
       const notes = [...document.querySelectorAll('#app .note.small')].filter((x) => /Okudu|Henüz okumadı/.test(x.textContent));
-      check('Mesaj kutusu: yalnızca son mesaj, okudu ya da okumadı etiketiyle', notes.length <= 1 && (pageText().includes('son mesaj') || !notes.length),
+      check('Mesaj kutusu: "Mesaj" sekmesinde; yalnızca son mesaj, okudu ya da okumadı etiketiyle', pageText().includes('mesaj bırak') && notes.length <= 1 && (pageText().includes('son mesaj') || !notes.length),
         notes.length ? `${notes.length} mesaj` : 'hiç mesaj yok');
+      [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
     }
 
     // Rapor, Gün gün çalışma (2026-11-09): tablodaki doğru ya da yanlış sayısına dokununca o konunun soruları tablonun altında

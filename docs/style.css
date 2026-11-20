@@ -498,6 +498,8 @@ td.wrap { white-space: normal; min-width: 160px; }
 /* Rapor sekmeleri: başlık çubuğu yapışkan, altında seçili bölüm. */
 .report-tabs > .chips { position: sticky; top: 0; z-index: 5; padding: 8px 0; background: var(--paper); }
 .report-panel { gap: 16px; }
+/* Birlikte bakılacaklar sekmesi, eskiden üstte duran kart gibi sarı çerçeveli (2026-11-20). */
+.report-bar .chip[data-tab="birlikte"][aria-pressed="false"] { border-color: var(--amber); }
 
 /* Derslere göre yanlış çubuğu düğme olarak (sayıya dokununca sorular açılır). */
 .bar-btn { width: 100%; min-height: 36px; padding: 2px 0; border: 0; background: transparent; border-radius: 8px; text-align: left; color: inherit; }
