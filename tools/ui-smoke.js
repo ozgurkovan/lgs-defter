@@ -870,6 +870,17 @@
       check('Rapor sekmeleri: başlığın hemen altında, bölüm hemen altlarında; Gün gün çalışmada yalnızca o görünür; deneme kutusu Denemeler\'de; seçim hatırlanır',
         ids.join() === want.join() && togetherLabel && top && afterClick && remembered && onlyDay,
         `${names.length} sekme: ${names.join(' | ')}; görünen ${visible().join()}${top ? '' : '; düzen bozuk'}${onlyDay ? '' : '; Gün gün sekmesinde başka kart görünüyor'}`);
+      // Hiçbir sekme boş kalmaz (2026-11-20, "burası boş"): bölümleri yoksa kısa bir açıklama görünür.
+      const empty = [];
+      for (const c of chips()) {
+        c.click();
+        const panel = document.querySelector(`#app .report-panel[data-tab="${c.dataset.tab}"]`);
+        const shown = () => [...(panel?.children || [])].some((x) => !x.hidden && x.offsetParent && x.textContent.trim());
+        for (let i = 0; i < 50 && !shown(); i++) await wait(150);
+        if (!shown()) empty.push(c.textContent);
+      }
+      chips().find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
+      check('Rapor: hiçbir sekme boş değil (bölümü olmayan sekmede kısa açıklama)', !empty.length, empty.join(', '));
       if (together) {
         chips().find((c) => c.dataset.tab === 'birlikte')?.click(); await wait(100);
         check('Rapor: birlikte bakılacaklar kendi sekmesinde, "Soruları aç" düğmesiyle', visible().join() === 'birlikte'
@@ -888,6 +899,29 @@
       check('Mesaj kutusu: "Mesaj" sekmesinde; yalnızca son mesaj, okudu ya da okumadı etiketiyle', pageText().includes('mesaj bırak') && notes.length <= 1 && (pageText().includes('son mesaj') || !notes.length),
         notes.length ? `${notes.length} mesaj` : 'hiç mesaj yok');
       [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'gun')?.click(); await wait(100);
+    }
+
+    // Yüklemelerin zamanı (2026-11-20): velinin Yüklemeler sekmesinde ve öğrencinin Yükle sayfasındaki "Son yüklemeler"de her
+    // yüklemenin altında "Gönderildi 20 Kas 14:05", işlendiyse "· işlendi …". Salt okunur.
+    if (role === 'parent' || (role === 'student' && allowedTabs().includes('send'))) {
+      let box = null;
+      if (role === 'parent') {
+        go('report'); await settle();
+        [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'yuklemeler')?.click(); await wait(100);
+        box = [...document.querySelectorAll('#app h2')].find((x) => x.textContent === 'Yüklemeler')?.parentElement;
+      } else {
+        go('send'); await settle();
+        box = [...document.querySelectorAll('#app p.label')].find((x) => x.textContent === 'Son yüklemeler')?.parentElement;
+      }
+      const rows = box ? [...box.querySelectorAll('.spread')] : [];
+      const whens = box ? [...box.querySelectorAll('.sub-when')] : [];
+      const stamp = '\\d{1,2} \\S+ \\d{2}:\\d{2}';
+      const fmt = whens.every((w) => new RegExp(`^Gönderildi ${stamp}( · işlendi ${stamp})?$`).test(w.textContent));
+      const done = rows.every((r, i) => !/İşlendi/.test(r.textContent) || /· işlendi/.test(whens[i]?.textContent || ''));
+      if (rows.length) check('Yüklemeler: her yüklemenin altında gönderildiği zaman, işlendiyse işlendiği zaman', whens.length === rows.length && fmt && done,
+        `${rows.length} yükleme, ${whens.length} zaman: ${whens[0]?.textContent || '—'}`);
+      else check('Yüklemeler: gönderilme zamanı', true, 'yükleme yok, atlandı');
+      if (role === 'parent') [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'gun')?.click();
     }
 
     // Rapor, Gün gün çalışma (2026-11-09): tablodaki doğru ya da yanlış sayısına dokununca o konunun soruları tablonun altında

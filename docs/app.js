@@ -1929,7 +1929,7 @@ function voteRow(questionId) {
    Bildirim yoksa kart görünmez. */
 function reportedBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
-  (async () => {
+  box.ready = (async () => {
     const rows = await q(sb.from('question_feedback').select('kind, note, status, verdict, response, created_at, questions(subject, stem, topics(name))')
       .eq('student_id', sid()).order('created_at', { ascending: false }).limit(10));
     if (!rows.length) return;
@@ -1956,7 +1956,7 @@ function reportedBox() {
    görür (veritabanı da öyle izin verir). Hiç yoksa kart görünmez. */
 function poemBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
-  (async () => {
+  box.ready = (async () => {
     const rows = await q(sb.from('poem_lines').select('poem_key, line, result, created_at')
       .eq('student_id', sid()).order('created_at', { ascending: false }).limit(10));
     if (!rows.length) return;
@@ -2522,6 +2522,15 @@ async function viewExamHub() {
 // Yüklemenin listede görünen adı.
 const subLabel = (s) => s.exams?.name || (s.books?.title && `📚 ${s.books.title}`)
   || { kitap: 'Kitap sayfaları', soru: 'Gönderilen sorular', okuma: 'Okuduğum kitap' }[s.kind] || 'Yükleme';
+// Yüklemenin ne zaman gönderildiği, işlendiyse ne zaman işlendiği (velinin isteği, 2026-11-20: "ne zaman upload edildi onu
+// da yazabiliriz"). Gönderilme zamanı olmayan eski kayıtta oluşturulma zamanı.
+const subWhen = (s) => {
+  const sent = s.submitted_at || s.created_at;
+  if (!sent) return null;
+  const f = (d) => new Date(d).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return h('p', { class: 'small muted sub-when' }, s.status === 'done' && s.processed_at
+    ? `Gönderildi ${f(sent)} · işlendi ${f(s.processed_at)}` : `Gönderildi ${f(sent)}`);
+};
 
 /* Öğrencinin Yükle sekmesi: tek tek soru gönderme (testte yapamadığı ya da beğendiği sorular), ilkokulda okuduğu
    kitabın sayfaları ve kâğıt deneme. Altta gönderdiği soruların çözümleri (görev işledikten sonra) ve son yüklemelerin
@@ -2530,7 +2539,7 @@ async function viewSend() {
   loading();
   const primary = (state.student?.grade || 8) <= 4;
   const [subs, myBooks] = await Promise.all([
-    q(sb.from('submissions').select('id, kind, status, submitted_at, result_note, exams(name), books(title)')
+    q(sb.from('submissions').select('id, kind, status, created_at, submitted_at, processed_at, result_note, exams(name), books(title)')
       .eq('student_id', sid()).neq('status', 'draft').order('created_at', { ascending: false }).limit(8)),
     primary ? q(sb.from('books').select('id, title, exam_date').eq('student_id', sid()).order('created_at', { ascending: false })) : [],
   ]);
@@ -2582,6 +2591,7 @@ async function viewSend() {
       h('p', { class: 'label' }, 'Son yüklemeler'),
       subs.map((s) => h('div', { class: 'stack', style: 'gap: 2px; padding-top: 6px; border-top: 1px solid var(--rule)' },
         h('div', { class: 'spread' }, h('span', {}, subLabel(s)), statusTag(s.status)),
+        subWhen(s),
         s.result_note && s.status !== 'submitted' ? h('p', { class: 'small muted' }, s.result_note) : null))) : null);
 }
 
@@ -4039,7 +4049,7 @@ async function viewShop() {
    kelimeler. Okuldaki İngilizce dersinden ayrıdır. Hiç kart çözmediyse görünmez. */
 function wordBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
-  (async () => {
+  box.ready = (async () => {
     const [progress, answers, list, memory, all, purchases, typed] = await Promise.all([
       q(sb.from('word_progress').select('word, box, wrong_count, stability').eq('student_id', sid())),
       q(sb.from('word_answers').select('word, correct, confidence, mode, answered_at').eq('student_id', sid()).gte('answered_at', addDays(localDate(), -6) + 'T00:00:00')),
@@ -4087,7 +4097,7 @@ function wordBox() {
    tarihini buradan değiştirir; sınav geçince o kitaptan soru gelmez. Hiç kitap yoksa görünmez. */
 function booksBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
-  (async () => {
+  box.ready = (async () => {
     const books = await q(sb.from('books').select('id, title, exam_date').eq('student_id', sid()).order('created_at', { ascending: false }));
     if (!books.length) return;
     const ids = books.map((b) => b.id);
@@ -4990,7 +5000,7 @@ async function viewReport() {
     q(sb.from('items').select('*').eq('student_id', s)),
     q(sb.from('reviews').select('id, item_id, question_id, track, answer, correct, understood, needs_help, together_at, duration_sec, confident, confidence, hint_used, answered_at, questions(subject, topic_id)')
       .eq('student_id', s).eq('voided', false).gte('answered_at', addDays(localDate(), -30))),
-    q(sb.from('submissions').select('id, kind, status, submitted_at, processed_at, result_note, exams(name), books(title)').or(`student_id.eq.${s},student_id.is.null`).neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
+    q(sb.from('submissions').select('id, kind, status, created_at, submitted_at, processed_at, result_note, exams(name), books(title)').or(`student_id.eq.${s},student_id.is.null`).neq('status', 'draft').order('created_at', { ascending: false }).limit(6)),
     q(sb.from('job_runs').select('*').order('started_at', { ascending: false }).limit(1)),
   ]);
   const [feedbackRows, togetherRows] = await Promise.all([
@@ -5322,6 +5332,7 @@ async function viewReport() {
     h('h2', {}, 'Yüklemeler'),
     subs.length ? subs.map((s) => h('div', { class: 'stack', style: 'gap: 4px' },
       h('div', { class: 'spread' }, h('span', {}, subLabel(s)), statusTag(s.status)),
+      subWhen(s),
       s.result_note ? h('p', { class: 'small muted' }, s.result_note) : null)) : h('p', { class: 'muted' }, 'Henüz yükleme yok.'),
     feedbackRows.length ? h('p', { class: 'small muted' },
       `Soru bildirimi: ${feedbackRows.length}. Kontrol edilen ${feedbackRows.filter((f) => f.status === 'checked').length}, ` +
@@ -5336,12 +5347,17 @@ async function viewReport() {
     ['gun', 'Gün gün çalışma', () => [dayReport(reviews30, items, topicName)]],
     togetherRows.length ? ['birlikte', `Birlikte bakılacaklar (${togetherRows.length})`, () => [togetherBox(togetherRows)]] : null,
     state.profile.role === 'parent' ? ['mesaj', 'Mesaj', () => [messageBox()]] : null,
-    ['bildirdikleri', 'Bildirdiği sorular', () => [reportedBox(), poemBox()]],
+    ['bildirdikleri', 'Bildirdiği sorular', () => emptyNote([reportedBox(), poemBox()],
+      'Henüz "Soruda sorun var" dediği bir soru ya da tamamladığı bir şiir yok.')],
     ['denemeler', 'Denemeler', () => [tiles, h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable), subjects, styles, misconceptions]],
     ['zayif', 'Zayıf konular', () => [gapCards, weakCards, causes, pastNoteCards]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
     ['son14', 'Son 14 gün', () => [perf, load]],
     ['yuklemeler', 'Yüklemeler', () => [job]],
-    ['diger', 'Kelime · Klavye · Kitap', () => [wordBox(), typingBox(), booksBox()]],
+    ['diger', 'Kelime · Klavye · Kitap', () => emptyNote([wordBox(), typingBox(), booksBox()],
+      'Henüz kelime kartı, klavye dersi ya da okuduğu kitap yok.',
+      state.profile.role !== 'parent' ? null : /^us/.test(studentCurriculum(state.student))
+        ? 'Klavye dersleri Ayarlar\'daki Günlük plan\'dan açılır.'
+        : 'Kelime kartları ve klavye dersleri Ayarlar\'daki Günlük plan\'dan açılır.')],
   ].filter(Boolean));
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
@@ -5352,6 +5368,14 @@ async function viewReport() {
     // bölümleri hemen sekmelerin altında; aralarında başka kart yok.
     tabs.bar,
     tabs.body);
+}
+// Bölümleri verisi gelince görünen (yoksa gizli kalan) sekmede hepsi gizli kalırsa kısa bir açıklama (velinin isteği,
+// 2026-11-20: Kelime · Klavye · Kitap sekmesi "burası boş"). Bölümler box.ready ile verisinin geldiğini bildirir.
+function emptyNote(boxes, ...lines) {
+  const note = h('div', { class: 'card flat stack empty-note', style: 'gap: 4px', hidden: true },
+    lines.filter(Boolean).map((l) => h('p', { class: 'muted small' }, l)));
+  Promise.all(boxes.map((b) => b.ready)).then(() => { note.hidden = boxes.some((b) => !b.hidden); });
+  return [...boxes, note];
 }
 // Rapor sekmeleri: [kimlik, başlık, bölümleri üreten işlev]. Bölümler ilk açılışta üretilir (hepsi bir kez), yalnızca seçili
 // sekmeninki görünür. Seçim localStorage'da (defter.reportTab) durur; o sekme artık yoksa (ör. birlikte bakılacak soru

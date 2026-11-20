@@ -536,7 +536,8 @@ Her maddenin yanında nasıl denendiği yazar:
   - Yapamadığı soru hata tekrarına girer; beğendiğinin benzerleri yazılır.
   - Çözümler "Gönderdiğin sorular" altında görünür.
 - **Kâğıt deneme**: kitapçık sayfaları, varsa optik form, "süre yetti mi?". Cevap anahtarı istenmez.
-- Son yüklemelerin durumu.
+- Son yüklemelerin durumu; her yüklemenin altında ne zaman gönderildiği ("Gönderildi 20 Kas 14:05"), işlendiyse ne zaman
+  işlendiği ("· işlendi 20 Kas 15:02") (velinin isteği, 2026-11-20). [A]
 - Gönder çubuğu hep ekranda, alt menünün üstünde durur; aşağı kaydırmak gerekmez. Düğmede fotoğraf sayısı yazar
   ("Gönder (3 fotoğraf)"), altında neyin eksik olduğu (velinin isteği, 2026-11-09: çocuklar aşağıdaki düğmeyi görmeyip
   başka düğmelere basıyor, fotoğraflar siliniyordu). Soru gönder, kâğıt deneme, okuduğum kitap ve velinin kitap sayfası
@@ -572,6 +573,9 @@ Her maddenin yanında nasıl denendiği yazar:
   soru varsa "Birlikte bakılacaklar (N)" sekmesinde (sarı çerçeveli). Sekme sırası: Gün gün çalışma · Birlikte
   bakılacaklar · Mesaj · Bildirdiği sorular · Denemeler · Zayıf konular · Son 14 gün · Yüklemeler · Kelime, Klavye, Kitap.
   Açılışta Gün gün çalışma (ya da en son seçilen sekme; o sekme artık yoksa Gün gün çalışma). [A]
+  Hiçbir sekme boş kalmaz (velinin isteği, 2026-11-20: "burası boş"): Kelime · Klavye · Kitap'ta kelime kartı, klavye dersi
+  ve kitap yoksa "Henüz kelime kartı, klavye dersi ya da okuduğu kitap yok." ve velide nereden açıldığı (ABD'de yalnızca
+  klavye); Bildirdiği sorular'da bildirim ve şiir yoksa "Henüz … yok." [A]
   - Deneme kutusu (velinin isteği, 2026-11-10; dört özet kutusunun yerine): en son deneme açık gelir, açılır listeden öbür
     denemelere geçilir. Net, toplam doğru/yanlış/boş ve derse göre tablo; yanlış ya da boş sayısına dokununca o dersin o
     denemedeki soruları açılır (soru, cevabı ve doğrusu, çözüm, "Benzer sorularla dene"), yeniden dokununca kapanır.
@@ -582,6 +586,8 @@ Her maddenin yanında nasıl denendiği yazar:
   Kitap. Seçilen sekme bu tarayıcıda hatırlanır. Hiçbir bölüm kaldırılmadı, yalnızca sekmelere taşındı. [A]
   Sekme düğmeleri başlığın hemen altında (velinin isteği, 2026-11-16: "en üste getir"), seçili sekmenin bölümleri hemen
   altlarında; sayfa aşağı kaymışken sekmeye dokununca sekmeler yeniden görünür. [A]
+- Yüklemeler sekmesi: son altı yükleme, durumu ve görevin notu; her birinin altında ne zaman gönderildiği, işlendiyse ne
+  zaman işlendiği ("Gönderildi 20 Kas 14:05 · işlendi 20 Kas 15:02"; velinin isteği, 2026-11-20). [A]
 - Özet kutuları.
 - "… mesaj bırak":
   - tatlı söz ya da şaka önerisi, imza;

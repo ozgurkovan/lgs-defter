@@ -1383,7 +1383,7 @@ function gameOver(game) {
 // Rapordaki klavye dersleri özeti: bitirdiği dersler, yıldızlar, son ders, bugün, zorlandığı tuşlar. Hiç ders yoksa görünmez.
 function typingBox() {
   const box = h('section', { class: 'card stack', style: 'gap: 8px', hidden: true });
-  (async () => {
+  box.ready = (async () => {
     // Kelime roketinin sonuçları (ders adı 'oyun') ve rekor sıfırlama satırı ('oyun-sifir') ders değildir; burada sayılmaz.
     const rows = (await q(sb.from('typing_results').select('lesson, chars, errors, seconds, stars, misses, created_at').eq('student_id', sid())
       .order('created_at', { ascending: false }).limit(500))).filter((r) => r.lesson !== 'oyun' && r.lesson !== 'oyun-sifir');
