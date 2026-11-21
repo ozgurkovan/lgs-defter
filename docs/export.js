@@ -30,6 +30,34 @@ function missMap(rows, order = []) {
     .sort((a, b) => rank(a.subject) - rank(b.subject) || b.n - a.n);
 }
 
+// Konunun anahtarı (ders + konu): konusu belirsiz sorular dersin "?" konusunda toplanır.
+const missTopicKey = (subject, topicId) => `${subject}|${topicId || '?'}`;
+// Kâğıttaki sıra: ders ders, ders içinde en çok sorusu olan konudan başlayarak; konu içinde önce hâlâ zorlandıkları, sonra
+// henüz sınanmayanlar, kısmen oturanlar, en sonda sonradan anladıkları (eşitlerde liste sırası: en yeni üstte).
+// → [{ key, subject, name, rows }]
+function missGroups(list, order = []) {
+  const out = [];
+  for (const g of missMap(list, order)) for (const t of g.topics) {
+    const key = missTopicKey(g.subject, t.id);
+    const rank = (x) => { const i = VERDICT_ORDER.indexOf(x.verdict); return i < 0 ? 1 : i; };
+    out.push({ key, subject: g.subject, name: t.name, rows: list.filter((x) => missTopicKey(x.subject, x.topicId) === key)
+      .map((x, i) => [x, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([x]) => x) });
+  }
+  return out;
+}
+/* Sonradan anladı mı (velinin isteği, 2026-11-21: "yapamadıklarının içinde daha sonra anlayıp yaptıkları var mı? hangileri
+   daha çok soru işareti, onları alabilsek"): raporun Gün gün çalışmasındaki kural. later: o sorudan sonra aynı konudan
+   verdiği cevaplar [{ correct, confidence }]. Tahminle ya da kararsız (%50 ve altı) doğru sayılmaz; "anlamadım" ya da
+   "birlikte bakalım" dediyse tek doğru yetmez. → 'zor' (sonrakilerin hiçbiri sağlam değil), 'belirsiz' (o konudan henüz
+   yeni soru çözmedi), 'kismen', 'anladi'. İlk üçü "hâlâ soru işareti"dir. */
+const VERDICT_ORDER = ['zor', 'belirsiz', 'kismen', 'anladi'];
+function missVerdict(saidNo, later) {
+  const n = (later || []).length;
+  const ok = (later || []).filter((r) => r.correct && !(r.confidence && r.confidence <= 50)).length;
+  const key = !n ? 'belirsiz' : ok === n && !(saidNo && ok < 2) ? 'anladi' : ok ? 'kismen' : 'zor';
+  return { key, n, ok };
+}
+const missOpen = (x) => x.verdict !== 'anladi';
 // Tekrar cevabının türü: boş geçtiyse 'bos', yanlışsa 'yanlis', tahminle (%25) doğruysa 'tahmin'; düz doğru null.
 const reviewMissKind = (r) => (r.needs_help ? 'bos' : !r.correct ? 'yanlis' : r.confidence === 25 ? 'tahmin' : null);
 
@@ -158,12 +186,20 @@ function exportButton(preset, label) {
 
 const MISS_COLOR = { yanlis: 'var(--red)', bos: 'var(--amber)', tahmin: 'var(--accent)' };
 const MISS_LABEL = { yanlis: 'Yanlış', bos: 'Boş', tahmin: 'Tahminle doğru' };
+const VERDICT_LABEL = { zor: 'Hâlâ zorlanıyor', belirsiz: 'Henüz sınanmadı', kismen: 'Kısmen oturdu', anladi: 'Sonradan anlamış görünüyor' };
+const VERDICT_COLOR = { zor: 'red', belirsiz: 'amber', kismen: 'amber', anladi: 'green' };
 const MISS_TOPICS_MAX = 8; // ekranda ders başına en çok bu kadar konu; kalanı tek satırda toplanır (kâğıtta hepsi)
 
 /* Derse ve konuya göre yanlış grafiği: her ders için toplam çubuğu, altında konuları (çoktan aza). Çubuk yanlış, boş ve
    tahminle doğru diye üç renge bölünür; uzunluk en çok yanlışı olan konuya göredir. */
-function missChart(groups, note, all) {
+function missChart(groups, note, onPick) {
   const total = groups.reduce((n, g) => n + g.n, 0);
+  // onPick verilirse konu satırı düğmedir: dokununca yalnızca o konu seçilir (çıktı sayfası).
+  const topicRow = (g, t) => {
+    const kids = [h('span', {}, t.name || 'Konusu belirsiz'), track(t, maxTopic), h('span', { class: 'num' }, t.n)];
+    return onPick ? h('button', { class: 'miss-row miss-pick', 'data-topic': missTopicKey(g.subject, t.id), 'aria-label': `${t.name || 'Konusu belirsiz'}: yalnızca bu konu`,
+      onclick: () => onPick(missTopicKey(g.subject, t.id)) }, kids) : h('div', { class: 'miss-row' }, kids);
+  };
   const maxTopic = Math.max(1, ...groups.flatMap((g) => g.topics.map((t) => t.n)));
   const maxSubj = Math.max(1, ...groups.map((g) => g.n));
   const track = (x, max) => h('span', { class: 'miss-track' }, EXPORT_KINDS.map((k) =>
@@ -175,13 +211,12 @@ function missChart(groups, note, all) {
     !total ? h('p', { class: 'muted small' }, 'Bu seçimde yanlış, boş ya da tahmin edilen soru yok.') : [
       h('div', { class: 'legend' }, used.map((k) => h('span', { style: `--c: ${MISS_COLOR[k]}` }, MISS_LABEL[k]))),
       groups.map((g) => {
-        const shown = all ? g.topics : g.topics.slice(0, MISS_TOPICS_MAX);
+        const shown = onPick ? g.topics : g.topics.slice(0, MISS_TOPICS_MAX); // çıktı sayfasında her konu seçilebilsin diye hepsi
         const rest = g.topics.slice(shown.length);
         return h('div', { class: 'stack miss-subject', style: 'gap: 4px', 'data-subject': g.subject },
           h('div', { class: 'miss-row miss-head' },
             h('b', {}, SUBJECTS[g.subject]?.name || g.subject), track(g, maxSubj), h('b', { class: 'num' }, g.n)),
-          shown.map((t) => h('div', { class: 'miss-row' },
-            h('span', {}, t.name || 'Konusu belirsiz'), track(t, maxTopic), h('span', { class: 'num' }, t.n))),
+          shown.map((t) => topicRow(g, t)),
           rest.length ? h('p', { class: 'small muted' }, `ve ${rest.length} konu daha: ${rest.reduce((n, t) => n + t.n, 0)} soru`) : null);
       })]);
 }
@@ -203,13 +238,24 @@ function reportMissChart(reviews30, eqs, topicName) {
 async function loadExportRows(days) {
   const s = sid();
   const from = addDays(localDate(), -days);
-  const [revs, exs] = await Promise.all([
+  const [revs, exs, allRevs] = await Promise.all([
     q(sb.from('reviews').select('id, question_id, answer, correct, needs_help, understood, confidence, track, answered_at, together_at, questions(subject, topic_id, stem, choices, answer, solution, image_path, topics(name))')
       .eq('student_id', s).eq('voided', false).gte('answered_at', from)
       .or('correct.eq.false,needs_help.eq.true,confidence.eq.25').order('answered_at', { ascending: false })),
     q(sb.from('exam_questions').select('id, q_no, subject, topic_id, outcome, student_answer, correct_answer, image_path, solution, question_id, created_at, exams(name, exam_date), topics(name), questions!exam_questions_question_id_fkey(stem, choices, image_path)')
       .eq('student_id', s).neq('outcome', 'dogru').order('created_at', { ascending: false })),
+    // Dönemin bütün cevapları (yalnızca konu ve sonuç): "sonradan anladı mı" bunlardan çıkar.
+    q(sb.from('reviews').select('question_id, correct, confidence, track, answered_at, questions(topic_id)')
+      .eq('student_id', s).eq('voided', false).gte('answered_at', from)),
   ]);
+  const byTopic = {};
+  for (const r of allRevs) { const id = r.questions?.topic_id; if (id) (byTopic[id] ||= []).push(r); }
+  // at: sorunun kaçırıldığı an. Denemede cevaplar deneme bitince topluca yazılır; aynı denemenin öteki soruları "sonra"
+  // sayılmasın diye deneme kaydından 10 dakika sonrası alınır.
+  const judge = (topicId, at, saidNo, qid) => {
+    const v = missVerdict(saidNo, (byTopic[topicId] || []).filter((r) => r.answered_at > at && r.question_id !== qid));
+    return { verdict: v.key, after: v.n ? `Sonra bu konudan ${v.n} soru çözdü: ${v.ok} sağlam doğru.` : topicId ? 'Bu konudan henüz yeni soru çözmedi.' : '' };
+  };
   const trackName = { mistake: 'Hata tekrarı', topic: 'Konu tekrarı', extra: 'Ek çalışma', practice: 'Konu çalışması', deneme: 'Deneme', book: 'Kitap soruları', check: 'Veli/öğretmen denemesi' };
   const out = [];
   const seen = new Set();
@@ -223,6 +269,7 @@ async function loadExportRows(days) {
       source: `${e.exams?.name || 'Deneme'} · ${e.q_no}. soru`, stem: qn.stem || '', choices: qn.choices || null,
       chosen: e.student_answer || null, answer: e.correct_answer || null, solution: e.solution || '',
       img: e.image_path ? ['photos', e.image_path] : qn.image_path ? ['questions', qn.image_path] : null, together: false,
+      ...judge(e.topic_id, new Date(new Date(e.created_at).getTime() + 10 * 60000).toISOString(), false, e.question_id),
     });
   }
   for (const r of revs) {
@@ -236,6 +283,7 @@ async function loadExportRows(days) {
       chosen: r.answer || null, answer: qn.answer || null, solution: qn.solution || '',
       img: qn.image_path ? ['questions', qn.image_path] : null,
       together: !r.together_at && (!!r.needs_help || r.understood === false || r.confidence === 25),
+      ...judge(qn.topic_id, r.answered_at, !!r.needs_help || r.understood === false, r.question_id),
     });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
@@ -245,10 +293,10 @@ async function loadExportRows(days) {
 function exportWorkbook(list, withKey) {
   const T = (s) => (typeof t === 'function' ? t(s) : s);
   const keys = ['A', 'B', 'C', 'D'];
-  const head = ['No', 'Tarih', 'Ders', 'Konu', 'Nereden', 'Durum', 'Soru', ...keys, 'İşaretlediği',
+  const head = ['No', 'Tarih', 'Ders', 'Konu', 'Nereden', 'Durum', 'Sonra', 'Soru', ...keys, 'İşaretlediği',
     ...(withKey ? ['Doğru cevap', 'Çözüm'] : []), 'Öğretmenin notu'].map(T);
-  const rows = list.map((x, i) => [
-    i + 1, fmtDate(x.date), T(SUBJECTS[x.subject]?.name || x.subject), x.topic, T(x.source), T(MISS_LABEL[x.kind]),
+  const rows = missGroups(list, visibleSubjects()).flatMap((g) => g.rows).map((x, i) => [ // kâğıttaki sırayla: konu konu
+    i + 1, fmtDate(x.date), T(SUBJECTS[x.subject]?.name || x.subject), x.topic, T(x.source), T(MISS_LABEL[x.kind]), [T(VERDICT_LABEL[x.verdict] || ''), T(x.after || '')].filter(Boolean).join('\n'),
     [x.stem, x.img ? T('(Görselli soru: görsel çıktıda ve uygulamada)') : ''].filter(Boolean).join('\n'),
     ...keys.map((k) => x.choices?.[k] ?? ''), x.chosen || T('Boş'),
     ...(withKey ? [x.answer || '', x.solution || ''] : []), '']);
@@ -259,7 +307,7 @@ function exportWorkbook(list, withKey) {
     for (const tp of g.topics) sum.push([name, tp.name || T('Konusu belirsiz'), tp.yanlis, tp.bos, tp.tahmin, tp.n]);
   }
   return xlsxBook([
-    { name: T('Sorular'), rows: [head, ...rows], widths: [5, 12, 16, 30, 26, 14, 70, 24, 24, 24, 24, 12, ...(withKey ? [12, 70] : []), 30] },
+    { name: T('Sorular'), rows: [head, ...rows], widths: [5, 12, 16, 30, 26, 14, 30, 70, 24, 24, 24, 24, 12, ...(withKey ? [12, 70] : []), 30] },
     { name: T('Konu özeti'), rows: sum, widths: [18, 44, 10, 10, 16, 10] },
   ]);
 }
@@ -274,19 +322,26 @@ function saveFile(bytes, name, type) {
 async function viewExport() {
   const preset = exportPreset;
   exportPreset = null;
-  const filter = { days: 30, kind: preset === 'together' ? 'together' : 'all', subject: 'all' };
+  // Açılışta yalnızca hâlâ soru işareti olanlar; hiç yoksa bütün yanlışlara düşer (velinin isteği: "eğer yoksa o zaman yanlış
+  // yaptıkları olabilir"). Veli süzmeyi kendi seçtikten sonra kendiliğinden değişmez.
+  const filter = { days: 30, kind: preset === 'together' ? 'together' : 'open', subject: 'all', topic: 'all' };
+  let autoKind = preset !== 'together';
+  const kindOk = (x) => (filter.kind === 'all' ? true : filter.kind === 'together' ? x.together : missOpen(x));
   let withKey = false;
+  let withChart = true;
   const cache = {};
   const subjects = visibleSubjects();
   const name = state.student?.display_name || '';
   const sheet = h('div', { class: 'stack print-sheet' });
   const count = h('p', { class: 'small muted no-print', 'aria-live': 'polite' });
+  const note = h('p', { class: 'small muted no-print export-fallback', hidden: true }, 'Hâlâ soru işareti olan soru yok: sonradan hepsini anlamış görünüyor. Bütün yanlış ve boşlar gösteriliyor.');
   let current = [];
   let images = [];
 
   const chipGroup = (key, options) => {
     const btns = options.map(([v, label]) => h('button', { class: 'chip', 'aria-pressed': String(filter[key] === v), 'data-v': String(v), onclick: () => {
       filter[key] = v;
+      if (key === 'kind') autoKind = false;
       btns.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i][0] === v)));
       draw();
     } }, label));
@@ -307,11 +362,16 @@ async function viewExport() {
     } catch (e) { console.error(e); toast('Excel dosyası hazırlanamadı, tekrar dene.'); }
   } }, '📊 Excel\'e aktar');
   const keyBox = h('input', { type: 'checkbox', id: 'export-key', onchange: (e) => { withKey = e.target.checked; draw(); } });
+  const chartBox = h('input', { type: 'checkbox', id: 'export-chart', checked: true, onchange: (e) => { withChart = e.target.checked; draw(); } });
+  // Konu konu yazdırma (velinin isteği, 2026-11-21: "hepsi değil de konu konu yazdırsak? çok fazla çıktı"): konu buradan ya da
+  // grafikteki konu satırına dokunarak seçilir; kâğıda ve Excel'e yalnızca o konunun soruları girer.
+  const topicSel = h('select', { id: 'export-topic', 'aria-label': 'Hangi konu', onchange: (e) => { filter.topic = e.target.value; draw(); } });
 
   const questionCard = (x, i) => h('article', { class: 'card stack print-q', style: 'gap: 6px' },
     h('div', { class: 'spread' },
       h('div', { class: 'row' }, h('b', { class: 'num' }, `${i + 1}.`), subjTag(x.subject), h('span', { class: 'small muted' }, x.topic || '')),
-      h('span', { class: 'tag ' + (x.kind === 'yanlis' ? 'red' : 'amber') }, MISS_LABEL[x.kind])),
+      h('span', { class: 'row', style: 'gap: 4px' }, h('span', { class: 'tag ' + (x.kind === 'yanlis' ? 'red' : 'amber') }, MISS_LABEL[x.kind]),
+        VERDICT_LABEL[x.verdict] ? h('span', { class: 'tag miss-verdict ' + VERDICT_COLOR[x.verdict], 'data-verdict': x.verdict }, VERDICT_LABEL[x.verdict]) : null)),
     x.img ? (() => {
       const img = h('img', { class: 'qimg', alt: 'Soru görseli' });
       images.push(signedUrl(...x.img).then((u) => (u ? new Promise((res) => { img.onload = img.onerror = res; img.src = u; }) : null)));
@@ -324,6 +384,7 @@ async function viewExport() {
     h('p', { class: 'small muted' }, [x.source, fmtDate(x.date),
       !x.choices && x.chosen ? `işaretlediği ${x.chosen}` : null, !x.chosen ? 'boş bıraktı' : null,
       withKey && x.answer ? `doğru cevap ${x.answer}` : null].filter(Boolean).join(' · ')),
+    x.after ? h('p', { class: 'small muted' }, x.after) : null,
     withKey && x.solution ? h('div', { class: 'note small' }, h('b', {}, 'Çözüm: '), x.solution) : null);
 
   async function draw() {
@@ -333,20 +394,46 @@ async function viewExport() {
       try { cache[filter.days] = await loadExportRows(filter.days); }
       catch (e) { console.error(e); return fill(sheet, h('div', { class: 'card' }, h('p', { class: 'error' }, 'Sorular yüklenemedi, tekrar dene.'))); }
     }
-    current = cache[filter.days].filter((x) => subjects.includes(x.subject)
-      && (filter.subject === 'all' || x.subject === filter.subject) && (filter.kind === 'all' || x.together));
+    const inSubject = cache[filter.days].filter((x) => subjects.includes(x.subject) && (filter.subject === 'all' || x.subject === filter.subject));
+    let fellBack = false;
+    if (autoKind && filter.kind === 'open' && inSubject.length && !inSubject.some(missOpen)) {
+      filter.kind = 'all'; fellBack = true;
+      document.querySelectorAll('#app [data-filter="kind"] .chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === 'all')));
+    }
+    const base = inSubject.filter(kindOk);
+    const topics = missGroups(base, subjects);
+    if (!topics.some((g) => g.key === filter.topic)) filter.topic = 'all'; // dönem ya da ders değişince o konu kalmadıysa
+    fill(topicSel, h('option', { value: 'all' }, `Bütün konular (${base.length} soru)`),
+      subjects.filter((s) => topics.some((g) => g.subject === s)).map((s) => h('optgroup', { label: t(SUBJECTS[s]?.name || s) },
+        topics.filter((g) => g.subject === s).map((g) => h('option', { value: g.key }, `${g.name || 'Konusu belirsiz'} (${g.rows.length})`)))));
+    topicSel.value = filter.topic;
+    topicSel.disabled = !base.length;
+    current = filter.topic === 'all' ? base : topics.find((g) => g.key === filter.topic).rows;
     images = [];
     const shown = current.slice(0, EXPORT_PRINT_MAX);
     printBtn.disabled = excelBtn.disabled = !current.length;
     count.textContent = current.length > shown.length
       ? `${current.length} soru. Kâğıda en yeni ${shown.length} soru çıkar; Excel'de hepsi var.` : `${current.length} soru`;
+    note.hidden = !fellBack;
     const period = `${fmtDate(addDays(localDate(), -filter.days))} – ${fmtDate(localDate())}`;
     fill(sheet,
       h('header', { class: 'print-only stack', style: 'gap: 2px' },
         h('h1', {}, name ? `${name} · ${state.student.grade}. sınıf` : 'Sorular'),
         h('p', { class: 'small' }, `Yanlış, boş ve tahmin edilen sorular · ${period}`)),
-      missChart(missMap(current, subjects), `${period} · ${current.length} soru`, true),
-      shown.map(questionCard),
+      (() => {
+        const chart = missChart(missMap(current, subjects),
+          `${period} · ${current.length} soru` + (filter.topic === 'all' && current.length ? '. Bir konuya dokununca yalnızca o konunun soruları kalır.' : ''),
+          filter.topic === 'all' ? (key) => { filter.topic = key; draw(); } : null);
+        if (!withChart) chart.classList.add('no-print');
+        return chart;
+      })(),
+      // Sorular konu konu: her konunun başlığı, altında soruları (numaralar baştan sona sürer).
+      h('div', { class: 'print-questions' }, (() => {
+        let no = 0;
+        return missGroups(shown, subjects).map((g) => [
+          h('h3', { class: 'print-topic' }, `${SUBJECTS[g.subject]?.name || g.subject} · ${g.name || 'Konusu belirsiz'} · ${g.rows.length} soru`),
+          g.rows.map((x) => questionCard(x, no++))]);
+      })()),
       !current.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted small' }, 'Bu seçimde soru yok.')) : null);
   }
 
@@ -355,15 +442,17 @@ async function viewExport() {
       h('p', { class: 'label' }, 'Yazdır · Excel'),
       h('h1', {}, 'Öğretmene sorulacak sorular'),
       h('p', { class: 'muted' }, isParentView()
-        ? 'Yanlış yaptığı, boş bıraktığı ve tahmin ettiği sorular. Yazdırıp okula götürebilir ya da Excel dosyası olarak öğretmenine gönderebilirsiniz.'
-        : 'Yanlış yaptığın, boş bıraktığın ve tahmin ettiğin sorular. Yazdırıp okula götürebilir, öğretmenine sorabilirsin.')),
+        ? 'Yanlış yaptığı, boş bıraktığı ve tahmin ettiği sorular. Önce hâlâ soru işareti olanlar gelir: o konudan sonra çözdüğü sorularda henüz oturmamış olanlar. Yazdırıp okula götürebilir ya da Excel dosyası olarak öğretmenine gönderebilirsiniz.'
+        : 'Yanlış yaptığın, boş bıraktığın ve tahmin ettiğin sorular. Önce hâlâ soru işareti olanlar gelir. Yazdırıp okula götürebilir, öğretmenine sorabilirsin.')),
     h('section', { class: 'stack no-print export-controls', style: 'gap: 8px' },
       chipGroup('days', [[7, 'Son 7 gün'], [30, 'Son 30 gün'], [90, 'Son 90 gün']]),
-      chipGroup('kind', [['all', 'Bütün yanlış ve boşlar'], ['together', 'Yalnızca birlikte bakılacaklar']]),
+      chipGroup('kind', [['open', 'Hâlâ soru işareti olanlar'], ['all', 'Bütün yanlış ve boşlar'], ['together', 'Yalnızca birlikte bakılacaklar']]),
       subjects.length > 1 ? chipGroup('subject', [['all', 'Bütün dersler'], ...subjects.map((x) => [x, SUBJECTS[x].name])]) : null,
+      topicSel,
       h('label', { class: 'row small', for: 'export-key' }, keyBox, h('span', {}, 'Doğru cevapları ve çözümleri de ekle')),
+      h('label', { class: 'row small', for: 'export-chart' }, chartBox, h('span', {}, 'Konu grafiğini de yazdır')),
       h('div', { class: 'row export-actions' }, printBtn, excelBtn),
-      count),
+      count, note),
     sheet);
   await draw();
 }

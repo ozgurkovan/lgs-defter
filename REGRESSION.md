@@ -669,13 +669,29 @@ Her maddenin yanında nasıl denendiği yazar:
   öğrencide Konular'ın başından ve Birlikte bakılacaklar'dan; velide ve öğretmende Sorular'ın başından, Birlikte bakılacaklar
   kutusundan ve sayfasından, Zayıf konular'daki grafiğin altından. [A]
   - Sorular: seçilen dönemde (son 7 / 30 / 90 gün, açılışta 30) yanlış yaptığı, boş bıraktığı ve tahminle doğru yaptığı
-    sorular; tekrarlar ve denemeler birlikte, en yeni üstte, aynı soru bir kez. Süzme: "Bütün yanlış ve boşlar" ya da
+    sorular; tekrarlar ve denemeler birlikte, en yeni üstte, aynı soru bir kez. Süzme: "Hâlâ soru işareti olanlar" (aşağıda), "Bütün yanlış ve boşlar" ya da
     "Yalnızca birlikte bakılacaklar" (Birlikte bakılacaklar'dan gelince bu seçili), ders. Üstte aynı konu grafiği (bütün
     konularıyla). Her soruda dersi, konusu, görseli, metni, şıkları, işaretlediği şık, nereden geldiği ve tarihi. "Doğru
     cevapları ve çözümleri de ekle" işaretlenirse doğru şık ve çözüm de görünür (açılışta kapalı). [A]
+  - **Hâlâ soru işareti olanlar** (velinin isteği, 2026-11-21: "yapamadıklarının içinde daha sonra anlayıp yaptıkları var mı?
+    hangileri daha çok soru işareti, onları alabilsek; yoksa yanlış yaptıkları"): her soruda "sonradan anladı mı" etiketi,
+    raporun Gün gün çalışmasındaki kuralla (o sorudan sonra aynı konudan çözdükleri; tahminle ya da kararsız doğru sayılmaz;
+    "anlamadım" ya da "birlikte bakalım" dediyse iki sağlam doğru gerekir): Hâlâ zorlanıyor, Henüz sınanmadı, Kısmen oturdu,
+    Sonradan anlamış görünüyor; altında "Sonra bu konudan N soru çözdü: M sağlam doğru". Sayfa "Hâlâ soru işareti olanlar"
+    seçili açılır (ilk üçü; sonradan anladıkları çıkmaz); hiç yoksa "Bütün yanlış ve boşlar"a düşer ve bunu yazar. Veli
+    süzmeyi kendi seçince kendiliğinden değişmez. Konu içinde sıra: zorlandıkları, sınanmayanlar, kısmen oturanlar, anladıkları.
+    Excel'de "Sonra" sütunu. Denemede aynı denemenin öteki soruları "sonra" sayılmaz. [O] kural ve sıra, [A] süzme
+  - **Konu konu** (velinin isteği, 2026-11-21: "hepsi değil de konu konu yazdırsak? çok fazla çıktı"): sorular konu
+    başlıklarının altında durur ("Matematik · Üslü ifadeler · 5 soru"; ders ders, derste en çok sorusu olan konu önce).
+    "Hangi konu" listesinden (derse göre gruplu, yanında soru sayısı) ya da grafikteki konu satırına dokunarak tek konu
+    seçilir: kâğıda ve Excel'e yalnızca o konunun soruları girer; "Bütün konular" hepsini geri getirir; dönem ya da ders
+    değişince o konu kalmadıysa seçim kendiliğinden kalkar. "Konu grafiğini de yazdır" kutusu kapatılırsa grafik kâğıda
+    girmez (ekranda kalır). [O] sıra, [A] seçim
   - "Yazdır": görseller indikten sonra (en çok 8 sn bekler) tarayıcının yazdırma penceresi; kâğıtta menü, üst çubuk, süzme
     düğmeleri yok, başta öğrencinin adı, sınıfı ve dönem, sorular sayfa ortasında bölünmez, koyu temada da açık renk. Kâğıda
-    en yeni 60 soru çıkar (fazlası sayının yanında yazar). [A] pencerenin açılması, kâğıt [E]
+    en yeni 60 soru çıkar (fazlası sayının yanında yazar). İlk sayfa boş çıkmaz (2026-11-21: grafik bölünemediği için
+    tümüyle ikinci sayfaya geçiyor, ilk sayfada yalnızca başlık kalıyordu); kâğıtta küçük yazı, grafik ve sorular iki sütun
+    (14 soruluk örnek 10 sayfadan 3 sayfaya indi). [A] pencerenin açılması, kâğıt [E] (başsız tarayıcıyla PDF'e basıp bakılır)
   - "Excel'e aktar": gerçek bir .xlsx dosyası iner (`telafio-sorular-<tarih>.xlsx`; ek kütüphane yok). "Sorular" sayfası: No,
     Tarih, Ders, Konu, Nereden, Durum, Soru, A–D, İşaretlediği, (işaretliyse Doğru cevap ve Çözüm), boş "Öğretmenin notu"
     sütunu; bütün sorular (60 sınırı yok); görselli soruda görselin çıktıda olduğu yazar. "Konu özeti" sayfası: derse ve

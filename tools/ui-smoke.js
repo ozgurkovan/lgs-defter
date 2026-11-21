@@ -1204,11 +1204,48 @@
           for (let i = 0; i < 70 && !printed; i++) await wait(150);
         }
       } finally { URL.createObjectURL = realUrl; HTMLAnchorElement.prototype.click = realClick; window.print = realPrint; }
+      // Konu konu (2026-11-21): sorular konu başlıklarının altında; konu listeden ya da grafikteki satırdan seçilince yalnızca
+      // o konunun soruları kalır (sayı listedeki sayıyla aynı, tek başlık); "Bütün konular" hepsini geri getirir.
+      const sel = document.querySelector('#app #export-topic');
+      const countNow = () => +((document.querySelector('#app .export-controls p.small')?.textContent || '').match(/^(\d+) soru/) || [])[1];
+      const pickTopic = async (v) => { sel.value = v; sel.dispatchEvent(new Event('change')); await wait(300); };
+      let topicOk = !!sel && (!n || document.querySelectorAll('#app .print-topic').length >= 1);
+      let topicNote = '';
+      if (topicOk && n && sel.options.length > 1) {
+        const opt = sel.options[1];
+        const want = +(opt.textContent.match(/\((\d+)\)$/) || [])[1];
+        await pickTopic(opt.value);
+        const one = countNow() === want && document.querySelectorAll('#app .print-topic').length === 1
+          && document.querySelectorAll('#app .print-q').length === Math.min(want, 60) && !document.querySelector('#app .miss-pick');
+        await pickTopic('all');
+        const row = document.querySelector('#app .print-sheet .miss-pick');
+        const key = row?.dataset.topic;
+        row?.click(); await wait(300);
+        const byChart = !!key && sel.value === key && document.querySelectorAll('#app .print-topic').length === 1;
+        await pickTopic('all');
+        topicOk = one && byChart && countNow() === n;
+        topicNote = `; konu seçimi: ${opt.textContent}${one ? '' : ' (liste seçimi tutmadı)'}${byChart ? '' : ' (grafikten seçim tutmadı)'}`;
+      }
+      // Hâlâ soru işareti olanlar (2026-11-21): açılışta bu seçili (hiç yoksa bütün yanlışlara düşer ve bunu söyler); her soruda
+      // "sonradan anladı mı" etiketi; bu seçimde sonradan anladığı soru yok, "Bütün yanlış ve boşlar"da sayı azalmaz.
+      const kindChip = (v) => document.querySelector(`#app [data-filter="kind"] .chip[data-v="${v}"]`);
+      const pressed = ['open', 'all', 'together'].find((v) => kindChip(v)?.getAttribute('aria-pressed') === 'true');
+      const fell = document.querySelector('#app .export-fallback')?.hidden === false;
+      const tags = [...document.querySelectorAll('#app .print-q .miss-verdict')].map((x) => x.dataset.verdict);
+      kindChip('all')?.click(); await wait(300);
+      const nAll = countNow();
+      const tagsAll = document.querySelectorAll('#app .print-q .miss-verdict').length === document.querySelectorAll('#app .print-q').length;
+      kindChip('open')?.click(); await wait(300);
+      const nOpen = countNow();
+      const openOk = !!kindChip('open') && tagsAll && nOpen <= nAll && ![...document.querySelectorAll('#app .print-q .miss-verdict')].some((x) => x.dataset.verdict === 'anladi')
+        && (pressed === 'open' ? !fell && n === nOpen && !tags.includes('anladi') : pressed === 'all' && fell && nOpen === 0 && n === nAll);
+      topicOk = topicOk && openOk;
+      topicNote += `; soru işareti ${nOpen} / hepsi ${nAll}${openOk ? '' : ' (süzme tutmadı)'}`;
       const filled = !n ? pageText().includes('bu seçimde soru yok') && document.querySelector('#app .export-excel').disabled
         : rowsIn === n && /^telafio-.*\.xlsx$/.test(name || '') && printed === 1 && document.querySelectorAll('#app .print-sheet .miss-subject').length >= 1;
-      check('Yazdır ve Excel: sayfa açılır, üstte konu grafiği, sorular (kâğıda en çok 60), Excel dosyasında her soru bir satır, Yazdır pencereyi bir kez açar',
-        state.tab === 'cikti' && entry && reportChart && chart && hiddenHead && Number.isFinite(n) && cards === Math.min(n, 60) && filled,
-        `${n} soru, ${cards} kart, Excel ${rowsIn} satır${entry ? '' : '; giriş düğmesi yok'}${reportChart ? '' : '; raporda grafik yok'}${chart ? '' : '; grafik yok'}`);
+      check('Yazdır ve Excel: sayfa açılır, üstte konu grafiği, açılışta hâlâ soru işareti olanlar, sorular konu konu (kâğıda en çok 60), konu seçilince yalnızca o konu, Excel dosyasında her soru bir satır, Yazdır pencereyi bir kez açar',
+        state.tab === 'cikti' && entry && reportChart && chart && hiddenHead && Number.isFinite(n) && cards === Math.min(n, 60) && filled && topicOk,
+        `${n} soru, ${cards} kart, Excel ${rowsIn} satır${entry ? '' : '; giriş düğmesi yok'}${reportChart ? '' : '; raporda grafik yok'}${chart ? '' : '; grafik yok'}${topicNote}`);
     }
     go(root); await settle();
   } finally {

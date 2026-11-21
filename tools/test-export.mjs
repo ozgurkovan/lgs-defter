@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(join(root, 'docs', 'export.js'), 'utf8');
 const pure = src.slice(src.indexOf('/* Çıktı: saf kısım'), src.indexOf('/* Çıktı: ekran */'));
-const T = new Function(pure + '\nreturn { missMap, reviewMissKind, xmlEsc, xlsxCol, xlsxSheet, xlsxSheetName, xlsxBook, zipStore, crc32, EXPORT_PRINT_MAX };')();
+const T = new Function(pure + '\nreturn { missMap, missGroups, missTopicKey, missVerdict, missOpen, reviewMissKind, xmlEsc, xlsxCol, xlsxSheet, xlsxSheetName, xlsxBook, zipStore, crc32, EXPORT_PRINT_MAX };')();
 
 let fails = 0;
 const check = (label, cond, info) => { if (!cond) fails++; console.log(`${cond ? 'OK  ' : 'FAIL'} ${label}${info !== undefined ? '  ' + info : ''}`); };
@@ -32,6 +32,30 @@ check('sayım: yanlış, boş ve tahmin ayrı; dersin toplamı konuların toplam
   && map.every((g) => g.n === g.topics.reduce((n, t) => n + t.n, 0)));
 check('sayım: konusu olmayan soru "?" altında toplanır; sırada olmayan ders sona gider; boş girdi boş liste',
   map[0].topics[0].id === '?' && T.missMap(rows, ['fen']).map((g) => g.subject)[0] === 'fen' && T.missMap(null).length === 0 && T.missMap([]).length === 0);
+const list = [
+  { id: 1, subject: 'fen', topicId: 'f1', topic: 'Basınç', kind: 'yanlis' }, { id: 2, subject: 'matematik', topicId: 'm2', topic: 'Kareköklü', kind: 'bos' },
+  { id: 3, subject: 'matematik', topicId: 'm1', topic: 'Üslü', kind: 'yanlis' }, { id: 4, subject: 'matematik', topicId: null, topic: '', kind: 'yanlis' },
+  { id: 5, subject: 'matematik', topicId: 'm1', topic: 'Üslü', kind: 'tahmin' }];
+const groups = T.missGroups(list, ['matematik', 'fen']);
+check('konu konu sıra: ders ders, derste en çok sorusu olan konu önce (eşitse ada göre), konu içinde liste sırası; her soru tam bir kez; konusuz sorular dersin "?" konusunda',
+  groups.map((g) => g.key).join() === 'matematik|m1,matematik|?,matematik|m2,fen|f1' && groups[0].rows.map((x) => x.id).join() === '3,5'
+  && groups.flatMap((g) => g.rows).length === list.length && T.missTopicKey('fen', null) === 'fen|?' && T.missGroups([], []).length === 0,
+  groups.map((g) => `${g.key}:${g.rows.length}`).join(' '));
+const ok = { correct: true, confidence: 100 }, guess = { correct: true, confidence: 25 }, unsure = { correct: true, confidence: 50 }, bad = { correct: false, confidence: 75 };
+check('sonradan anladı mı: yeni soru yoksa belirsiz; hepsi sağlam doğruysa anladı; tahminle ya da kararsız doğru sayılmaz; karışıksa kısmen; hiç sağlam yoksa zor',
+  T.missVerdict(false, []).key === 'belirsiz' && T.missVerdict(false, null).key === 'belirsiz' && T.missVerdict(false, [ok]).key === 'anladi'
+  && T.missVerdict(false, [ok, ok, ok]).key === 'anladi' && T.missVerdict(false, [guess]).key === 'zor' && T.missVerdict(false, [unsure, bad]).key === 'zor'
+  && T.missVerdict(false, [ok, bad]).key === 'kismen' && T.missVerdict(false, [ok, guess]).key === 'kismen' && T.missVerdict(false, [ok, bad]).ok === 1);
+check('sonradan anladı mı: "anlamadım" ya da "birlikte bakalım" dediyse tek doğru yetmez, iki sağlam doğru yeter',
+  T.missVerdict(true, [ok]).key === 'kismen' && T.missVerdict(true, [ok, ok]).key === 'anladi' && T.missVerdict(true, []).key === 'belirsiz');
+check('hâlâ soru işareti: zor, belirsiz ve kısmen açık; anladı kapalı',
+  ['zor', 'belirsiz', 'kismen'].every((v) => T.missOpen({ verdict: v })) && !T.missOpen({ verdict: 'anladi' }));
+const ordered = T.missGroups([
+  { id: 'a', subject: 'fen', topicId: 'f1', topic: 'Basınç', kind: 'yanlis', verdict: 'anladi' }, { id: 'b', subject: 'fen', topicId: 'f1', topic: 'Basınç', kind: 'yanlis', verdict: 'kismen' },
+  { id: 'c', subject: 'fen', topicId: 'f1', topic: 'Basınç', kind: 'bos', verdict: 'zor' }, { id: 'd', subject: 'fen', topicId: 'f1', topic: 'Basınç', kind: 'yanlis', verdict: 'belirsiz' },
+  { id: 'e', subject: 'fen', topicId: 'f1', topic: 'Basınç', kind: 'yanlis', verdict: 'zor' }], ['fen']);
+check('konu içinde sıra: hâlâ zorlandıkları, henüz sınanmayanlar, kısmen oturanlar, sonradan anladıkları; eşitlerde liste sırası',
+  ordered[0].rows.map((x) => x.id).join('') === 'cedba', ordered[0].rows.map((x) => x.id).join(''));
 check('tekrar cevabının türü: boş geçti, yanlış, tahminle doğru; düz doğru yok',
   T.reviewMissKind({ needs_help: true, correct: false }) === 'bos' && T.reviewMissKind({ correct: false, confidence: 100 }) === 'yanlis'
   && T.reviewMissKind({ correct: true, confidence: 25 }) === 'tahmin' && T.reviewMissKind({ correct: true, confidence: 75 }) === null);

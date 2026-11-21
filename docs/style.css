@@ -792,22 +792,45 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .miss-head .miss-track { height: 14px; }
 .miss-track i { display: block; height: 100%; }
 .export-actions { flex-wrap: wrap; gap: 8px; }
+.miss-pick { width: 100%; min-height: 32px; padding: 2px 4px; border: 0; background: transparent; border-radius: 8px; text-align: left; color: inherit; font-weight: inherit; }
+.miss-pick:hover, .miss-pick:focus-visible { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.print-questions { display: flex; flex-direction: column; gap: 12px; }
+.print-topic { margin: 8px 0 0; font-size: 1rem; }
 .print-only { display: none; }
 @media (max-width: 420px) { .miss-row { grid-template-columns: minmax(0, 7.5rem) 1fr 2rem; } }
+/* Kâğıt: menü ve düğmeler yok, açık renk, küçük yazı, sorular iki sütun. Esnek kutular (flex) sayfa sonunda bölünemediği için
+   boş sayfa bırakıyordu (ilk sayfada yalnızca başlık kalıyordu): kâğıtta her şey blok düzeninde akar, grafik sayfalar
+   arasında bölünebilir, yalnızca tek bir soru ve tek bir grafik satırı bölünmez. */
 @media print {
   :root {
     --paper: #fff; --card: #fff; --ink: #111; --ink-soft: #444; --rule: #c9ced8; --accent: #2448b8;
     --red: #c8372d; --red-soft: #fbe7e4; --green: #1f7a4d; --green-soft: #e1f2e8; --amber: #a86400; --amber-soft: #fbefd9;
     color-scheme: light;
   }
-  html, body { background: #fff !important; color: #111; }
+  @page { margin: 12mm; }
+  html, body { background: #fff !important; color: #111; min-height: 0 !important; font-size: 10pt; }
   nav.tabs, .topbar, .toast, .no-print, .export-open { display: none !important; }
-  .print-only { display: flex; }
-  #app { max-width: none; padding: 0; margin: 0; }
+  #app { display: block; max-width: none; padding: 0 !important; margin: 0; min-height: 0; }
   .print-sheet, .print-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .print-sheet .card { box-shadow: none; border: 1px solid #c9ced8; background: #fff; }
-  .print-q { break-inside: avoid; page-break-inside: avoid; }
-  .print-sheet .qimg { width: auto; max-width: 100%; max-height: 10cm; }
-  .miss-chart { break-inside: avoid-page; }
-  .miss-row > span:first-child { white-space: normal; }
+  .print-sheet, .print-sheet .miss-chart, .print-sheet .miss-subject, .print-only { display: block; }
+  .print-only h1 { font-size: 14pt; margin: 0; }
+  .print-only { margin-bottom: 4mm; }
+  .print-sheet .card { box-shadow: none; border: 1px solid #c9ced8; background: #fff; padding: 2.5mm 3mm; border-radius: 6px; }
+  .print-sheet .miss-chart { margin-bottom: 4mm; column-count: 2; column-gap: 6mm; }
+  .print-sheet .miss-chart > h2, .print-sheet .miss-chart > p, .print-sheet .miss-chart > .legend { column-span: all; }
+  .print-sheet .miss-chart > * { margin: 0 0 1.5mm; }
+  .print-sheet .miss-chart h2 { font-size: 12pt; }
+  .print-sheet .miss-subject { margin: 0 0 2mm; }
+  .print-sheet .miss-row { break-inside: avoid; margin-bottom: 0.8mm; min-height: 0; padding: 0; font-size: 9pt; grid-template-columns: minmax(0, 48%) 1fr 1.6rem; }
+  .print-sheet .miss-row > span:first-child { white-space: normal; }
+  .print-sheet .miss-track, .print-sheet .miss-head .miss-track { height: 8px; }
+  .print-questions { display: block; column-count: 2; column-gap: 6mm; column-fill: auto; }
+  .print-topic { font-size: 10.5pt; margin: 0 0 1.5mm; break-after: avoid; }
+  .print-q { display: block; break-inside: avoid; page-break-inside: avoid; margin: 0 0 3mm; }
+  .print-q > * { margin: 0 0 1.2mm; }
+  .print-q > *:last-child { margin-bottom: 0; }
+  .print-q .stack { gap: 2px !important; }
+  .print-q .opt { padding: 1.5px 5px; border-radius: 4px; }
+  .print-q .stem, .print-q .opt, .print-q .small { font-size: 9.5pt; line-height: 1.3; }
+  .print-sheet .qimg { display: block; width: auto; max-width: 100%; max-height: 8cm; }
 }
