@@ -51,7 +51,7 @@ Her maddenin yanında nasıl denendiği yazar:
   Görünüş `docs/theme.css`'te (öteki stillerden sonra yüklenir): düz açık zemin, kalın kenarlı kartlar, kabartmalı ana
   düğmeler, ana sayfada sarı "Başla" ve simgeli Hata tekrarı / Konu tekrarı kartları, mavi kahraman kartı, seçili sekmesi
   renkli alt menü, soru ekranında kalın ilerleme çubuğu ve dolu şık harfleri; koyu tema. Hiçbir ekranın içeriği değişmedi.
-  Sürüm numarası theme.css'i de kapsar (9 dosya). [O] (sürüm sayımı), [A] (sayfalar hatasız açılır), [E] (görünüş)
+  Sürüm numarası theme.css'i ve export.js'i de kapsar (10 dosya). [O] (sürüm sayımı), [A] (sayfalar hatasız açılır), [E] (görünüş)
 - Ülke ve müfredat ayrımı (velinin isteği, 2026-11-09; `supabase/country-curriculum.sql`): konular sınıfın yanında müfredata
   göre de seçilir (`topics.curriculum`, `profiles.curriculum`; bugün hepsi `tr`). Başka müfredatın aynı sınıftaki konusu
   öğrenciye görünmez ve yıllık plana göre açılmaz. LGS'ye özgü dersler, günlük plan ağırlıkları, sayaç ve denemeler
@@ -659,6 +659,29 @@ Her maddenin yanında nasıl denendiği yazar:
     gruplu, en yeniden eskiye açılır (deneme adı, soru no, tarih, soru, cevabı ve doğrusu, çözüm, "Benzer sorularla dene").
     Yeniden dokununca kapanır (velinin isteği, 2026-11-10). [A]
 - Son 14 gün, önümüzdeki 7 gün, yüklemeler ve saatlik görevin en son çalıştığı saat.
+- **Yanlışlar hangi konulardan geliyor?** (velinin isteği, 2026-11-21: "hangi derste yanlışlar hangi konulardan gelmiş, grafikli…
+  öğretmenleri görsün"; `docs/export.js`, missChart): Zayıf konular sekmesinin en üstünde. Her ders için toplam çubuğu, altında
+  konuları çoktan aza (ders başına en çok 8, kalanı tek satırda "ve N konu daha"); çubuk yanlış (kırmızı), boş (sarı) ve
+  tahminle doğru (mavi) diye bölünür. Son 30 günün tekrarları ve bütün denemeler; uygulamadaki denemenin cevapları iki kez
+  sayılmaz. Öğretmen yalnızca kendi derslerini görür. Altında "Bu soruları yazdır ya da Excel'e aktar". [O] sayım, [A]
+- **Yazdır ve Excel** (velinin isteği, 2026-11-21: "bilemediği soruların print'ini alabilir miyiz? okulda öğretmenine sormak
+  istiyor, excel butonu lazım"; `docs/export.js`, 'cikti' sayfası): "Öğretmene sorulacak sorular". Öğrenci, veli ve öğretmen açar:
+  öğrencide Konular'ın başından ve Birlikte bakılacaklar'dan; velide ve öğretmende Sorular'ın başından, Birlikte bakılacaklar
+  kutusundan ve sayfasından, Zayıf konular'daki grafiğin altından. [A]
+  - Sorular: seçilen dönemde (son 7 / 30 / 90 gün, açılışta 30) yanlış yaptığı, boş bıraktığı ve tahminle doğru yaptığı
+    sorular; tekrarlar ve denemeler birlikte, en yeni üstte, aynı soru bir kez. Süzme: "Bütün yanlış ve boşlar" ya da
+    "Yalnızca birlikte bakılacaklar" (Birlikte bakılacaklar'dan gelince bu seçili), ders. Üstte aynı konu grafiği (bütün
+    konularıyla). Her soruda dersi, konusu, görseli, metni, şıkları, işaretlediği şık, nereden geldiği ve tarihi. "Doğru
+    cevapları ve çözümleri de ekle" işaretlenirse doğru şık ve çözüm de görünür (açılışta kapalı). [A]
+  - "Yazdır": görseller indikten sonra (en çok 8 sn bekler) tarayıcının yazdırma penceresi; kâğıtta menü, üst çubuk, süzme
+    düğmeleri yok, başta öğrencinin adı, sınıfı ve dönem, sorular sayfa ortasında bölünmez, koyu temada da açık renk. Kâğıda
+    en yeni 60 soru çıkar (fazlası sayının yanında yazar). [A] pencerenin açılması, kâğıt [E]
+  - "Excel'e aktar": gerçek bir .xlsx dosyası iner (`telafio-sorular-<tarih>.xlsx`; ek kütüphane yok). "Sorular" sayfası: No,
+    Tarih, Ders, Konu, Nereden, Durum, Soru, A–D, İşaretlediği, (işaretliyse Doğru cevap ve Çözüm), boş "Öğretmenin notu"
+    sütunu; bütün sorular (60 sınırı yok); görselli soruda görselin çıktıda olduğu yazar. "Konu özeti" sayfası: derse ve
+    konuya göre yanlış, boş, tahminle doğru, toplam. Başlık satırı kalın ve dondurulmuş. ABD'de hepsi İngilizce. [O] dosyanın
+    yapısı, [A] satır sayısı, dosyayı Excel'de açmak [E]
+  - Hiçbir şey kaydetmez; soru yoksa "Bu seçimde soru yok", düğmeler kapalı. [A]
 
 **Diğer sayfalar**
 - Sorular sayfası. [A]

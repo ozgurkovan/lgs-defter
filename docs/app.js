@@ -535,8 +535,8 @@ const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.studen
 // Rolün açabildiği sayfalar: aynı sekmede başka biri giriş yapınca geçmişteki eski sayfalar buna göre süzülür.
 // ABD'de İngilizce kelime kartları yok (yabancı dil ABD öğrencisi için ayrı bir iş).
 const allowedTabs = () => (state.profile?.role === 'student'
-  ? ['home', ...(typeof isUsCurriculum === 'function' && isUsCurriculum(state.profile) ? [] : ['words']), 'shop', 'typing', 'hero', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together']
-  : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together']);
+  ? ['home', ...(typeof isUsCurriculum === 'function' && isUsCurriculum(state.profile) ? [] : ['words']), 'shop', 'typing', 'hero', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together', 'cikti']
+  : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together', 'cikti']);
 function goBack() {
   if (navDepth() > 0) history.back();
   else go(rootTab(), 'replace');
@@ -599,6 +599,7 @@ function go(tab, how = 'push') {
     settings: viewSettings, report: viewReport, reasons: viewReasons, questions: viewQuestions,
     together: viewTogether, words: viewWords, shop: viewShop, typing: viewTyping, // klavye dersleri: typing.js
     hero: viewHero, // kahramanı besleme: feed.js
+    cikti: viewExport, // yapamadığı soruları yazdırma ve Excel'e aktarma: export.js
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
   return true;
@@ -1996,7 +1997,8 @@ function togetherBox(rows) {
     isParentView()
       ? [h('p', {}, parts + '.'), h('p', { class: 'small muted' }, 'Bu sorulara biriyle birlikte bakması, iyice anlaması gerekiyor.')]
       : h('p', { class: 'small muted' }, 'Anlamadığın ya da tahmin ettiğin sorular. Velin ya da öğretmeninle birlikte üstünden geçin.'),
-    h('button', { class: 'primary block', onclick: () => go('together') }, 'Soruları aç'));
+    h('button', { class: 'primary block', onclick: () => go('together') }, 'Soruları aç'),
+    exportButton('together'));
 }
 
 async function viewTogether() {
@@ -2012,7 +2014,9 @@ async function viewTogether() {
       h('p', { class: 'muted' }, isParentView()
         ? `${name} bu soruları anlamadığını söyledi ya da tahmin etti. Yanına oturup birlikte çözün, iyice anladığından emin olun.` +
           ' Baktığınız soruyu "Birlikte baktık" ile listeden çıkarın.'
-        : 'Anlamadığın ya da tahmin ettiğin sorular. Velin ya da öğretmeninle birlikte üstünden geçin.')),
+        : 'Anlamadığın ya da tahmin ettiğin sorular. Velin ya da öğretmeninle birlikte üstünden geçin.'),
+      // Okulda öğretmenine sorabilsin diye (velinin isteği, 2026-11-21): yazdırma ve Excel sayfası (export.js).
+      exportButton(rows.length ? 'together' : null)),
     rows.length ? rows.map((r) => {
       const when = h('p', { class: 'small muted' }, [trackName[r.track],
         new Date(r.answered_at).toLocaleString(LOCALE, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })].filter(Boolean).join(' · '));
@@ -2877,7 +2881,8 @@ async function viewMyTopics() {
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, 'Konular'),
       h('h1', {}, 'Hangi konuyu çalışmak istersin?'),
-      h('p', { class: 'small muted' }, 'Okulda işlediğin bir konuya dokun, yalnızca o konudan soru çöz. Yanlışların hata tekrarına girer.')),
+      h('p', { class: 'small muted' }, 'Okulda işlediğin bir konuya dokun, yalnızca o konudan soru çöz. Yanlışların hata tekrarına girer.'),
+      exportButton(null, '🖨️ Yapamadığın soruları yazdır ya da Excel\'e aktar')),
     cards(topics.filter((t) => t.grade === grade), true),
     upper.map(([g, c]) => [h('h2', { style: 'margin-top: 8px' }, `${g}. sınıf konuları`), c]),
     !topics.length ? h('div', { class: 'card flat' }, h('p', { class: 'muted' }, 'Bu sınıfın konu listesi henüz yüklenmedi.')) : null);
@@ -4977,7 +4982,8 @@ async function viewQuestions() {
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, `Sorular · ${state.student.display_name}`),
-      h('h1', {}, 'Hangi soruları yaptı, hangilerini kaçırdı?')),
+      h('h1', {}, 'Hangi soruları yaptı, hangilerini kaçırdı?'),
+      exportButton(null, '🖨️ Kaçırdıklarını yazdır ya da Excel\'e aktar')),
     h('section', { class: 'stack', style: 'gap: 8px' },
       chipGroup('source', [['exam', 'Denemeler'], ['review', 'Tekrarlar']]),
       chipGroup('outcome', [['missed', 'Kaçırdıkları'], ['correct', 'Doğruları'], ['all', 'Hepsi']]),
@@ -5350,7 +5356,8 @@ async function viewReport() {
     ['bildirdikleri', 'Bildirdiği sorular', () => emptyNote([reportedBox(), poemBox()],
       'Henüz "Soruda sorun var" dediği bir soru ya da tamamladığı bir şiir yok.')],
     ['denemeler', 'Denemeler', () => [tiles, h('section', { class: 'card' }, h('h2', {}, 'Denemeler'), examTable), subjects, styles, misconceptions]],
-    ['zayif', 'Zayıf konular', () => [gapCards, weakCards, causes, pastNoteCards]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
+    // En üstte derse ve konuya göre yanlış grafiği (velinin isteği, 2026-11-21: "öğretmenleri görsün"; export.js).
+    ['zayif', 'Zayıf konular', () => [reportMissChart(reviews30, eqs, topicName), gapCards, weakCards, causes, pastNoteCards]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
     ['son14', 'Son 14 gün', () => [perf, load]],
     ['yuklemeler', 'Yüklemeler', () => [job]],
     ['diger', 'Kelime · Klavye · Kitap', () => emptyNote([wordBox(), typingBox(), booksBox()],

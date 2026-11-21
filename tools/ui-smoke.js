@@ -1172,6 +1172,44 @@
       try { for (let i = 0; i < 40; i++) { jokeCard(); poemCard('Mola'); } } catch (e) { cardErr = e.message; }
       check('Şaka ve şiir kartları', !cardErr, cardErr || '');
     }
+    // Yazdırma ve Excel (velinin isteği, 2026-11-21): 'cikti' sayfası açılır; üstte derse ve konuya göre yanlış grafiği, altında
+    // sorular (kâğıda en çok 60). "Excel'e aktar" gerçek bir .xlsx üretir (indirme burada durdurulur, dosyanın satır sayısı
+    // ekrandaki soru sayısıyla aynı olmalı); "Yazdır" yazdırma penceresini bir kez açar (burada pencere açılmaz). Sayfaya
+    // öğrencide Konular'dan, veli ve öğretmende Sorular'dan ve raporun Zayıf konular sekmesindeki grafikten gidilir.
+    {
+      go(role === 'student' ? 'topics' : 'questions'); await settle();
+      const entry = !!document.querySelector('#app .export-open');
+      let reportChart = true;
+      if (role !== 'student') {
+        go('report'); await settle();
+        [...document.querySelectorAll('#app .report-bar .chip')].find((c) => c.dataset.tab === 'zayif')?.click(); await wait(100);
+        reportChart = document.querySelector('#app .report-panel[data-tab="zayif"]')?.firstElementChild?.classList.contains('miss-chart') === true;
+      }
+      go('cikti'); await settle();
+      const n = +((document.querySelector('#app .export-controls p.small')?.textContent || '').match(/^(\d+) soru/) || [])[1];
+      const cards = document.querySelectorAll('#app .print-q').length;
+      const chart = !!document.querySelector('#app .print-sheet .miss-chart');
+      const hiddenHead = !!document.querySelector('#app .print-only') && getComputedStyle(document.querySelector('#app .print-only')).display === 'none';
+      let blob = null, name = null, printed = 0, rowsIn = -1;
+      const realUrl = URL.createObjectURL, realClick = HTMLAnchorElement.prototype.click, realPrint = window.print;
+      URL.createObjectURL = (b) => { blob = b; return realUrl.call(URL, b); };
+      HTMLAnchorElement.prototype.click = function () { if (this.download) { name = this.download; return; } return realClick.call(this); };
+      window.print = () => { printed++; };
+      try {
+        if (n) {
+          document.querySelector('#app .export-excel').click(); await wait(200);
+          const txt = blob ? new TextDecoder().decode(new Uint8Array(await blob.arrayBuffer())) : '';
+          rowsIn = txt.slice(txt.indexOf('<worksheet'), txt.indexOf('</worksheet>')).split('<row ').length - 2; // başlık satırı hariç
+          document.querySelector('#app .export-controls button.primary').click();
+          for (let i = 0; i < 70 && !printed; i++) await wait(150);
+        }
+      } finally { URL.createObjectURL = realUrl; HTMLAnchorElement.prototype.click = realClick; window.print = realPrint; }
+      const filled = !n ? pageText().includes('bu seçimde soru yok') && document.querySelector('#app .export-excel').disabled
+        : rowsIn === n && /^telafio-.*\.xlsx$/.test(name || '') && printed === 1 && document.querySelectorAll('#app .print-sheet .miss-subject').length >= 1;
+      check('Yazdır ve Excel: sayfa açılır, üstte konu grafiği, sorular (kâğıda en çok 60), Excel dosyasında her soru bir satır, Yazdır pencereyi bir kez açar',
+        state.tab === 'cikti' && entry && reportChart && chart && hiddenHead && Number.isFinite(n) && cards === Math.min(n, 60) && filled,
+        `${n} soru, ${cards} kart, Excel ${rowsIn} satır${entry ? '' : '; giriş düğmesi yok'}${reportChart ? '' : '; raporda grafik yok'}${chart ? '' : '; grafik yok'}`);
+    }
     go(root); await settle();
   } finally {
     window.confirm = realConfirm;

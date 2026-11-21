@@ -782,3 +782,32 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .ballet-barre { position: absolute; left: 50%; bottom: 10px; width: 132px; height: 77px; z-index: 1; }
 .ballet-barre svg { width: 100%; height: 100%; display: block; }
 .dance-card .label, .dance-wrap .dance-banner { margin: 0; }
+
+/* Yapamadığı soruların çıktısı (export.js): derse ve konuya göre yanlış grafiği, yazdırma sayfası. */
+.miss-row { display: grid; grid-template-columns: minmax(0, 11rem) 1fr 2rem; gap: 8px; align-items: center; font-size: 0.85rem; }
+.miss-row > span:first-child, .miss-row > b:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.miss-row .num { text-align: right; }
+.miss-head { font-size: 0.95rem; margin-top: 6px; }
+.miss-track { display: flex; height: 12px; background: var(--rule); border-radius: 6px; overflow: hidden; }
+.miss-head .miss-track { height: 14px; }
+.miss-track i { display: block; height: 100%; }
+.export-actions { flex-wrap: wrap; gap: 8px; }
+.print-only { display: none; }
+@media (max-width: 420px) { .miss-row { grid-template-columns: minmax(0, 7.5rem) 1fr 2rem; } }
+@media print {
+  :root {
+    --paper: #fff; --card: #fff; --ink: #111; --ink-soft: #444; --rule: #c9ced8; --accent: #2448b8;
+    --red: #c8372d; --red-soft: #fbe7e4; --green: #1f7a4d; --green-soft: #e1f2e8; --amber: #a86400; --amber-soft: #fbefd9;
+    color-scheme: light;
+  }
+  html, body { background: #fff !important; color: #111; }
+  nav.tabs, .topbar, .toast, .no-print, .export-open { display: none !important; }
+  .print-only { display: flex; }
+  #app { max-width: none; padding: 0; margin: 0; }
+  .print-sheet, .print-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-sheet .card { box-shadow: none; border: 1px solid #c9ced8; background: #fff; }
+  .print-q { break-inside: avoid; page-break-inside: avoid; }
+  .print-sheet .qimg { width: auto; max-width: 100%; max-height: 10cm; }
+  .miss-chart { break-inside: avoid-page; }
+  .miss-row > span:first-child { white-space: normal; }
+}
