@@ -91,6 +91,8 @@ function armyMedalSvg(m, state = 'earned') {
 }
 // Açık mı: veli seçtiyse o; seçmediyse 7. sınıfa kadar açık (besleme gibi).
 const armyOn = (p) => p?.hero_army ?? ((p?.grade || 8) <= 7);
+// Çocuğun ekranında açık mı: velinin ayarı ve plan (bedava planda kapalı; plan.js). Velinin ayar satırı armyOn'a bakar.
+const armyOpen = (p) => armyOn(p) && (typeof planHas !== 'function' || planHas('army', p));
 const armyUs = (p) => /^us/.test(p?.curriculum || '');
 const armyCorpsList = (p) => (armyUs(p) ? ARMY_CORPS_EN : ARMY_CORPS);
 const armyCorps = (id) => [...ARMY_CORPS, ...ARMY_CORPS_EN].find((c) => c.id === id) || null;
@@ -143,7 +145,7 @@ function armyNews(st, seen) {
 const armyCache = new Map();
 // Çocuğun numarası ve kolu ({ points, before, corps }); asker kahraman kapalıysa ya da okunamazsa null.
 async function loadArmy(p = state.student) {
-  if (!p || !armyOn(p)) return null;
+  if (!p || !armyOpen(p)) return null;
   const st = await q(sb.rpc('hero_army_state', { sid: p.id }));
   if (!st) return null;
   armyCache.set(p.id, st);
@@ -1020,7 +1022,7 @@ const armyHeroLevel = (p) => (feedOn(p) ? loadFeed(p).then((fs) => fs.hero.level
 function battleCard(correct, wrong, hard, kind = 'session', fromRadar = false) {
   const box = h('section', { class: 'card stack battle-card', hidden: true, style: 'gap: 8px' });
   const p = state.student;
-  if (!p || !armyOn(p) || correct + wrong <= 0) return box;
+  if (!p || !armyOpen(p) || !heroGamesOn(p) || correct + wrong <= 0) return box; // oyunları veli kapatabilir (plan.js)
   loadArmy(p).then(async (st) => {
     if (!st || !armyCorps(st.corps)) return;
     const [level, radar] = await Promise.all([
@@ -1665,7 +1667,7 @@ function trainScene(move, streak, p, level, opts = {}) {
 function trainSlot(ss, correct) {
   const slot = h('div', { class: 'train-slot' });
   const p = state.student;
-  if (!p || !armyOn(p) || reduceMotion()) return slot;
+  if (!p || !armyOpen(p) || reduceMotion()) return slot;
   // Balerinde kahramanın seviyesi gerekmez (çizimi seviyesiz); kum torbasında okunur.
   const ballet = trainStyle(p) === 'balerin';
   ss.train ??= Promise.all([loadArmy(p), ballet ? 1 : armyHeroLevel(p)]).catch(() => [null, 1]);
@@ -2093,7 +2095,7 @@ function danceGame(cfg, p, opts = {}) {
 function danceCard(correct) {
   const box = h('section', { class: 'card stack dance-card', hidden: true, style: 'gap: 8px' });
   const p = state.student;
-  if (!p || !armyOn(p) || trainStyle(p) !== 'balerin' || !(correct > 0)) return box;
+  if (!p || !armyOpen(p) || !heroGamesOn(p) || trainStyle(p) !== 'balerin' || !(correct > 0)) return box;
   loadArmy(p).then((st) => {
     if (!st || !trainOn(p, st) || st.points < TRAIN_ALIEN_AT) return;
     const cfg = danceSetup(correct, p.grade);

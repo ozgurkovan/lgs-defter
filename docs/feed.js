@@ -123,7 +123,7 @@ function feedBar(sat) {
 // yalnızca kahramanı ve asker satırını gösterir. İkisi de kapalıysa ya da okunamazsa görünmez.
 function feedHomeCard() {
   const box = h('section', { class: 'card feed-home', hidden: true });
-  const feeding = feedOn(state.student), army = armyOn(state.student);
+  const feeding = feedOn(state.student), army = armyOpen(state.student);
   if (!feeding && !army) return box;
   Promise.all([feeding ? loadFeed() : null, army ? loadArmy().catch(() => null) : null, !feeding ? typingHero() : null]).then(([fs, st, solo]) => {
     if (!fs && !st) return;

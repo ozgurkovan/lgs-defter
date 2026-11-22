@@ -12,6 +12,9 @@ declare
   r jsonb := '{}';
   n int;
 begin
+  -- Yükleme bedava planda kapalı (plan-limits.sql): test ailesi bu testte hediye abonelikle çalışır (geri alınır).
+  delete from public.subscriptions where parent_id = parent;
+  insert into public.subscriptions (parent_id, source, note) values (parent, 'gift', 'test');
   -- Test öğretmeni bu testte IrfTest'e matematik ve fen için bağlanır (geri alınır); gerçek bağları ne olursa olsun test aynı çalışır.
   delete from public.family_links where parent_id = teacher and student_id = kid;
   insert into public.family_links (parent_id, student_id, relation, subjects) values (teacher, kid, 'teacher', array['matematik', 'fen']);

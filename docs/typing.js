@@ -578,8 +578,8 @@ async function viewTyping() {
       h('button', { class: 'primary block', onclick: () => runTyping(next, hero) }, `Başla: Ders ${next + 1} · ${lesson.title}`),
       h('p', { class: 'small muted' }, 'Parmakların böyle durur: işaret parmakların F ve J\'de (bu iki tuşta küçük çıkıntı var), başparmakların boşlukta.'),
       kb.el),
-    // Oyun: düşen kelimeleri yaz, çatıdan roket fırlat (kelimeler bitirdiği derslerin harflerinden).
-    h('section', { class: 'card stack', style: 'gap: 8px' },
+    // Oyun: düşen kelimeleri yaz, çatıdan roket fırlat (kelimeler bitirdiği derslerin harflerinden). Veli kapatabilir (plan.js).
+    typingGameOn(state.student) && h('section', { class: 'card stack rocket-card', style: 'gap: 8px' },
       h('div', { class: 'spread' }, h('b', {}, '🚀 Kelime roketi'), gameBest() ? h('span', { class: 'small muted num' }, `En iyi puanın: ${gameBest()}`) : null),
       h('p', { class: 'small muted' }, 'Yukarıdan düşen kelimeleri yaz; çatıdan roket kalkıp vursun. Kelime çatıya değerse çatı hırpalanır, '
         + 'çatılar bitince oyun biter. Kelimeler bitirdiğin derslerin harflerinden; oyun gittikçe hızlanır. Her yeni seviyede bir çatı '
@@ -858,6 +858,7 @@ function gameBest() {
 // Oyun Klavye sayfasından açılır; ders gibi alt menü gizli, geri tuşu önce sorar. Pencere arka plana geçince durur, bir
 // harfe basınca sürer. game.spawn(tür: '', 'super' ya da 'ice') ve game.tick duman testi içindir.
 function runTypingGame(hero) {
+  if (!typingGameOn(state.student)) return;
   if (!gameWords(hero.typing.best).length) return;
   if (gameBestCache.sid !== sid()) gameBestLoad(); // rekor okunmadıysa (bitişteki "Yeni rekor!" için)
   const game = {

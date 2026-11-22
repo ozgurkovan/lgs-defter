@@ -14,6 +14,9 @@ declare
   r jsonb := '{}';
   n int;
 begin
+  -- Yükleme bedava planda kapalı (plan-limits.sql): test ailesi bu testte hediye abonelikle çalışır (geri alınır).
+  delete from public.subscriptions where parent_id = parent;
+  insert into public.subscriptions (parent_id, source, note) values (parent, 'gift', 'test');
   -- Çocuk kitabını ekler, sayfalarını yükler; sınav tarihini sonradan değiştiremez
   perform set_config('request.jwt.claims', json_build_object('sub', kid, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);

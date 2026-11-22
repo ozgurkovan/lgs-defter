@@ -25,13 +25,13 @@ const node = (args) => {
 };
 
 // 1
-const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']) + node(['--check', 'docs/feed.js']) + node(['--check', 'docs/army.js']) + node(['--check', 'docs/steps.js']) + node(['--check', 'docs/export.js'])
+const checked = node(['--check', 'docs/app.js']) + node(['--check', 'docs/typing.js']) + node(['--check', 'docs/feed.js']) + node(['--check', 'docs/army.js']) + node(['--check', 'docs/steps.js']) + node(['--check', 'docs/export.js']) + node(['--check', 'docs/plan.js'])
   + node(['--check', 'docs/i18n.js']) + node(['--check', 'docs/i18n-en.js']);
-report(!checked.trim(), 'app.js, typing.js, feed.js, army.js, steps.js, export.js ve dil dosyaları sözdizimi', checked.trim().split('\n')[0]);
+report(!checked.trim(), 'app.js, typing.js, feed.js, army.js, steps.js, export.js, plan.js ve dil dosyaları sözdizimi', checked.trim().split('\n')[0]);
 const html = readFileSync('docs/index.html', 'utf8');
 const v = JSON.parse(readFileSync('docs/version.json', 'utf8')).v;
-const inHtml = [...html.matchAll(/(?:app\.js|style\.css|theme\.css|typing\.js|typing\.css|feed\.js|army\.js|steps\.js|export\.js|i18n\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
-report(inHtml.length === 10 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
+const inHtml = [...html.matchAll(/(?:app\.js|style\.css|theme\.css|typing\.js|typing\.css|feed\.js|army\.js|steps\.js|export\.js|plan\.js|i18n\.js)\?v=(\d+)/g)].map((m) => +m[1]); // config.js'in kendi numarası var
+report(inHtml.length === 11 && inHtml.every((x) => x === v), 'Sürüm numarası', `version.json ${v}, index.html ${[...new Set(inHtml)].join(',')}`);
 // Başka bir adres reddedilmeli. Deneme kapalı bir porta gider: koruma bozulsa bile Supabase'e ulaşmaz, hesap açılmaz.
 // Giriş bağlantısı üreten her araç adresi test-accounts.mjs'ten almalı.
 const refused = await testAccountEmail('velitest@hotmail.com', 'http://127.0.0.1:9', {}).then(() => 'kabul edildi', (e) => e.message);
@@ -84,6 +84,10 @@ report(stepsOut.length > 0 && !stepsBad.length, 'Adım adım çözüm', stepsBad
 const exportOut = node(['tools/test-export.mjs']).trim().split(/\r?\n/).filter(Boolean);
 const exportBad = exportOut.filter((l) => !l.startsWith('OK'));
 report(exportOut.length > 0 && !exportBad.length, 'Yazdırma ve Excel', exportBad.length ? exportBad.join(' | ') : `${exportOut.length} kontrol`);
+// Plan sınırları: günlük soru hakkı, oturumların kesilmesi, haftalık deneme, aylık yükleme hakları (tools/test-plan.mjs).
+const planOut = node(['tools/test-plan.mjs']).trim().split(/\r?\n/).filter(Boolean);
+const planBad = planOut.filter((l) => !l.startsWith('OK'));
+report(planOut.length > 0 && !planBad.length, 'Plan sınırları', planBad.length ? planBad.join(' | ') : `${planOut.length} kontrol`);
 // İngilizce katman (2026-11-10): kodda yeni bir Türkçe yazı varsa çevirisi de olmalı; çeviriler yer tutucuları korur,
 // Türkçe harf taşımaz; docs/i18n-en.js en.json'dan üretilmiş ve güncel (tools/i18n-build.mjs).
 const i18nOut = node(['tools/i18n-build.mjs', '--check']).trim();

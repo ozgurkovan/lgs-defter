@@ -332,9 +332,10 @@ function studentSwitcher() {
     return h('span', { class: 'small muted' }, me.role !== 'student' && state.student
       ? `${me.display_name || ''} · ${state.student.display_name}` : me.display_name || '');
   }
-  const pick = (id) => {
+  const pick = async (id) => {
     state.student = state.students.find((s) => s.id === id);
     try { localStorage.setItem('defter.student', state.student.id); } catch (err) { /* önemli değil */ }
+    await planInfo(true); // çocuğun planı: sekmeler ve kahraman buna bakar (plan.js)
     go(state.tab);
   };
   return h('select', { id: 'student-switch', class: 'switch', 'aria-label': 'Hangi çocuk', onchange: (e) => {
@@ -433,8 +434,8 @@ function renderTabs() {
     : role === 'teacher'
       ? [['report', 'Rapor', 'report'], ['questions', 'Sorular', 'questions'], ['topics', 'Konular', 'topics'], ['settings', 'Ayarlar', 'settings']]
       : [['home', 'Bugün', 'home'], ['upload', 'Deneme', 'exam'], ['send', 'Yükle', 'upload'], ['topics', 'Konular', 'topics'],
-          typingPerDay(state.student) > 0 && hasKeyboard() ? ['typing', 'Klavye', 'keyboard'] : null,
-          wordsPerDay(state.student) > 0 ? ['words', 'İngilizce', 'words'] : null, ['settings', 'Ayarlar', 'settings']].filter(Boolean);
+          typingPerDay(state.student) > 0 && hasKeyboard() && planHas('typing') ? ['typing', 'Klavye', 'keyboard'] : null,
+          wordsPerDay(state.student) > 0 && planHas('words') ? ['words', 'İngilizce', 'words'] : null, ['settings', 'Ayarlar', 'settings']].filter(Boolean);
   const nav = h('nav', { class: 'tabs', 'aria-label': 'Menü' },
     h('div', { class: 'inner' }, tabs.map(([id, label, ic]) =>
       // Konunun sayfası (konu) öğrencinin Konular sekmesinin içindedir.
@@ -633,6 +634,7 @@ async function start() {
         : 'Hesabınız henüz bir öğrenciye bağlanmamış.'),
       h('button', { onclick: signOut }, 'Çıkış yap')));
   }
+  await planInfo(true); // plan: sekmeler ve kahraman buna bakar (plan.js); okunamazsa hiçbir şey kısıtlanmaz
   // Kendini güncellemeden sonra kullanıcının gitmek istediği sayfaya, yenileyince de bulunduğu sayfaya devam edilir
   // (geçmiş kaydı korunur; geri tuşu yine önceki sayfaya döner).
   let resume = null, resumeDepth = null;
@@ -1075,6 +1077,15 @@ async function viewHome() {
   const topic = await buildSession('topic', remaining, busy);
   const dueNow = mistake.entries.length + topic.entries.length;
   const extra = await buildExtra(remaining, [...mistake.entries, ...topic.entries].map((e) => e.question.id));
+  // Bedava planda günde 20 soru (plan.js): önce hata tekrarı, sonra konu tekrarı, ek çalışma, kitap soruları sığar.
+  const planNow = await planInfo();
+  const planLeft = planDailyLeft(planNow, planCounted(todayCount));
+  if (planLeft !== Infinity) {
+    const secs = (list) => list.reduce((n, e) => n + maxSeconds(e.question.subject) + 15, 0);
+    const [m, t, x, ...bk] = planTrim([mistake.entries, topic.entries, extra.entries, ...bookWork.map((w) => w.entries)], planLeft);
+    [[mistake, m], [topic, t], [extra, x]].forEach(([s, list]) => { if (list.length < s.entries.length) { s.entries = list; s.seconds = secs(list); } });
+    bookWork.forEach((w, i) => { if (bk[i].length < w.entries.length) { w.entries = bk[i]; w.capped = true; } });
+  }
   state.cache = { mistake, topic, extra };
 
   const hour = new Date().getHours();
@@ -1120,7 +1131,7 @@ async function viewHome() {
       : w.entries.length
         ? [h('p', { class: 'small muted' }, `Bugün ${w.entries.length} soru · bu kitapta ${w.open} soru kaldı`),
            h('button', { class: 'block', onclick: () => runSession('book', { entries: w.entries, seconds: 0 }) }, 'Kitap sorularına başla')]
-        : h('p', { class: 'small muted' }, w.open ? `Bugünkü kitap soruları tamam ✓ (${w.open} soru kaldı)` : 'Bu kitabın bütün sorularını çözdün 🎉')));
+        : h('p', { class: 'small muted' }, w.capped ? 'Kitap soruları yarın devam edecek.' : w.open ? `Bugünkü kitap soruları tamam ✓ (${w.open} soru kaldı)` : 'Bu kitabın bütün sorularını çözdün 🎉')));
   const topicTail = [extraTail, ...bookTails].filter(Boolean);
 
   render(
@@ -1128,7 +1139,11 @@ async function viewHome() {
       h('p', { class: 'label' }, new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })),
       h('h1', {}, playfulGreeting(name) || (name ? `${hello}, ${name}` : hello)),
       isLgsStudent(state.student) ? h('p', { class: 'muted' }, `LGS'ye ${daysBetween(localDate(), state.student.lgs_date)} gün var.`) : null,
-      holiday ? h('p', { class: 'small muted holiday-line' }, `🏖️ ${holiday.name}: bugün hedefin ${fmtFactor(holidayX)} kat, ${dailyTarget} soru.`) : null),
+      holiday ? h('p', { class: 'small muted holiday-line' }, `🏖️ ${holiday.name}: bugün hedefin ${fmtFactor(holidayX)} kat, ${dailyTarget} soru.`) : null,
+      // Bedava planın günlük sınırı: çocuk yalnızca durumu görür, teklif yalnızca velide (plan.js).
+      planLeft === Infinity ? null : h('p', { class: 'small muted quota-line' }, planLeft > 0
+        ? `Bugün ${planNow.daily_questions} sorunun ${planNow.daily_questions - planLeft} tanesini çözdün.`
+        : `Bugünlük bu kadar: ${planNow.daily_questions} sorunu çözdün. Yarın yenileri gelecek.`)),
     // Kahramanı besleme açıksa kahraman burada konuşur: acıkınca yardım ister, çalışmaya çağırır (feed.js). Kapalıysa görünmez.
     feedHomeCard(),
     // Mesaj yoksa ara sıra (üç girişte bir kadar) bir fıkra, bilmece ya da şiir; gün yorucu geçmesin.
@@ -2194,13 +2209,19 @@ document.addEventListener('paste', (e) => {
 async function viewUpload(kind) {
   loading();
   activePicker = null;
+  // Plan (plan.js): bedavada fotoğraf yükleme kapalı; aile planında ayda sınırlı kâğıt deneme ve yeni kitap.
+  const planNow = await planInfo(true);
+  const planLock = planUploadLock(planNow, kind);
+  if (planLock) { leaveGuard = null; return render(planLock); }
+  const planLine = planUploadLine(planNow, kind);
+  const noNewBook = kind === 'okuma' && planBooksLeft(planNow) <= 0;
   const exams = kind === 'deneme' ? await q(sb.from('exams').select('*').eq('student_id', sid()).order('exam_date', { ascending: false })) : [];
   // Okuduğu kitap: sınavı geçmemiş kitaplarından biri ya da yeni kitap (adı ve biliyorsa sınav tarihi).
   const books = kind === 'okuma' ? (await q(sb.from('books').select('id, title, exam_date').eq('student_id', sid()).order('created_at', { ascending: false })))
     .filter((b) => !b.exam_date || b.exam_date >= localDate()) : [];
   const bookSel = h('select', { id: 'book' },
     books.map((b) => h('option', { value: b.id, selected: b.id === state.readBook || null }, b.exam_date ? `${b.title} · sınav ${fmtDate(b.exam_date)}` : b.title)),
-    h('option', { value: '__new', selected: !books.length || null }, '+ Yeni kitap'));
+    h('option', { value: '__new', selected: !books.length || null, disabled: noNewBook ? true : null }, noNewBook ? '+ Yeni kitap (bu ayın hakkı doldu)' : '+ Yeni kitap'));
   const bookTitle = h('input', { id: 'book-title', placeholder: 'Örn. Küçük Prens', maxlength: 120 });
   const bookExam = h('input', { id: 'book-exam', type: 'date', min: localDate() });
   const bookNew = h('div', { class: 'stack', hidden: bookSel.value !== '__new' },
@@ -2254,8 +2275,8 @@ async function viewUpload(kind) {
   }
   function refreshState() {
     if (kind === 'okuma') {
-      const bookOk = bookSel.value && (bookSel.value !== '__new' || bookTitle.value.trim());
-      const missing = [!bookOk && 'kitabın adını yaz', !photos.length && 'sayfaların fotoğraflarını ekle'].filter(Boolean);
+      const bookOk = bookSel.value && (bookSel.value !== '__new' || (bookTitle.value.trim() && !noNewBook));
+      const missing = [!bookOk && (noNewBook && bookSel.value === '__new' ? 'eklediğin bir kitabı seç (bu ay yeni kitap hakkı doldu)' : 'kitabın adını yaz'), !photos.length && 'sayfaların fotoğraflarını ekle'].filter(Boolean);
       sendBtn.disabled = !!missing.length;
       missingNote.textContent = missing.length ? 'Göndermek için: ' + missing.join(', ') + '.' : '';
       return;
@@ -2321,6 +2342,7 @@ async function viewUpload(kind) {
       }
       await q(sb.from('submissions').update({ status: 'submitted', submitted_at: new Date().toISOString() }).eq('id', sub.id));
       sent = true;
+      planForget(); // bu ayın yükleme sayımı değişti
       photos.forEach((p) => URL.revokeObjectURL(p.preview));
       render(h('section', { class: 'card', style: 'margin-top: 10vh; text-align: center' },
         h('h2', {}, kind === 'kitap' ? 'Sayfaları aldım' : kind === 'okuma' ? 'Kitap sayfalarını aldım' : 'Sorularını aldım'),
@@ -2364,7 +2386,7 @@ async function viewUpload(kind) {
       h('header', { class: 'stack', style: 'gap: 4px' },
         h('p', { class: 'label' }, 'Okuduğum kitap'), h('h1', {}, 'Kitap sayfalarını gönder'),
         h('p', { class: 'muted' }, 'Okuduğun sayfaların fotoğrafını çek. Kitaptan sorular hazırlayacağım; böylece kitabı okuyup anladığını göreceğiz.')),
-      h('section', { class: 'card stack' }, h('label', { class: 'field' }, 'Hangi kitap?', bookSel), bookNew),
+      h('section', { class: 'card stack' }, h('label', { class: 'field' }, 'Hangi kitap?', bookSel), bookNew, planLine),
       photoPicker('Kitabın sayfaları', 'Sırayla çek, ilk okuduğun sayfadan başla. Yazılar net okunsun, sayfa numarası görünsün. Bölüm bölüm de gönderebilirsin.',
         'okuma', photos, refresh),
       h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
@@ -2389,7 +2411,7 @@ async function viewUpload(kind) {
       h('p', { class: 'label' }, 'Deneme yükle'),
       h('h1', {}, state.profile.role === 'parent' ? `${state.student.display_name} için deneme gönder` : 'Denemeni gönder'),
       h('p', { class: 'muted' }, 'Kitapçığın tamamı ve varsa optik formun. Cevap anahtarı gerekmiyor, soruları ben çözüyorum.')),
-    h('section', { class: 'card' }, h('label', { class: 'field' }, 'Hangi deneme?', examSel), newBox),
+    h('section', { class: 'card' }, h('label', { class: 'field' }, 'Hangi deneme?', examSel), newBox, planLine),
     photoPicker('1. Kitapçık sayfaları', 'Tüm sayfalar, sırayla. Karalamaların görünsün; T ve yuvarlak işaretlerin de.', 'kitapcik', photos, refresh),
     photoPicker('2. Optik form (varsa)', null, 'optik', photos, refresh),
     h('section', { class: 'card' }, h('h3', {}, 'Süre yetti mi?'), h('div', { class: 'chips' }, timeChips)),
@@ -2472,6 +2494,9 @@ async function viewExamHub() {
   });
   const booklets = BOOKLETS.filter(([id, , , n]) => (count[id] || 0) >= n && !untaught[id]);
   const resume = savedExam();
+  // Bedava planda uygulamada haftada bir deneme (plan.js); yarım kalan deneme her zaman sürdürülür.
+  const examWait = planExamWait(await planInfo(), past, localDate());
+  state.examWait = examWait;
   const minutes = (subjects, n) => Math.round(subjects.reduce((s, x) => s + SECTION_COUNTS[x] * maxSeconds(x), 0) / 60);
 
   const bookletCard = ([id, title, section, n]) => {
@@ -2480,7 +2505,7 @@ async function viewExamHub() {
       h('div', { class: 'spread' }, h('b', {}, title),
         h('span', { class: 'small muted num' }, `${n} soru · ${minutes(SECTION_SUBJECTS[section])} dk`)),
       last ? h('p', { class: 'small muted' }, `Daha önce çözdün: net ${fmtNet(examNet(last.exam_results || []))} (${fmtDate(last.exam_date)})`) : null,
-      h('button', { class: last ? 'block' : 'primary block', onclick: () => startBookletExam(id, title, section) }, last ? 'Yeniden çöz' : 'Başla'));
+      h('button', { class: last ? 'block' : 'primary block', disabled: examWait ? true : null, onclick: () => startBookletExam(id, title, section) }, last ? 'Yeniden çöz' : 'Başla'));
   };
 
   render(
@@ -2497,6 +2522,7 @@ async function viewExamHub() {
       h('div', { class: 'row' },
         h('button', { class: 'primary', style: 'flex: 1', onclick: () => showExam(resume) }, resume.endsAt > Date.now() ? 'Devam et' : 'Sonucu gör'),
         h('button', { class: 'ghost', onclick: () => { if (confirm('Bu deneme silinsin mi? Cevapların kaydedilmez.')) { dropExam(); viewExamHub(); } } }, 'Bırak'))) : null,
+    examWait ? h('p', { class: 'note small quota-line' }, `Bu haftanın denemesini çözdün. Sıradaki deneme ${planDay(examWait)} günü açılır.`) : null,
     booklets.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Gerçek LGS soruları'),
       h('p', { class: 'small muted' }, 'Son üç yılın LGS soruları, sınavdaki sırasıyla ve süresiyle. Bu sorular günlük tekrarda hiç gelmez.'),
@@ -2510,10 +2536,10 @@ async function viewExamHub() {
       lgs ? ['sozel', 'sayisal'].map((section) => h('div', { class: 'card stack', style: 'gap: 6px' },
         h('div', { class: 'spread' }, h('b', {}, `Karma · ${SECTION_NAMES[section]}`),
           h('span', { class: 'small muted num' }, `${SECTION_SUBJECTS[section].reduce((s, x) => s + SECTION_COUNTS[x], 0)} soru · ${minutes(SECTION_SUBJECTS[section])} dk`)),
-        h('button', { class: 'block', onclick: () => startMixedExam(section) }, 'Başla')))
+        h('button', { class: 'block', disabled: examWait ? true : null, onclick: () => startMixedExam(section) }, 'Başla')))
         : h('div', { class: 'card stack', style: 'gap: 6px' },
           h('div', { class: 'spread' }, h('b', {}, 'Karma deneme'), h('span', { class: 'small muted num' }, '30 soru')),
-          h('button', { class: 'block', onclick: () => startMixedExam(null) }, 'Başla')),
+          h('button', { class: 'block', disabled: examWait ? true : null, onclick: () => startMixedExam(null) }, 'Başla')),
       lgs && !booklets.length ? h('p', { class: 'small muted' }, 'Gerçek LGS soruları bütün yılın konularını kapsadığı için konular okulda işlenince açılacak.') : null),
     past.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Çözdüğün denemeler'),
@@ -2552,31 +2578,36 @@ async function viewSend() {
   const added = done.length ? await q(sb.from('questions')
     .select('id, subject, stem, image_path, choices, answer, hint, solution, source_note, submission_id, topics(name)')
     .in('submission_id', done).order('created_at', { ascending: false }).limit(12)) : [];
+  // Bedava planda fotoğraf yükleme kapalı (plan.js): kartlar durur, düğmeler kapanır; gönderdikleri ve çözümleri görünür.
+  const planNow = await planInfo();
+  const noUpload = !planNow.uploads ? true : null;
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, 'Yükle'),
       h('h1', {}, 'Fotoğrafla gönder'),
       h('p', { class: 'muted' }, 'Tek tek sorular ya da kâğıt üzerinde çözdüğün bir deneme.')),
+    noUpload ? h('p', { class: 'note small quota-line' }, 'Fotoğraf yükleme şu an kapalı. Velin Ayarlar\'dan açabilir.') : null,
     h('section', { class: 'card stack', style: 'gap: 8px' },
       h('h2', {}, 'Soru ekle'),
       h('p', { class: 'small muted' }, 'Testte yapamadığın ya da çok beğendiğin bir soru mu var? Fotoğrafını çek, gönder. ' +
         'Bir saat içinde çözümünü yazarım; yapamadıkların benzerleriyle hata tekrarına girer, beğendiklerinin benzerleri de gelir.'),
-      h('button', { class: 'primary block', onclick: () => go('ask') }, 'Soru ekle')),
+      h('button', { class: 'primary block', disabled: noUpload, onclick: () => go('ask') }, 'Soru ekle')),
     // İlkokul: okuduğu kitabın sayfaları. Sorular sınav tarihine kadar Bugün'de, konu tekrarının altında gelir.
     primary ? h('section', { class: 'card stack', style: 'gap: 8px' },
       h('h2', {}, 'Okuduğum kitap'),
       h('p', { class: 'small muted' }, 'Okuduğun kitabın sayfalarını fotoğrafla. Kitaptan sorular hazırlarım; sınavına kadar her gün Bugün sayfasında gelir.'),
-      h('button', { class: 'block', onclick: () => { state.readBook = null; go('read'); } }, 'Kitap sayfalarını gönder'),
+      h('button', { class: 'block', disabled: noUpload, onclick: () => { state.readBook = null; go('read'); } }, 'Kitap sayfalarını gönder'),
       myBooks.map((b) => h('div', { class: 'spread', style: 'padding-top: 8px; border-top: 1px solid var(--rule)' },
         h('div', {}, h('div', {}, `📚 ${b.title}`),
           h('div', { class: 'small muted' }, !b.exam_date ? 'Sınav tarihi yok' : b.exam_date < today ? `Sınavı geçti (${fmtDate(b.exam_date)})` : `Sınav ${fmtDate(b.exam_date)}`)),
         !b.exam_date || b.exam_date >= today
-          ? h('button', { class: 'ghost small', onclick: () => { state.readBook = b.id; go('read'); } }, 'Sayfa ekle') : null))) : null,
+          ? h('button', { class: 'ghost small', disabled: noUpload, onclick: () => { state.readBook = b.id; go('read'); } }, 'Sayfa ekle') : null))) : null,
     h('section', { class: 'card stack', style: 'gap: 8px' },
       h('h2', {}, 'Kâğıt deneme'),
       h('p', { class: 'small muted' }, 'Kâğıt üzerinde bir deneme mi çözdün? Fotoğraflarını gönder, ben notlandırayım.'),
-      h('button', { class: 'block', onclick: () => go('paper') }, 'Kâğıt denemeyi yükle')),
+      planNow.uploads && planNow.paper_month != null ? h('p', { class: 'small muted quota-line' }, `Bu ay ${planNow.paper_month} kâğıt denemenin ${planNow.paper_used} tanesi yüklendi.`) : null,
+      h('button', { class: 'block', disabled: noUpload || (planPaperLeft(planNow) <= 0 ? true : null), onclick: () => go('paper') }, 'Kâğıt denemeyi yükle')),
     added.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Gönderdiğin sorular'),
       added.map((x) => h('div', { class: 'card stack', style: 'gap: 8px' },
@@ -2600,6 +2631,7 @@ async function viewSend() {
 }
 
 async function startBookletExam(id, title, section) {
+  if (state.examWait) return;
   if (savedExam() && !confirm('Yarım kalan bir denemen var; yenisine başlarsan o silinir. Başlansın mı?')) return;
   const qs = await q(sb.from('questions').select('id, subject, topic_id, styles, target_seconds, stem, image_path, choices, answer, hint, solution, booklet_no')
     .eq('booklet', id).eq('active', true).order('booklet_no'));
@@ -2609,6 +2641,7 @@ async function startBookletExam(id, title, section) {
 // Karma deneme: LGS bölümünün ders ve soru sayıları (ilkokulda 30 soru, günlük plan ağırlığıyla); her derste
 // konular LGS sıklığına göre ağırlıklı seçilir, aynı konudan art arda gelme ihtimali azalır.
 async function startMixedExam(section) {
+  if (state.examWait) return;
   if (savedExam() && !confirm('Yarım kalan bir denemen var; yenisine başlarsan o silinir. Başlansın mı?')) return;
   loading('Deneme hazırlanıyor…');
   const counts = section ? SECTION_COUNTS : dailyPlan({ ...state.student, daily_questions: 30, daily_by_subject: null });
@@ -2927,6 +2960,15 @@ async function viewTopicPractice() {
   if (!topic) return go('topics', 'replace');
   const covered = !!status && status.status !== 'not_taught';
   const practice = covered ? await buildPractice(topic) : { entries: [], seconds: 0, fresh: 0 };
+  // Bedava planın günlük sınırı konu çalışmasını da kapsar (plan.js).
+  const planNow = await planInfo();
+  const planLeft = practice.entries.length ? await planLeftToday(planNow) : Infinity;
+  const planFull = planLeft <= 0;
+  if (planLeft < practice.entries.length) {
+    [practice.entries] = planTrim([practice.entries], planLeft);
+    practice.seconds = practice.entries.reduce((n, e) => n + maxSeconds(e.question.subject) + 15, 0);
+    practice.fresh = Math.min(practice.fresh, practice.entries.length);
+  }
   const [label, color] = topicLevel(topic, status?.status, items);
   const review = items.find((i) => i.track === 'topic' && i.state === 'active');
   const n = practice.entries.length;
@@ -2945,7 +2987,8 @@ async function viewTopicPractice() {
                : 'Daha önce doğru yaptığın sorular geliyor; bu konunun yeni soruları günlük tekrarların için ayrıldı. ')
                + 'Yalnızca bu konudan sorular gelir; yanlış yaptıkların hata tekrarına girer.'),
              h('button', { class: 'primary block', onclick: () => runSession('practice', practice, 'konu') }, `Bu konudan ${n} soru çöz`)]
-          : h('p', { class: 'muted' }, 'Bu konunun soruları şimdilik günlük tekrarların için ayrıldı. Yeni sorular hazırlanıyor; birkaç saat sonra tekrar bak.')),
+          : planFull ? h('p', { class: 'muted quota-line' }, `Bugünlük bu kadar: ${planNow.daily_questions} sorunu çözdün. Yarın yenileri gelecek.`)
+            : h('p', { class: 'muted' }, 'Bu konunun soruları şimdilik günlük tekrarların için ayrıldı. Yeni sorular hazırlanıyor; birkaç saat sonra tekrar bak.')),
     // Özel ders notu veli ve öğretmene (velinin isteği, 2026-11-11): eksik konu kapansa da durur.
     status?.tutor_note && isParentView() ? h('details', { class: 'card' }, h('summary', {}, '📝 Özel ders notu'), h('div', { class: 'note teacher', style: 'margin-top: 8px' }, status.tutor_note)) : null,
     covered && status?.lesson ? h('details', { class: 'card' }, h('summary', {}, '📖 Bu konunun kısa anlatımı'), h('div', { class: 'note teacher', style: 'margin-top: 8px' }, status.lesson)) : null,
@@ -4174,6 +4217,7 @@ function viewSettings() {
   if (p) { paintNextUp(); grade.addEventListener('change', paintNextUp); }
   render(
     h('header', {}, h('h1', {}, isParent && p ? `Ayarlar · ${p.display_name}` : 'Ayarlar')),
+    isParent && p ? planCard() : null,
     isParent && p ? planSection(p) : null,
     isParent ? familySection() : null,
     showStudent && h('section', { class: 'card' },
@@ -4341,10 +4385,11 @@ function planSection(p) {
     // Kahraman (velinin isteği, 2026-11-13; 2026-11-18'den beri Kapalı / Asker / Balerin seçimi): çocuk başına; seçtiği kol
     // sıfırlanabilir (army.js).
     const armyRow = armySetting(p);
+    const gamesRow = gamesSetting(p); // oyunları veli çocuk çocuk kapatır (plan.js)
     const save = h('button', { class: 'primary block', onclick: async () => {
       const by = Object.fromEntries(subjects.map((s) => [s, Math.min(60, Math.max(0, Math.round(+inputs[s].value || 0)))]));
       if (!planTotal(by)) return toast('En az bir derse soru ver.');
-      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value(), ...holidayRow.value(), ...feedRow.value(), ...armyRow.value() };
+      const upd = { daily_by_subject: by, daily_questions: planTotal(by), daily_words: wordsRow.value(), daily_typing: typingRow.value(), ...holidayRow.value(), ...feedRow.value(), ...armyRow.value(), ...gamesRow.value() };
       save.disabled = true;
       try { await q(sb.from('profiles').update(upd).eq('id', p.id)); } catch (e) { save.disabled = false; return toast('Kaydedilemedi, tekrar dene.'); }
       save.disabled = false;
@@ -4355,6 +4400,7 @@ function planSection(p) {
       holidayRow.show();
       feedRow.show();
       armyRow.show();
+      gamesRow.show();
       update();
       toast('Kaydedildi. Yeni sayılar bugünden geçerli.');
     } }, 'Kaydet');
@@ -4365,7 +4411,7 @@ function planSection(p) {
         + (days ? `, çalıştığı ${days} günde ortalama ${fmtMinutes(sum('week') / days)}.` : '.')),
       h('p', { class: 'small muted' }, 'Her dersten günde en fazla kaç soru gelsin? Önce hata tekrarları, sonra konu tekrarları gelir; kalan sayı en zayıf konulardan ek çalışmayla dolar. Süre, soruyu açtığı andan şıkkı seçtiği ana kadar ölçülür.'),
       h('div', { class: 'spread', style: 'padding: 8px 0' }, h('label', {}, h('b', {}, 'Günde toplam'), h('span', { class: 'small muted' }, ' · değiştirince derslere aynı oranla dağılır')), totalInput),
-      rowsEl, totalLine, holidayRow, wordsRow, typingRow, feedRow, armyRow, save);
+      rowsEl, totalLine, holidayRow, wordsRow, typingRow, feedRow, armyRow, gamesRow, save);
   })().catch(() => fill(box, h('p', { class: 'label' }, 'Günlük plan'), h('p', { class: 'small muted' }, 'Yüklenemedi, sayfayı yenile.')));
   return box;
 }

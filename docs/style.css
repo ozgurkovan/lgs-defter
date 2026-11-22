@@ -834,3 +834,16 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
   .print-q .stem, .print-q .opt, .print-q .small { font-size: 9.5pt; line-height: 1.3; }
   .print-sheet .qimg { display: block; width: auto; max-width: 100%; max-height: 8cm; }
 }
+
+/* Plan sınırları (plan.js): günlük soru hakkı satırı, velinin plan kartı ve "Kilidi aç", yükleme kilidi. */
+.quota-line { margin-top: 2px; }
+.quota-card { border-left: 4px solid var(--amber); }
+.quota-lock { text-align: center; }
+.quota-asked { color: var(--green); font-weight: 600; }
+.quota-unlock { margin-top: 4px; }
+.quota-preview { margin: 4px 0; }
+.quota-preview summary { cursor: pointer; font-weight: 700; color: var(--accent, inherit); }
+.games-setting label { align-items: flex-start; flex-wrap: nowrap; }
+.games-setting label span { flex: 1; }
+.games-setting input { flex: none; margin-top: 2px; }
+.rocket-card { position: relative; }

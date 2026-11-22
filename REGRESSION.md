@@ -51,7 +51,7 @@ Her maddenin yanında nasıl denendiği yazar:
   Görünüş `docs/theme.css`'te (öteki stillerden sonra yüklenir): düz açık zemin, kalın kenarlı kartlar, kabartmalı ana
   düğmeler, ana sayfada sarı "Başla" ve simgeli Hata tekrarı / Konu tekrarı kartları, mavi kahraman kartı, seçili sekmesi
   renkli alt menü, soru ekranında kalın ilerleme çubuğu ve dolu şık harfleri; koyu tema. Hiçbir ekranın içeriği değişmedi.
-  Sürüm numarası theme.css'i ve export.js'i de kapsar (10 dosya). [O] (sürüm sayımı), [A] (sayfalar hatasız açılır), [E] (görünüş)
+  Sürüm numarası theme.css'i, export.js'i ve plan.js'i de kapsar (11 dosya). [O] (sürüm sayımı), [A] (sayfalar hatasız açılır), [E] (görünüş)
 - Ülke ve müfredat ayrımı (velinin isteği, 2026-11-09; `supabase/country-curriculum.sql`): konular sınıfın yanında müfredata
   göre de seçilir (`topics.curriculum`, `profiles.curriculum`; bugün hepsi `tr`). Başka müfredatın aynı sınıftaki konusu
   öğrenciye görünmez ve yıllık plana göre açılmaz. LGS'ye özgü dersler, günlük plan ağırlıkları, sayaç ve denemeler
@@ -126,6 +126,54 @@ Her maddenin yanında nasıl denendiği yazar:
   bir günde o dersin günlük sayısından fazla hata tekrarı düşmez (`spread_new_mistake` tetiği, `test-spread.sql`).
 - Konu tekrarı Fibonacci aralıklarıyla gelir. LGS'de sık çıkan konular en fazla 21 gün arayla, seyrek konular aralık çarpı velinin katsayısıyla.
 - İlkokulda (3–4. sınıf) günde 20 soru. Üstün çocuk bir üst sınıfın konularını da alabilir.
+
+**Plan sınırları** (velinin isteği, 2026-11-22: "20 soru sınırını yapalım, kullanıcılar unlock yapabilsinler… deneme, kitap
+yüklemesi yapabilecekler ama onun da bir limiti olsun, mesela ayda 6 deneme, paralıda bile"; `docs/plan.js`,
+`supabase/plan-limits.sql`) [O] hesap ve yetki, [A] ekran (plan taklit edilerek), ödeme [E]
+- Üç durum; sayılar veritabanında durur (`plan_caps`), uygulama `plan_limits` ile okur:
+  - **Bedava plan** (aboneliği olmayan aile): günde 20 soru, uygulamada haftada bir deneme, fotoğraf yükleme kapalı;
+    İngilizce kelime kartları, klavye dersleri ve Kelime roketi, asker ve balerin kahraman kapalı (velinin isteği, 2026-11-22:
+    "yabancı dil ve klavye, klavye oyununu da paralıya bağlayalım, savaşçı askeri de").
+  - **Aile planı** (ayda 10 dolar, ailedeki bütün çocuklar): soru ve deneme sınırı yok; ayda 6 kâğıt deneme ve 2 yeni kitap
+    yüklenir, soru fotoğrafı serbest; kelime kartları, klavye ve kahraman velinin Günlük plan ayarına göre açık.
+  - **Hediye abonelik** (aile ve yakınlar, `subscriptions.source = 'gift'`): hiçbir sınır yok.
+- Plan okunamazsa (internet, işlev yok) hiçbir şey kısıtlanmaz; uygulama kilitlenmez. [O]
+- Günlük 20 soruya hata tekrarı, konu tekrarı, ek çalışma, konu çalışması ve kitap soruları birlikte sayılır; velinin ya da
+  öğretmenin denemesi ve uygulamadaki deneme sayılmaz; kelime kartları ve klavye dersleri ayrıdır, sınırlanmaz. Kalan hakka
+  önce hata tekrarı, sonra konu tekrarı, ek çalışma, kitap soruları sığar; ortadan kesilen konu tekrarının kalan son sorusu
+  maddeyi kapatır (yarım kalmaz). Gün çocuğun kendi saatine göredir. [O]
+- Çocuk yalnızca durumu görür, teklif ve fiyat görmez: ana sayfada selamın altında "Bugün 20 sorunun N tanesini çözdün." ya
+  da "Bugünlük bu kadar: 20 sorunu çözdün. Yarın yenileri gelecek."; konu sayfasında hak bittiyse aynı söz. Sınırsız planda
+  satır yok. [A]
+- Deneme sekmesi (bedava): son 7 günde uygulamada bir deneme çözdüyse "Başla" düğmeleri kapalı ve "Bu haftanın denemesini
+  çözdün. Sıradaki deneme … günü açılır."; yarım kalan deneme her zaman sürdürülür. [O] tarih, [A]
+- Yükle (bedava): öğrencinin Yükle sekmesinde kartlar durur, düğmeler kapalı, "Fotoğraf yükleme şu an kapalı. Velin
+  Ayarlar'dan açabilir."; gönderdiği sorular ve son yüklemeler görünür. Yükleme sayfaları (soru, kâğıt deneme, okuduğum kitap,
+  velinin deneme ve kitap sayfası) yerine kilit kartı; velide kartta "Kilidi aç". [A]
+- Yükle (aile planı): kâğıt deneme kartında ve sayfasında "Bu ay 6 kâğıt denemenin N tanesi yüklendi."; altısı dolunca düğme
+  kapanır, sayfada "Bu ayın kâğıt denemeleri tamam" ve yeni hakkın açılacağı gün. Okuduğum kitapta ayın 2 yeni kitabı dolunca
+  "+ Yeni kitap" seçilemez; eklenmiş kitaba sayfa göndermek sayılmaz. [A] deneme, kitap [E]
+- Veli, Ayarlar'ın en üstünde "Plan" kartı: bedavada sınırlar, aile planının ne açtığı ve "Kilidi aç · ayda 10 dolar". Düğme
+  önce sorar ("Şimdi hiçbir ödeme alınmaz"); "İsteğimi gönder" isteği kaydeder (`unlock_requests`), kart "✓ İsteğin alındı"
+  olur. Ödeme altyapısı bağlanana kadar abonelik elle yazılır (`subscriptions`). Aile planında bu ayın yükleme sayımı,
+  hediyede "sınır yok". Öğretmende kart yok. [A], istek göndermek [E]
+- Bedavada kapalı özellikler çocuğun ekranında hiç görünmez: Klavye ve İngilizce sekmeleri yok; forma numarası, cevaptan
+  sonraki antrenman ya da bale, madalyalar, uzaylı savaşı ve dans yok. Kahramanı besleme açık kalır. Velinin Günlük plandaki
+  ayarları (günde kaç kart, kaç ders, Kahraman seçimi) değişmez ve saklanır; aile planına geçince ayarlandığı gibi geri
+  gelir, numara ve yıldızlar kaybolmaz. Plan girişte ve çocuk değiştirince okunur. [O] hesap, [A] sekmeler
+- **Açmadan önce veli bilgilendirilir** (velinin isteği, 2026-11-22: "veliye bunları açmadan önce öğrencinin neyle
+  karşılaşacağını bildirelim"): Plan kartında "Çocuğunuz neyle karşılaşacak?" açılır kutusu; beş başlık (sınırsız soru ve
+  deneme, fotoğraf yükleme, kelime kartları, klavye dersleri ve Kelime roketi, asker ya da balerin kahraman), her birinde
+  çocuğun ekranında ne olduğu: hangisi oyun, ne kadar sürer, uzaylı savaşında kimsenin ölmediği, gerçek silah ve kan
+  olmadığı, çocuğa reklam ve satın alma teklifi gösterilmediği. "Kilidi aç" penceresi de karta gönderir. [A]
+- **Oyunları veli kapatır** (velinin isteği, 2026-11-22: "oyun açmak istemeyebilir veli, 100'den sonraki oyun hoşlarına
+  gitmeyebilir"; `supabase/game-settings.sql`): Günlük planın sonunda "Oyunlar" satırı, çocuk başına iki kutu, ikisi de açık
+  gelir: "Kahramanın oyunları" (uzaylı savaşı ve uzaylıyla dans) ve "Kelime roketi". Kapatınca yalnızca oyun kartı
+  görünmez; kahraman, numarası, rütbesi, cevaptan sonraki sahneler ve klavye dersleri kalır. Kaydet ile kaydedilir; öğrenci
+  değiştiremez (`test-game-settings.sql`). [O] yetki, [A] satır, kaydetme [E]
+- Yüklemeleri veritabanı da denetler (her yükleme saatlik görevde yapay zekâ işi): bedava hesap yükleme ve kitap açamaz,
+  aile planında ayın 7. kâğıt denemesi ve 3. yeni kitabı reddedilir; saatlik görev ve elle işlemler etkilenmez. Günlük soru
+  ve haftalık deneme sınırını uygulama uygular (veritabanı denetlemez). [O] (`test-plan-limits.sql`)
 
 **Soru çözme** [E]
 - Sorular LGS kitapçık sırasıyla (derslere göre gruplu), ders içinde müfredat sırasıyla gelir.
@@ -788,6 +836,10 @@ Her maddenin yanında nasıl denendiği yazar:
   çocukları ve çocukların öteki velisi aynı plandadır (`my_plan()`: 'family' ya da 'free'), öğretmen bağı plan taşımaz,
   süresi biten abonelik sayılmaz. Satırı yalnızca gizli anahtar yazar: çocuk da veli de yazamaz; veli yalnız kendi satırını
   görür, çocuk ve başka veli hiçbir satır görmez. Uygulama planı henüz okumuyor; hiçbir kısıt bağlı değil.
+- Plan sınırları (`test-plan-limits.sql`): planı ve sınırlarını öğrencinin kendisi, velisi ve öğretmeni sorar, başka aile
+  soramaz; bedava hesap fotoğraf yüklemesi ve kitap açamaz; aile planında ayda 6 kâğıt deneme ve 2 yeni kitap, fazlası
+  reddedilir, soru fotoğrafı serbest; hediye abonelikte sınır yok. "Kilidi aç" isteğini yalnızca veli bırakır, yalnız kendi
+  isteğini görür; çocuk bırakamaz.
 - Aile dışından biri hiçbir şey görmez.
 - Test araçları şifresiz giriş bağlantısını yalnızca test hesaplarına üretir (IrfTest, test4.sinif, Test Veli, Test Öğretmen).
   Başka bir ad ya da adres verilirse durur, Supabase'e hiç gitmez; hesap açılmaz.

@@ -244,7 +244,7 @@ check('antrenman çizimleri (uzaylı partnerin dört hâli, kum torbası, eldive
   trainPics.every((s) => s.startsWith('<svg') && s.endsWith('</svg>') && !/NaN|undefined|Infinity/.test(s)) && R.trainAlien('xyz') === R.trainAlien('guard'));
 check('antrenman bağlı: oturumda cevabın altında; seri ve düşüş sayılır, asker olunca ya da hareket azaltılmışsa yok, hiçbir şey yazmaz',
   /trainSlot\(ss, correct\),/.test(app) && /ss\.streak = correct \? \(ss\.streak \|\| 0\) \+ 1 : 0;/.test(app) && /if \(!correct && !help\) ss\.falls/.test(app)
-  && /if \(!st \|\| !trainOn\(p, st\) \|\| !slot\.isConnected\) return;/.test(src) && /if \(!p \|\| !armyOn\(p\) \|\| reduceMotion\(\)\) return slot;/.test(src)
+  && /if \(!st \|\| !trainOn\(p, st\) \|\| !slot\.isConnected\) return;/.test(src) && /if \(!p \|\| !armyOpen\(p\) \|\| reduceMotion\(\)\) return slot;/.test(src)
   && !/sb\.from\(/.test(pick(src, 'function trainSlot(', '/* Asker: veli */')));
 
 // Bale (2026-11-18): kız kahramanda kum torbasının yerine balerin; 70'ten sonra uzaylıyla dans ve oturum sonunda dans oyunu
