@@ -894,7 +894,7 @@ async function buildSession(track, remaining, busy = new Set()) {
     // Hata maddesi önce yanlış yaptığı sorunun benzerlerini alır; başka hata maddelerine ayrılmış benzerlere
     // (konu tekrarında da) dokunulmaz. Benzer yoksa konudan, kaçırdığı tarzlara yakın bir soru gelir. Kitap soruları
     // yalnızca kendi benzerleri olarak gelir (kitabın günlük sorularını önden harcamasın, başka kitaba karışmasın).
-    const own = { q: new Set([it.question_id].filter(Boolean)), e: new Set([it.exam_question_id].filter(Boolean)) };
+    const own = { q: new Set([it.question_id].filter(Boolean)), e: new Set(kinOf(reserved.kin, it.exam_question_id)) };
     const variants = fresh.filter((p) => isVariantOf(p, own));
     const candidates = fresh.filter((p) => !p.book_id && !isVariantOf(p, reserved))
       .sort((a, b) => overlap(b.styles, styles) - overlap(a.styles, styles));
@@ -944,11 +944,16 @@ async function buildExtra(remaining, exclude) {
 
 function overlap(a, set) { return (a || []).filter((s) => set.has(s)).length; }
 // Açık hata maddelerinin kaynak soruları: bunların benzerleri o maddeye ayrılmıştır.
+// kin: aynı denemenin aynı sorusunu yanlış yapan başka çocukların kayıtları (deneme kataloğu, exam_kin): onlar için
+// yazılmış tekrar soruları da bu maddeye sayılır, yeniden yazılmaz. Okunamazsa boş kalır, eskisi gibi çalışır.
 async function reservedVariants() {
-  const rows = await q(sb.from('items').select('question_id, exam_question_id')
-    .eq('student_id', sid()).eq('track', 'mistake').eq('state', 'active'));
-  return { q: new Set(rows.map((r) => r.question_id).filter(Boolean)), e: new Set(rows.map((r) => r.exam_question_id).filter(Boolean)) };
+  const [rows, kin] = await Promise.all([
+    q(sb.from('items').select('question_id, exam_question_id').eq('student_id', sid()).eq('track', 'mistake').eq('state', 'active')),
+    sb.rpc('exam_kin', { student: sid() }).then(({ data, error }) => (error || !data || typeof data !== 'object' ? {} : data), () => ({})),
+  ]);
+  return { q: new Set(rows.map((r) => r.question_id).filter(Boolean)), e: new Set(rows.flatMap((r) => kinOf(kin, r.exam_question_id))), kin };
 }
+const kinOf = (kin, id) => (id ? [id, ...((kin && kin[id]) || [])] : []);
 const isVariantOf = (p, src) => (!!p.variant_of && src.q.has(p.variant_of)) || (!!p.variant_of_exam && src.e.has(p.variant_of_exam));
 function pickVaried(candidates, n) {
   const picked = [], shown = new Set(), rest = [...candidates];

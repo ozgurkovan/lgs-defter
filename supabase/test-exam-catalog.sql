@@ -1,15 +1,16 @@
 -- Deneme kataloğu ve bekletme testi: yeni denemeden yazılan soru (ve o denemenin bir sorusunun hata tekrarı sorusu)
 -- bekleme gününe kadar yalnızca denemeyi yükleyen ailenin; başka aile görmez; aynı denemeyi yükleyen ikinci çocuk
 -- görenlere eklenir ve yükleme sayısı artar; gün gelince soru ortak havuza açılır; süresi geçmiş katalogdan yazılan soru
--- hiç beklemez; uygulama katalog tablolarını okuyamaz, deneme adlarını yalnızca kendi çocuğu için alır.
+-- hiç beklemez; uygulama katalog tablolarını okuyamaz, deneme adlarını yalnızca kendi çocuğu için alır. Aynı denemenin
+-- aynı sorusunu yanlış yapan ikinci çocuk için yeni tekrar sorusu istenmez (akraba kayıt), uygulama akrabaları okur.
 -- Sonuç hata mesajıyla döner; her şey geri alınır.
--- beklenen: {"bekliyor":true,"hata_sorusu_bekliyor":true,"yukleyen_goruyor":2,"baska_aile_goruyor":0,"ikinci_cocuk_eklendi":true,"yukleme_sayisi":2,"ikinci_aile_goruyor":2,"acilan":2,"acildi":true,"eski_katalog_beklemez":true,"tablo_kapali":true,"adlar":true,"baska_aile_adlar":0}
+-- beklenen: {"bekliyor":true,"hata_sorusu_bekliyor":true,"yukleyen_goruyor":2,"baska_aile_goruyor":0,"ikinci_cocuk_eklendi":true,"yukleme_sayisi":2,"ikinci_aile_goruyor":2,"akraba":2,"ikinci_cocuk_ihtiyac":2,"katalogsuz_ihtiyac":3,"uygulama_akraba":1,"acilan":2,"acildi":true,"eski_katalog_beklemez":true,"tablo_kapali":true,"adlar":true,"baska_aile_adlar":0}
 do $$
 declare
   kid uuid := (select id from public.profiles where display_name = 'IrfTest' and role = 'student');
   other_parent uuid := (select id from public.profiles where display_name = 'ABD Veli' and role = 'parent');
   other_kid uuid;
-  cat uuid; old_cat uuid; ex uuid; ex2 uuid; eq uuid; q1 uuid; q2 uuid; q3 uuid;
+  cat uuid; old_cat uuid; ex uuid; ex2 uuid; ex3 uuid; eq uuid; eq2 uuid; eq3 uuid; q1 uuid; q2 uuid; q3 uuid;
   topic text := (select id from public.topics where grade = 8 and coalesce(curriculum, 'tr') = 'tr' order by id limit 1);
   subj text;
   r jsonb := '{}';
@@ -55,6 +56,22 @@ begin
     'yukleme_sayisi', (select uploads from public.exam_catalog where id = cat));
   perform set_config('role', 'authenticated', true);
   select count(*) into n from public.questions where id in (q1, q2); r := r || jsonb_build_object('ikinci_aile_goruyor', n);
+
+  -- İkinci çocuk aynı soruyu yanlış yapar: ilk çocuk için yazılan sorular ona da sayılır (1 soru var, 3'e 2 eksik).
+  -- Katalogda olmayan bir denemede aynı durum: hiç sorusu yok, 3 istenir.
+  perform set_config('role', 'postgres', true);
+  insert into public.exam_questions (student_id, exam_id, subject, q_no, topic_id, outcome) values (other_kid, ex2, subj, 1, topic, 'yanlis') returning id into eq2;
+  insert into public.items (student_id, track, topic_id, exam_question_id, step, interval_days, due_date)
+    values (other_kid, 'mistake', topic, eq2, 0, 1, current_date + 1);
+  insert into public.exams (student_id, name) values (other_kid, 'katalogsuz') returning id into ex3;
+  insert into public.exam_questions (student_id, exam_id, subject, q_no, topic_id, outcome) values (other_kid, ex3, subj, 1, topic, 'yanlis') returning id into eq3;
+  insert into public.items (student_id, track, topic_id, exam_question_id, step, interval_days, due_date)
+    values (other_kid, 'mistake', topic, eq3, 0, 1, current_date + 1);
+  r := r || jsonb_build_object('akraba', array_length(public.exam_question_kin(eq2), 1),
+    'ikinci_cocuk_ihtiyac', (select need from public.mistake_variant_needs where exam_question_id = eq2),
+    'katalogsuz_ihtiyac', (select need from public.mistake_variant_needs where exam_question_id = eq3));
+  perform set_config('role', 'authenticated', true);
+  r := r || jsonb_build_object('uygulama_akraba', (select count(*) from jsonb_object_keys(public.exam_kin(other_kid))));
 
   -- Bekleme günü gelir
   perform set_config('role', 'postgres', true);

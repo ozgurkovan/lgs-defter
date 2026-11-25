@@ -184,6 +184,11 @@ yüklemesi yapabilecekler ama onun da bir limiti olsun, mesela ayda 6 deneme, pa
   `release_held_questions` ile ortak havuza açar. Soru tipleri güncel denemeler (`is_current`) havuz yazımında örnek
   alınır. Deneme yükleme sayfasında "Denemenin adı" bilinen adları önerir. [O] `test-exam-catalog.sql`; görevin
   eşleştirmesi ve kısa yol [E]
+- **Deneme sorusunun tekrar soruları ortak** (v143; velinin isteği, 2026-11-25: "100 kişi aldıktan sonra pek yeni soruya
+  gerek kalmayacak"): katalogdaki aynı denemenin aynı sorusunu yanlış yapan çocukların kayıtları akrabadır
+  (`exam_question_kin`); biri için yazılan hata tekrarı soruları öbürlerine de gelir (`exam_kin`, uygulama okur) ve
+  `mistake_variant_needs` onlar için yeniden soru istemez. Katalogda olmayan denemede eskisi gibi. Bekletme bozulmaz.
+  [O] `test-exam-catalog.sql`; ekranda iki çocukla [E]
 - **İki görev, iki rol** (velinin kararı, 2026-11-25): saatlik görev (küçük model) soru yazmaz ve yeni denemeyi işlemez;
   katalogda olmayan denemeyi `route = 'yazim'` ile bırakır. Yazım görevi (ayrı zamanlanmış görev, güçlü model, günde 3 kez;
   deneme amaçlı, bir iki hafta sonra küçük modelle karşılaştırılacak) çalıştırma başına en çok 1 yeni deneme işler ve en çok
