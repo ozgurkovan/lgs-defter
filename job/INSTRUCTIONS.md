@@ -38,13 +38,20 @@ This file is used by two scheduled tasks. Your task prompt names your role; if i
 ROUTINE.
 
 - ROUTINE: the hourly task, a small and cheap model. It does everything in this file EXCEPT writing
-  new questions and processing a deneme for the first time. Concretely it skips: the full path of a
-  new deneme (1a, path C), section 1c and section 2. It never writes a pool question or a mistake
-  question, even if the run has time left.
-- WRITER: runs three times a day on a strong model, as a trial: after one or two weeks its questions
-  and its cost are compared with the small model's and one of them is kept. It does ONLY this, in
-  this order: section 0 (log the run, with "yazım: " at the start of the summary), one new deneme
-  ("WRITER: new denemes" in section 1), section 1c, section 2, section 5. It skips everything else
+  new questions: it skips section 1c and section 2 and never writes a pool question or a mistake
+  question, even if the run has time left. It tries every upload first, new denemes included, and
+  hands a deneme up to the WRITER only when it cannot finish it reliably (velinin kararı, 2026-11-25:
+  "Haiku yapamayınca Opus'a bıraksa, Opus yapsa"; see "ROUTINE and denemes" in section 1).
+- WRITER: runs three times a day on a strong model until 2026-12-31 (velinin kararı, 2026-11-25:
+  "yıl sonuna kadar test edelim deneme yüklemelerini; her şey çalışırsa Haiku'ya devredelim"). The aim
+  is to hand this work back to the small model once the catalog and the queue are proven to work; at
+  the end of the year the two are compared (deneme processing, question quality, cost) and the
+  parent decides who does what. So that the comparison can be counted, every run that touches a
+  deneme writes one of these in its `job_runs` summary, with the deneme's name: "deneme kendim: ..."
+  (ROUTINE finished it), "deneme yazıma: ... (neden)" (ROUTINE handed it up), "deneme yazım bitirdi:
+  ..." or "deneme yazım bitiremedi: ... (neden)" (WRITER). It does ONLY this, in
+  this order: section 0 (log the run, with "yazım: " at the start of the summary), one deneme the
+  ROUTINE task handed up ("WRITER: denemes handed up" in section 1), section 1c, section 2, section 5. It skips everything else
   (other uploads, hero photos, steps, gaps, feedback, votes).
   Limits per run, never exceeded: at most 1 deneme, and at most 40 new questions in total (1c first,
   nearest `due_date` first; what is left of the 40 goes to section 2). These limits replace the larger
@@ -184,24 +191,36 @@ the queue is not installed: process every `submitted` upload as before
 ```
 node tools/sb.mjs get "submissions?id=in.(<ids, comma separated>)&select=*,exams(*),submission_photos(*),profiles!submissions_student_id_fkey(display_name,grade)"
 ```
-ROUTINE and denemes: a `deneme` in `ids` is yours only when it is already in the catalog. If the
-catalog is not installed, do not open denemes at all: leave them `submitted` for the WRITER. If it is
-installed, download only the first two photos (lowest `sort`), do step A of "Deneme catalog" in 1a,
-and then either take the short path B (download the rest and finish it), or, when no row matches, hand
-it over: `patch "submissions?id=eq.<id>" '{"route": "yazim"}'`, leave `status` as `submitted`, write
-nothing else. This hand-over is the one exception to the rule below about never leaving an upload
-`submitted`; a row with `route = yazim` does not come back in `ids`.
+ROUTINE and denemes: try every `deneme` in `ids` yourself first, with section 1a: step A of "Deneme
+catalog", then the short path B (known deneme) or the full path C (new deneme). Hand it up to the
+WRITER only when you cannot finish it reliably, and only for a reason a stronger model can fix:
+- there is no answer key and your two independent solutions disagree, or you are not sure, on more
+  than a few questions;
+- you cannot read the child's marks or the pages well enough to be sure, although the photos are
+  not plainly unusable;
+- the deneme is too large to finish correctly in one run.
+To hand it up: undo nothing you have already saved, `patch "submissions?id=eq.<id>" '{"route":
+"yazim", "status": "submitted"}'`, and write what you did and why you stopped to
+`.work/<submission_id>/devir.txt` (in Turkish: which sections are done, which answers you are unsure
+of, what you could not read). This is the one exception to the rule below about never putting an
+upload back to `submitted`; a row with `route = yazim` does not come back in `ids`. Do not hand up an
+upload that no model could process (blank or blurred photos, pages missing): that one ends as
+`error` with a note to the child, as the rule below says.
 
-WRITER: new denemes. Take one deneme per run:
+WRITER: denemes handed up. Take one deneme per run:
 ```
 node tools/sb.mjs post rpc/writer_queue '{}'
 ```
 It returns the id of the next deneme waiting for you (paid and gift plans first, then the oldest), or
 null. If the function does not exist yet, take the oldest one yourself:
 `submissions?status=eq.submitted&kind=eq.deneme&select=id&order=submitted_at&limit=1`. Load it with the
-`get` below and process it with section 1a: check the catalog once more (step A; if it matches after
-all, use the short path B), otherwise the full path C. You are the one who solves it, so the rule about
-never leaving an upload `submitted` applies to you in full.
+`get` below, read `.work/<submission_id>/devir.txt` if it exists (the ROUTINE task's notes: keep what
+it saved and is sure of, redo what it was unsure of; do not insert rows twice, check
+`exam_questions?exam_id=eq.<exam_id>` first), and process it with section 1a: check the catalog once
+more (step A; if it matches after all, use the short path B), otherwise the full path C. You are the
+last step: there is no model above you. The rule about never leaving an upload `submitted` applies to
+you in full; what you cannot finish ends as `error` with a `result_note` that tells the child exactly
+what to send again.
 
 For each submission: patch `status` to `processing`, download every photo to
 `.work/<submission_id>/` (`node tools/sb.mjs download photos <storage_path> .work/<storage_path>`),
