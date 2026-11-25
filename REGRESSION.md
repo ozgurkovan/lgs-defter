@@ -131,7 +131,10 @@ Her maddenin yanında nasıl denendiği yazar:
 yüklemesi yapabilecekler ama onun da bir limiti olsun, mesela ayda 6 deneme, paralıda bile"; `docs/plan.js`,
 `supabase/plan-limits.sql`) [O] hesap ve yetki, [A] ekran (plan taklit edilerek), ödeme [E]
 - Üç durum; sayılar veritabanında durur (`plan_caps`), uygulama `plan_limits` ile okur:
-  - **Bedava plan** (aboneliği olmayan aile): günde 20 soru, uygulamada haftada bir deneme, fotoğraf yükleme kapalı;
+  - **Bedava plan** (aboneliği olmayan aile): günde 20 soru, uygulamada haftada bir deneme, haftada 10 soru fotoğrafı ve
+    ayda 1 kâğıt deneme (velinin isteği, 2026-11-25: "bedavalar haftada en fazla 10 soru yükleyebilsin, fazlasında premium
+    istesin; deneme yüklemesi ayda 1 tane, sonrasında premium istesin"; her fotoğraf bir soru, hafta pazartesi başlar),
+    kitap yükleme kapalı;
     İngilizce kelime kartları, klavye dersleri ve Kelime roketi, asker ve balerin kahraman kapalı (velinin isteği, 2026-11-22:
     "yabancı dil ve klavye, klavye oyununu da paralıya bağlayalım, savaşçı askeri de").
   - **Aile planı** (ayda 10 dolar, ailedeki bütün çocuklar): soru ve deneme sınırı yok; ayda 6 kâğıt deneme ve 2 yeni kitap
@@ -157,6 +160,35 @@ yüklemesi yapabilecekler ama onun da bir limiti olsun, mesela ayda 6 deneme, pa
   önce sorar ("Şimdi hiçbir ödeme alınmaz"); "İsteğimi gönder" isteği kaydeder (`unlock_requests`), kart "✓ İsteğin alındı"
   olur. Ödeme altyapısı bağlanana kadar abonelik elle yazılır (`subscriptions`). Aile planında bu ayın yükleme sayımı,
   hediyede "sınır yok". Öğretmende kart yok. [A], istek göndermek [E]
+- **Soru fotoğrafı her planda açık** (v142): bedavada Yükle sayfasında "Soru ekle" açık, altında "Bu hafta 10 soru
+  fotoğrafının N tanesi gönderildi"; Soru gönder sayfasında kalan haktan fazla fotoğraf eklenince Gönder kapanır ve kaç
+  fotoğrafın çıkarılacağını yazar; hak dolunca "Bu haftanın soru fotoğrafları tamam, yeni hak pazartesi" (çocukta teklif yok,
+  velide "Kilidi aç"). Bedavada ayda 1 kâğıt deneme: dolunca "Bu ayın kâğıt denemeleri tamam" (çocukta teklif yok, "Soru gönder" düğmesi; velide "Kilidi aç" ve "Yapamadığı soruları yükle"); kitap bedavada kapalı. Veli de çocuğunun
+  yapamadığı soruları yükler (velinin isteği, 2026-11-24: "veliye de söylememiz lazım"): raporun Yüklemeler sekmesinin
+  başında "Yapamadığı soruları yükleyin" kartı ve sayaç, velinin Deneme sayfasındaki kilit kartında "Yapamadığı soruları
+  yükle". Yüklemeyle ilgili yazılarda "benzeri" denmez (velinin isteği, 2026-11-24): "takıldığı konu tekrarlarına eklenir".
+  Veritabanı fotoğraf fotoğraf sayar (`guard_plan_photo`). [O] sayım ve ret, [A] sayaç ve kartlar, gerçek gönderim [E]
+- **Bedava yüklemeler sıraya girer** (v142; velinin isteği, 2026-11-25: "işleyeceğimiz soru sayısı belli olsun; onlar
+  yükleme yapabilir ama biz işlemeyiz, onlarınki sıraya girer"): saatlik görev neyi işleyeceğini `upload_queue()` ile
+  sorar; ücretli ve hediye planlar her zaman ve önce, bedavadan günde en çok `process_day` (200) fotoğraf, en eski önce;
+  fazlası `submitted` kalır, ertesi gün işlenir; sayı 0 yapılırsa bedava işleme durur (yükleme yine alınır). Bedavada
+  ekranda "bir saat içinde" denmez: "Sıra gelince çözümünü yazarım", gönderince "Soruların sıraya girdi", yükleme
+  satırında "Sırada, sıra gelince işlenecek"; velinin kartında "Aile planında bir saat içinde işlenir". Ücretli planda
+  yazılar eskisi gibi. [O] sıra ve bütçe (`test-upload-queue.sql`), birim testinde planQueued, [A] bedava yazıları
+- **Deneme kataloğu ve bekletme** (v142; velinin isteği, 2026-11-25: "çocuk denemeyi yüklediğinde yeni bir deneme ise
+  bunu belirtmemiz lazım, bu soruları bir süre beklemeye alacağız"; "denemeyi başka çocuk indirdiyse yalnızca
+  cevap/yanlışlarını not etmek yeter"): saatlik görev her kâğıt denemeyi katalogda arar (`exam_catalog`); yoksa "Yeni
+  deneme" diye kaydeder (anahtar, konu, kazanım notu, çözüm; kaynağın metni yok), varsa yalnızca çocuğun cevaplarını okur.
+  Katalogdaki denemeden yazılan sorular ve o denemenin hata tekrarı soruları 30 gün yalnızca denemeyi yükleyen ailelere
+  görünür (`hold_until`, `private_students`); aynı denemeyi yükleyen ikinci çocuk görenlere eklenir; gün gelince görev
+  `release_held_questions` ile ortak havuza açar. Soru tipleri güncel denemeler (`is_current`) havuz yazımında örnek
+  alınır. Deneme yükleme sayfasında "Denemenin adı" bilinen adları önerir. [O] `test-exam-catalog.sql`; görevin
+  eşleştirmesi ve kısa yol [E]
+- **İki görev, iki rol** (velinin kararı, 2026-11-25): saatlik görev (küçük model) soru yazmaz ve yeni denemeyi işlemez;
+  katalogda olmayan denemeyi `route = 'yazim'` ile bırakır. Yazım görevi (ayrı zamanlanmış görev, güçlü model, günde 3 kez;
+  deneme amaçlı, bir iki hafta sonra küçük modelle karşılaştırılacak) çalıştırma başına en çok 1 yeni deneme işler ve en çok
+  40 soru yazar (önce hata tekrarı, sonra havuz); sırası `writer_queue()`, ücretli önce. Güncellik kararı ayrı görevde
+  (ayrı zamanlanmış görev, `job/GUNCELLIK.md`), deneme başına bir kez. [O] sıra (`test-upload-queue.sql`), görevler [E]
 - Bedavada kapalı özellikler çocuğun ekranında hiç görünmez: Klavye ve İngilizce sekmeleri yok; forma numarası, cevaptan
   sonraki antrenman ya da bale, madalyalar, uzaylı savaşı ve dans yok. Kahramanı besleme açık kalır. Velinin Günlük plandaki
   ayarları (günde kaç kart, kaç ders, Kahraman seçimi) değişmez ve saklanır; aile planına geçince ayarlandığı gibi geri

@@ -32,6 +32,24 @@ hopes they do well in private-school scholarship exams (bursluluk sınavları). 
 - A parent can open the next grade's topics for a strong child (`profiles.extra_grades`, e.g. a
   3rd grader tracking grade-4 topics). Write those questions at the topic's grade, not the child's.
 
+## Two tasks, two roles (velinin kararı, 2026-11-25)
+
+This file is used by two scheduled tasks. Your task prompt names your role; if it names none, you are
+ROUTINE.
+
+- ROUTINE: the hourly task, a small and cheap model. It does everything in this file EXCEPT writing
+  new questions and processing a deneme for the first time. Concretely it skips: the full path of a
+  new deneme (1a, path C), section 1c and section 2. It never writes a pool question or a mistake
+  question, even if the run has time left.
+- WRITER: runs three times a day on a strong model, as a trial: after one or two weeks its questions
+  and its cost are compared with the small model's and one of them is kept. It does ONLY this, in
+  this order: section 0 (log the run, with "yazım: " at the start of the summary), one new deneme
+  ("WRITER: new denemes" in section 1), section 1c, section 2, section 5. It skips everything else
+  (other uploads, hero photos, steps, gaps, feedback, votes).
+  Limits per run, never exceeded: at most 1 deneme, and at most 40 new questions in total (1c first,
+  nearest `due_date` first; what is left of the 40 goes to section 2). These limits replace the larger
+  numbers written in 1c and section 2. Later runs continue where you stopped.
+
 ## Content rules for everything you write (velinin isteği, 2026-11-16)
 
 The readers are children. Every question, choice, passage, hint, solution, step and lesson must be
@@ -62,9 +80,18 @@ The database enforces this (`supabase/private-questions.sql`): `questions.privat
 students a question is private to (null = shared pool). Rows you insert with `source` `ogrenci`,
 `kitap`, `meb` or `deneme` are made private to the uploader's family automatically; never clear that
 column, and leave it null on the questions you write yourself (`source=claude`).
-When an uploaded question leads to new questions (1c variants, 1e look-alikes, section 2), take from
-it only what nobody owns: the kazanım, the skill, the question style and the misconception behind the
-distractors. Then write a new question from scratch:
+When an uploaded question leads to new questions (1c, 1e, section 2), work in two separate steps
+(velinin kararı, 2026-11-24: "yüklemeden konu ve kazanım çıkacak, soruyu sıfırdan yazalım"):
+
+Step 1, the brief. From the uploaded question take only what nobody owns and write it down as a short
+brief in your own words: the topic (`topic_id`), the kazanım, the skill being tested, the difficulty,
+the general question type (for example "two-step word problem", "read a bar chart", "find the main
+idea of a short text") and, for a mistake, the misconception behind the wrong choice. The brief holds
+no sentence, name, number, scenario, table, figure or choice text from the source.
+
+Step 2, the questions. Put the source away and write from the brief alone, as you would for any topic
+in section 2. Do not look back at the source while writing; you only return to it for the final check
+below. The new questions are questions on that topic and kazanım, not versions of the upload:
 - a new scenario and setting, new names, new data, new wording; your own table, list or figure layout;
 - never the source's sentences, its characters, its table or figure with other numbers, its order of
   choices or its distractor texts; "the same question with different numbers" is a copy, not a variant;
@@ -72,6 +99,12 @@ distractors. Then write a new question from scratch:
   paraphrased sentence by sentence; write your own text on a different subject;
 - check before saving: put your question next to the source. If a reader would say "this is that
   question, changed", rewrite it. What may match is the idea being tested and nothing else.
+
+Words shown to families (velinin kararı, 2026-11-24): in `result_note` and any other text a child or
+parent reads, never say that questions are made from, modelled on or similar to an uploaded question
+(no "benzeri", "benzer soru", "look-alike", "similar to your question"). Say what is true: the solution
+is written, and the topic she got stuck on joins her reviews ("takıldığın konu hata tekrarına girdi").
+This wording rule is about uploads; for mistakes on our own questions the app's own texts stay as they are.
 Quoted texts in your own questions: only your own writing or works clearly in the public domain.
 
 ## US students (`profiles.curriculum` starts with `us`, e.g. `us-pa` = Pennsylvania)
@@ -123,17 +156,124 @@ Then start topics whose week in the MEB yearly plan has arrived, for every stude
 node tools/sb.mjs post rpc/activate_planned_topics '{}'
 ```
 
+Then open the questions whose waiting time is over (see "Deneme catalog" in 1a; returns how many):
+```
+node tools/sb.mjs post rpc/release_held_questions '{}'
+```
+If this call or any `exam_catalog` call below fails because the function or table does not exist yet
+(404 / "could not find"), the catalog is not installed: skip every catalog step in this file, process
+denemes the full way, and say so in the summary.
+
 ## 1. New uploads
 
+Ask the database which uploads to process in this run (velinin kararı, 2026-11-25: "işleyeceğimiz soru
+sayısı belli olsun; onlar yükleme yapabilir ama biz işlemeyiz, onlarınki sıraya girer"):
 ```
-node tools/sb.mjs get "submissions?status=eq.submitted&select=*,exams(*),submission_photos(*),profiles!submissions_student_id_fkey(display_name,grade)&order=submitted_at"
+node tools/sb.mjs post rpc/upload_queue '{}'
 ```
+It returns `ids` (the submissions to process now, in order: paid and gift plans first, then free-plan
+question photos, oldest first) and the free plan's daily numbers (`free_day` the daily budget in photos,
+`free_done` already processed today, `free_now` taken in this run, `free_waiting` left in the queue).
+Process only the submissions in `ids`, in that order. Every other `submitted` row belongs to a free
+plan over today's budget: leave it exactly as it is (no status change, no note); it will come back in
+`ids` on a later day. Never process a free-plan upload that is not in `ids`, even if the run has time
+left. If `ids` is empty, skip to section 2. Put the four numbers in your run summary.
+If the call itself fails because the function does not exist yet (404 / "could not find the function"),
+the queue is not installed: process every `submitted` upload as before
+(`submissions?status=eq.submitted&...&order=submitted_at`) and say so in the summary.
+```
+node tools/sb.mjs get "submissions?id=in.(<ids, comma separated>)&select=*,exams(*),submission_photos(*),profiles!submissions_student_id_fkey(display_name,grade)"
+```
+ROUTINE and denemes: a `deneme` in `ids` is yours only when it is already in the catalog. If the
+catalog is not installed, do not open denemes at all: leave them `submitted` for the WRITER. If it is
+installed, download only the first two photos (lowest `sort`), do step A of "Deneme catalog" in 1a,
+and then either take the short path B (download the rest and finish it), or, when no row matches, hand
+it over: `patch "submissions?id=eq.<id>" '{"route": "yazim"}'`, leave `status` as `submitted`, write
+nothing else. This hand-over is the one exception to the rule below about never leaving an upload
+`submitted`; a row with `route = yazim` does not come back in `ids`.
+
+WRITER: new denemes. Take one deneme per run:
+```
+node tools/sb.mjs post rpc/writer_queue '{}'
+```
+It returns the id of the next deneme waiting for you (paid and gift plans first, then the oldest), or
+null. If the function does not exist yet, take the oldest one yourself:
+`submissions?status=eq.submitted&kind=eq.deneme&select=id&order=submitted_at&limit=1`. Load it with the
+`get` below and process it with section 1a: check the catalog once more (step A; if it matches after
+all, use the short path B), otherwise the full path C. You are the one who solves it, so the rule about
+never leaving an upload `submitted` applies to you in full.
+
 For each submission: patch `status` to `processing`, download every photo to
 `.work/<submission_id>/` (`node tools/sb.mjs download photos <storage_path> .work/<storage_path>`),
 then read each image. If something fails, patch `status=error` and a Turkish `result_note` that says
 what the student should do (for example "3. sayfa bulanık, tekrar çekip gönder").
 
+Never put an upload back to `submitted` and never leave it there after you opened it (velinin kararı,
+2026-11-25: token harcaması). An upload you cannot finish in this run ends as `error` with a
+`result_note` that names exactly what is missing ("Cevap anahtarının fotoğrafı yok; anahtarı da çekip
+yeniden gönder", "İşaretlediğin şıklar okunmuyor; optik formu yakından çek"). A `submitted` row is
+retried every hour, and each retry reads all its photos again for nothing.
+
 ### 1a. Deneme (`kind = deneme`, has `student_id`)
+
+#### Deneme catalog: is this deneme new? (velinin kararı, 2026-11-25)
+
+Many children solve the same printed deneme, in different cities and on different days. The parent
+decided: "çocuk denemeyi yüklediğinde yeni bir deneme ise bunu belirtmemiz lazım, bu soruları bir süre
+beklemeye alacağız"; "denemeyi başka çocuk indirdiyse yalnızca cevap/yanlışlarını not etmekten başka bir
+şey yapmamıza gerek kalmaz". So before grading, find out which printed deneme this is.
+
+A. Identify it from the cover and the first pages: publisher, name and number, grade, booklet type
+   (A/B) if printed, and whether it is sözel, sayısal or both. Then look it up:
+   ```
+   node tools/sb.mjs get "exam_catalog?grade=eq.<grade>&curriculum=eq.<tr|us-pa>&select=*&order=first_seen.desc"
+   ```
+   A row matches only when publisher, name/number, part and booklet type agree AND its `fingerprint`
+   agrees with what you see (the number of questions per section and the topic of the first three
+   questions of each section). The name the child typed is a hint, never proof. When in doubt, it is
+   not a match.
+
+B. Known deneme (a row matches): do the short path.
+   - Patch the child's exam: `exams?id=eq.<exam_id>` with `{"catalog_id": "<id>"}`.
+   - Read `exam_catalog_questions?catalog_id=eq.<id>&order=subject,q_no`. That is the answer key and
+     our notes. Do NOT solve the questions again and do NOT rewrite topics, hints or solutions.
+   - Read only the child's answers (optik form, otherwise the marks in the booklet) and her own marks
+     (`T`, circled numbers). Insert the `exam_questions` rows with `correct_answer`, `topic_id`,
+     `styles`, `hint` and `solution` copied from the catalog, and `outcome` from her answer.
+   - For her wrong and blank questions only: crop the question from HER photos (`image_path`; never
+     use another child's photo), and write `diagnosis_cause`, `diagnosis_text` and `misconception`
+     from her chosen choice (`wrong_notes` in the catalog names the idea behind each choice) and her
+     scratch work.
+   - Continue with steps 6 to 9 below as usual. In `result_note` do not mention other children.
+   - If a catalog answer turns out to be wrong (her scratch work or the printed key proves it), fix
+     the catalog row and say so in the run summary.
+
+C. New deneme (no row matches): do the full path, steps 1 to 9 below, and record it.
+   - Before step 4, insert the catalog row and keep its `id`:
+     `post exam_catalog` with `name` (clean, as printed), `publisher`, `grade`, `curriculum`, `season`
+     (school year, e.g. "2026-27"), `booklet`, `part`, `first_submission_id`, `fingerprint`
+     (`{"sections": {"turkce": 20, ...}, "first": {"turkce": ["paragrafta ana düşünce", ...]}}`, in
+     your own words: topics, never a sentence from the booklet). Leave `is_current` and `style_note`
+     empty: whether its question types are current is decided once per deneme by a separate task
+     with a stronger model (`job/GUNCELLIK.md`; velinin kararı, 2026-11-25). Never fill them yourself.
+     `hold_until` fills itself (30 days from today): until then nothing written from this deneme
+     reaches other children.
+   - Patch the child's exam with `catalog_id`.
+   - After step 5, post one `exam_catalog_questions` row per question: `catalog_id, subject, q_no,
+     correct_answer, topic_id, styles, brief, hint, solution, wrong_notes`. `brief` is the brief of
+     "Original questions only" (topic, kazanım, skill, question type, difficulty); `wrong_notes` is
+     `{"A": "...", "B": "..."}` with the idea behind each wrong choice. `hint` and `solution` are your
+     own words. None of these fields may hold a sentence, name, number, table or choice text from the
+     booklet.
+   - If you could not grade the deneme (no key and you cannot solve it reliably, unreadable pages),
+     do not create a catalog row; the upload ends as `error` as the rule above says.
+   - Start the summary line with "Yeni deneme: <name>" so the parent sees it is the first upload.
+
+Waiting time. Every question you write from a catalog deneme carries `catalog_id`: the 1c questions
+for a mistake on one of its questions get it by themselves (through `variant_of_exam`); when you write
+pool questions from a catalog brief (section 2), set `catalog_id` yourself. The database then keeps
+them for the families who uploaded that deneme until `hold_until`, and opens them to everyone after
+that. Never set `private_students` or `hold_until` yourself, and never work around the waiting time.
 
 Standard LGS order (a branş or school exam may differ; follow the booklet):
 Sözel: Türkçe 1–20, İnkılap Tarihi 1–10, Din Kültürü 1–10, İngilizce 1–10.
@@ -252,17 +392,19 @@ For every photo (usually one question each):
 4. `yapamadim`: make sure the topic is `active` for her (`topic_status` as in 1a step 7) and that she
    has a `topic` item for it, then create a `mistake` item (`track=mistake, topic_id,
    question_id=<new question id>, step=0, interval_days=1, due_date=tomorrow,
-   note='Yapamadığı soru (kendi gönderdi)'`). Section 1c then writes its variants (in this run if
-   time allows). If her marks showed the wrong idea she followed, give each variant a distractor built on
-   that same idea.
-5. `begendim`: write 2 new questions in the same style and on the same skill, written from scratch as
-   "Original questions only" (top of this file) says: a new scenario, new data and new wording, not her
-   question with other numbers. `variant_of` = the liked question's id, `source=claude`,
-   `source_note='Beğendiği sorunun benzeri'`. They join the pool and reach her in topic reviews and
+   note='Yapamadığı soru (kendi gönderdi)'`). Section 1c then writes the review questions for it (in
+   this run if time allows), from the brief as "Original questions only" says. If her marks showed the
+   wrong idea she followed, put that misconception in the brief and give each new question a distractor
+   built on that idea.
+5. `begendim`: write the brief ("Original questions only", step 1), then 2 new questions on that topic
+   and skill from the brief alone: a new scenario, new data and new wording, not her question with
+   other numbers. `variant_of` = the liked question's id, `source=claude`,
+   `source_note='Beğendiği konudan soru'`. They join the pool and reach her in topic reviews and
    extra practice. The uploaded question itself (`source='ogrenci'`) is for her alone; what the pool
-   gains from an upload is these original questions and the 1c variants.
+   gains from an upload is the original questions written from its brief.
 6. Patch the submission `done` with a short, warm Turkish `result_note` to her, for example "2 soru
-   eklendi. Çözümleri 'Gönderdiğin sorular'da; yapamadığının benzerleri yarın hata tekrarında."
+   eklendi. Çözümleri 'Gönderdiğin sorular'da; takıldığın konu yarın hata tekrarında." Never say
+   "benzeri" here (see "Words shown to families").
 
 ### 1f. A book a child read (`kind = okuma`, has `student_id` and `book_id`)
 
@@ -383,13 +525,14 @@ image and diagnosis) and write `need` variants, a mix of:
 1. The same skill and the same steps to solve, in a new scenario with new data and wording. Only when
    the source is one of our own questions (`source` `claude` or `okuma`) may you keep its frame and
    change the numbers, names or words. For every other source (`meb`, `kitap`, `ogrenci`, and every
-   `exam_questions` item) follow "Original questions only" above: a new question from scratch.
+   `exam_questions` item) follow "Original questions only" above: write the brief first, then a new
+   question from the brief alone.
 2. The same idea asked from another side: reversed question, a "değildir" / "yanlıştır" form, or a
    different choice being correct, so memorising the old answer does not help.
 3. A similar question aimed at the misconception behind her wrong choice (what made `student_answer`
    attractive?).
 Set `variant_of` = the source `question_id` (or `variant_of_exam` = the `exam_question_id`), the same
-`topic_id` and `subject`, `source=claude`, `source_note='Hata tekrarı benzeri'`, and fill `styles`, `stem`,
+`topic_id` and `subject`, `source=claude`, `source_note='Hata tekrarı sorusu'`, and fill `styles`, `stem`,
 `choices`, `answer`, `hint`, `solution`, `target_seconds` and `verified=true` as for any question. The
 grade rules apply (primary school: short sentences, three choices A–C up to grade 3). Matematik and
 Fen: solve each variant twice. Spread correct answers over the letters. Write up to 40 variants per
@@ -398,7 +541,7 @@ run, nearest `due_date` first; they do not count against the limit in section 2.
 Book questions (the source question has a `book_id`, 1f) need different variants. Write them from the
 same pages of that book: re-read the photos of its submission. Ask about the same moment of the story
 from another side, not the same question with new names. Give them the same `book_id`, `topic_id` and
-`subject`, with `source='okuma'` and `source_note='Hata tekrarı benzeri, sayfa 12'`.
+`subject`, with `source='okuma'` and `source_note='Hata tekrarı sorusu, sayfa 12'`.
 
 Skip the mistakes of a book whose `exam_date` is past.
 
@@ -492,6 +635,16 @@ the nearest review (`next_due`). Work in two passes:
 Add up to 80 questions in one run while any topic is below 10 unseen, otherwise up to 40 (fewer if a
 deneme was processed in the same run); later runs continue where you stopped. Never trade quality
 for count. Rules:
+
+- Current question types (velinin kararı, 2026-11-25: "denemeler yeni ise ve soru tipleri güncel ise
+  üretebiliriz; sorularımız güncel ise yararlı olur"). Before writing for a topic, look at what recent
+  denemes ask on it:
+  `exam_catalog_questions?topic_id=eq.<id>&select=brief,styles,catalog_id,exam_catalog(is_current,first_seen)`.
+  Use only rows whose catalog has `is_current = true` (set by the currency task; a deneme not yet
+  reviewed, `is_current` null, does not count), newest first, and write about a third of the
+  topic's new questions from those briefs (the question type and skill, never the question). Set
+  `catalog_id` on each such question so the waiting time applies. If there is no such row, write as
+  usual.
 
 - A student must never see the same question twice, and never one of their own exam questions. Do
   not copy an `exam_questions` item into the pool. Each new question must differ in numbers,

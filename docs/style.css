@@ -847,3 +847,4 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .games-setting label span { flex: 1; }
 .games-setting input { flex: none; margin-top: 2px; }
 .rocket-card { position: relative; }
+.quota-ask h2 { margin: 0; }

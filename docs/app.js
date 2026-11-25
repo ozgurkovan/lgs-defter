@@ -537,7 +537,7 @@ const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.studen
 // ABD'de İngilizce kelime kartları yok (yabancı dil ABD öğrencisi için ayrı bir iş).
 const allowedTabs = () => (state.profile?.role === 'student'
   ? ['home', ...(typeof isUsCurriculum === 'function' && isUsCurriculum(state.profile) ? [] : ['words']), 'shop', 'typing', 'hero', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together', 'cikti']
-  : ['report', 'questions', 'topics', 'upload', 'book', 'settings', 'together', 'cikti']);
+  : ['report', 'questions', 'topics', 'upload', 'ask', 'book', 'settings', 'together', 'cikti']); // ask: veli de çocuğunun yapamadığı soruları yükler
 function goBack() {
   if (navDepth() > 0) history.back();
   else go(rootTab(), 'replace');
@@ -1177,6 +1177,7 @@ async function viewHome() {
   );
 }
 
+// Bedava planda yüklemeler sırada bekler (görev günde belli sayıda fotoğraf işler): "bir saat içinde" denmez.
 function statusTag(status) {
   const map = {
     submitted: ['Sırada, bir saat içinde işlenecek', 'amber'],
@@ -1184,8 +1185,10 @@ function statusTag(status) {
     done: ['İşlendi', 'green'],
     error: ['Sorun var', 'red'],
   };
-  const [t, c] = map[status] || [status, ''];
-  return h('span', { class: 'tag ' + c }, t);
+  const [label, c] = map[status] || [status, ''];
+  const tag = h('span', { class: 'tag ' + c }, label);
+  if (status === 'submitted') planInfo().then((info) => { if (planQueued(info)) tag.replaceChildren(t('Sırada, sıra gelince işlenecek')); });
+  return tag;
 }
 
 // ---------------------------------------------------------------- öğrenci: soru oturumu
@@ -2209,8 +2212,10 @@ document.addEventListener('paste', (e) => {
 async function viewUpload(kind) {
   loading();
   activePicker = null;
-  // Plan (plan.js): bedavada fotoğraf yükleme kapalı; aile planında ayda sınırlı kâğıt deneme ve yeni kitap.
+  // Plan (plan.js): bedavada haftada sınırlı soru fotoğrafı, kâğıt deneme ve kitap kapalı; aile planında ayda sınırlı
+  // kâğıt deneme ve yeni kitap.
   const planNow = await planInfo(true);
+  const askLeft = kind === 'soru' ? planQuestionLeft(planNow) : Infinity;
   const planLock = planUploadLock(planNow, kind);
   if (planLock) { leaveGuard = null; return render(planLock); }
   const planLine = planUploadLine(planNow, kind);
@@ -2242,11 +2247,17 @@ async function viewUpload(kind) {
     h('option', { value: '' }, exams.length ? 'Deneme seç' : 'Henüz deneme yok'),
     exams.map((e) => h('option', { value: e.id }, `${e.name} · ${fmtDate(e.exam_date)}`)),
     h('option', { value: '__new' }, '+ Yeni deneme ekle'));
-  const newName = h('input', { id: 'exam-name', placeholder: 'Örn. Hız Yayınları 3. Deneme' });
+  // Bilinen denemelerin adları öneri olarak gelir (deneme kataloğu): aynı adı seçmek eşleştirmeyi kolaylaştırır.
+  const nameList = h('datalist', { id: 'exam-names' });
+  const newName = h('input', { id: 'exam-name', placeholder: 'Örn. Hız Yayınları 3. Deneme', list: 'exam-names' });
+  if (kind === 'deneme') sb.rpc('exam_catalog_names', { student: sid() }).then(({ data }) => {
+    if (Array.isArray(data)) nameList.replaceChildren(...data.slice(0, 60).map((n) => h('option', { value: n })));
+  }, () => {});
   const newDate = h('input', { id: 'exam-date', type: 'date', value: localDate() });
   const newKind = h('select', { id: 'exam-kind' }, EXAM_KINDS.map(([v, l]) => h('option', { value: v }, l)));
   const newBox = h('div', { class: 'stack', hidden: true },
-    h('label', { class: 'field' }, 'Denemenin adı', newName),
+    h('label', { class: 'field' }, 'Denemenin adı', newName), nameList,
+    h('p', { class: 'small muted' }, 'Kapaktaki adı ve numarasını yaz (yayın, kaçıncı deneme).'),
     h('div', { class: 'row' },
       h('label', { class: 'field', style: 'flex: 1' }, 'Tarih', newDate),
       h('label', { class: 'field', style: 'flex: 1' }, 'Tür', newKind)));
@@ -2282,8 +2293,10 @@ async function viewUpload(kind) {
       return;
     }
     if (kind !== 'deneme') {
-      sendBtn.disabled = !photos.length;
-      missingNote.textContent = photos.length ? '' : kind === 'soru' ? 'Göndermek için en az bir soru fotoğrafı ekle.' : 'Göndermek için en az bir sayfa ekle.';
+      const over = photos.length - askLeft; // bu haftanın soru hakkını aşan fotoğraf
+      sendBtn.disabled = !photos.length || over > 0;
+      missingNote.textContent = over > 0 ? `Bu hafta ${askLeft} soru fotoğrafı hakkı kaldı: ${over} fotoğrafı çıkar.`
+        : photos.length ? '' : kind === 'soru' ? 'Göndermek için en az bir soru fotoğrafı ekle.' : 'Göndermek için en az bir sayfa ekle.';
       return;
     }
     const examOk = examSel.value && (examSel.value !== '__new' || newName.value.trim());
@@ -2351,7 +2364,13 @@ async function viewUpload(kind) {
           : kind === 'okuma'
             ? 'Bir saat içinde sayfaları okuyup sorularını hazırlayacağım. Sorular Bugün sayfasında, konu tekrarının altında gelecek; sınavına kadar her gün biraz.'
           : kind === 'soru'
-            ? 'Bir saat içinde çözümlerini yazacağım; Yükle sekmesinde "Gönderdiğin sorular" altında göreceksin. Yapamadıkların yarından itibaren benzerleriyle hata tekrarında gelecek.'
+            ? (planQueued(planNow)
+              ? (state.profile?.role === 'student'
+                ? 'Soruların sıraya girdi. Sıra gelince çözümlerini yazacağım; Yükle sekmesinde "Gönderdiğin sorular" altında göreceksin. Takıldığın konular ondan sonra hata tekrarında gelecek.'
+                : 'Sorular sıraya girdi. Sıra gelince çözümleri yazılır; çocuğun Yükle sekmesinde "Gönderdiğin sorular" altında görünür. Takıldığı konular ondan sonra hata tekrarında gelir. Aile planında bir saat içinde işlenir.')
+              : state.profile?.role === 'student'
+              ? 'Bir saat içinde çözümlerini yazacağım; Yükle sekmesinde "Gönderdiğin sorular" altında göreceksin. Takıldığın konular yarından itibaren hata tekrarında gelecek.'
+              : 'Bir saat içinde çözümleri yazılır; çocuğun Yükle sekmesinde "Gönderdiğin sorular" altında görünür. Takıldığı konular yarından itibaren hata tekrarında gelir.')
             : 'Bir saat içinde işleyeceğim. Yanlışlarının nedenini seçme görevi ana sayfaya düşecek, ilk tekrarları yarın gelecek.'),
         // Açıldığı sayfaya döner (öğrenci Yükle sekmesine, veli rapora ya da Deneme'ye).
         h('button', { class: 'primary block', onclick: goBack }, 'Tamam')));
@@ -2374,8 +2393,9 @@ async function viewUpload(kind) {
       h('p', { class: 'note', style: 'border-left: 4px solid var(--amber)' },
         '✏️ Yapamadığın her soruda nerede takıldığını, hangi şıklar arasında kaldığını ve hangisini işaretlediğini yaz: ' +
         'fotoğrafı çekmeden önce kâğıdın üstüne kalemle ya da aşağıdaki Not kısmına numarasıyla (1. soru: …).'),
-      photoPicker('Yapamadığım sorular', 'Çözümünü takıldığın yerden anlatırım; benzerleri hata tekrarında gelir.', 'yapamadim', photos, refresh),
-      photoPicker('Beğendiğim sorular', 'Bu tarzda yeni sorular yazarım.', 'begendim', photos, refresh),
+      planLine,
+      photoPicker('Yapamadığım sorular', 'Çözümünü takıldığın yerden anlatırım; konusu hata tekrarına girer.', 'yapamadim', photos, refresh),
+      photoPicker('Beğendiğim sorular', 'Sevdiğin konulardan daha çok soru gelir.', 'begendim', photos, refresh),
       h('section', { class: 'card' }, h('label', { class: 'field' }, 'Not', noteInput)),
       sendBar);
     refresh();
@@ -2578,21 +2598,27 @@ async function viewSend() {
   const added = done.length ? await q(sb.from('questions')
     .select('id, subject, stem, image_path, choices, answer, hint, solution, source_note, submission_id, topics(name)')
     .in('submission_id', done).order('created_at', { ascending: false }).limit(12)) : [];
-  // Bedava planda fotoğraf yükleme kapalı (plan.js): kartlar durur, düğmeler kapanır; gönderdikleri ve çözümleri görünür.
+  // Bedava planda kâğıt deneme ve kitap yükleme kapalı, soru fotoğrafı haftada sınırlı (plan.js): kartlar durur, düğmeler
+  // kapanır; gönderdikleri ve çözümleri görünür.
   const planNow = await planInfo();
   const noUpload = !planNow.uploads ? true : null;
+  const noAsk = planQuestionLeft(planNow) <= 0 ? true : null;
 
   render(
     h('header', { class: 'stack', style: 'gap: 4px' },
       h('p', { class: 'label' }, 'Yükle'),
       h('h1', {}, 'Fotoğrafla gönder'),
       h('p', { class: 'muted' }, 'Tek tek sorular ya da kâğıt üzerinde çözdüğün bir deneme.')),
-    noUpload ? h('p', { class: 'note small quota-line' }, 'Fotoğraf yükleme şu an kapalı. Velin Ayarlar\'dan açabilir.') : null,
     h('section', { class: 'card stack', style: 'gap: 8px' },
       h('h2', {}, 'Soru ekle'),
-      h('p', { class: 'small muted' }, 'Testte yapamadığın ya da çok beğendiğin bir soru mu var? Fotoğrafını çek, gönder. ' +
-        'Bir saat içinde çözümünü yazarım; yapamadıkların benzerleriyle hata tekrarına girer, beğendiklerinin benzerleri de gelir.'),
-      h('button', { class: 'primary block', disabled: noUpload, onclick: () => go('ask') }, 'Soru ekle')),
+      h('p', { class: 'small muted' }, planQueued(planNow)
+        ? 'Okulda, ödevde ya da testte yapamadığın bir soru mu var? Fotoğrafını çek, gönder. Sıra gelince çözümünü yazarım; takıldığın konu hata tekrarına girer. Çok beğendiğin soruları da gönderebilirsin.'
+        : 'Okulda, ödevde ya da testte yapamadığın bir soru mu var? Fotoğrafını çek, gönder. ' +
+        'Bir saat içinde çözümünü yazarım; takıldığın konu hata tekrarına girer. Çok beğendiğin soruları da gönderebilirsin.'),
+      planUploadLine(planNow, 'soru'),
+      noAsk ? h('p', { class: 'note small quota-line' }, 'Bu haftanın soru fotoğrafları tamam. Yeni hak pazartesi açılır.') : null,
+      h('button', { class: 'primary block', disabled: noAsk, onclick: () => go('ask') }, 'Soru ekle')),
+    noUpload && primary ? h('p', { class: 'note small quota-line' }, 'Kitap yükleme şu an kapalı. Velin Ayarlar\'dan açabilir.') : null,
     // İlkokul: okuduğu kitabın sayfaları. Sorular sınav tarihine kadar Bugün'de, konu tekrarının altında gelir.
     primary ? h('section', { class: 'card stack', style: 'gap: 8px' },
       h('h2', {}, 'Okuduğum kitap'),
@@ -2606,8 +2632,8 @@ async function viewSend() {
     h('section', { class: 'card stack', style: 'gap: 8px' },
       h('h2', {}, 'Kâğıt deneme'),
       h('p', { class: 'small muted' }, 'Kâğıt üzerinde bir deneme mi çözdün? Fotoğraflarını gönder, ben notlandırayım.'),
-      planNow.uploads && planNow.paper_month != null ? h('p', { class: 'small muted quota-line' }, `Bu ay ${planNow.paper_month} kâğıt denemenin ${planNow.paper_used} tanesi yüklendi.`) : null,
-      h('button', { class: 'block', disabled: noUpload || (planPaperLeft(planNow) <= 0 ? true : null), onclick: () => go('paper') }, 'Kâğıt denemeyi yükle')),
+      planNow.paper_month != null ? h('p', { class: 'small muted quota-line' }, `Bu ay ${planNow.paper_month} kâğıt denemenin ${planNow.paper_used} tanesi yüklendi.`) : null,
+      h('button', { class: 'block', disabled: planPaperLeft(planNow) <= 0 ? true : null, onclick: () => go('paper') }, 'Kâğıt denemeyi yükle')),
     added.length ? h('section', { class: 'stack' },
       h('h2', {}, 'Gönderdiğin sorular'),
       added.map((x) => h('div', { class: 'card stack', style: 'gap: 8px' },
@@ -5405,7 +5431,7 @@ async function viewReport() {
     // En üstte derse ve konuya göre yanlış grafiği (velinin isteği, 2026-11-21: "öğretmenleri görsün"; export.js).
     ['zayif', 'Zayıf konular', () => [reportMissChart(reviews30, eqs, topicName), gapCards, weakCards, causes, pastNoteCards]], // "Yanlışlar nereden geliyor?" burada (velinin isteği, 2026-11-10)
     ['son14', 'Son 14 gün', () => [perf, load]],
-    ['yuklemeler', 'Yüklemeler', () => [job]],
+    ['yuklemeler', 'Yüklemeler', () => [state.profile.role === 'parent' ? planAskCard() : null, job].filter(Boolean)],
     ['diger', 'Kelime · Klavye · Kitap', () => emptyNote([wordBox(), typingBox(), booksBox()],
       'Henüz kelime kartı, klavye dersi ya da okuduğu kitap yok.',
       state.profile.role !== 'parent' ? null : /^us/.test(studentCurriculum(state.student))

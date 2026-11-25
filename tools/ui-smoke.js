@@ -1257,7 +1257,7 @@
     }
     // Plan sınırları (velinin isteği, 2026-11-22: "20 soru sınırını yapalım, kullanıcılar unlock yapabilsinler… ayda 6 deneme,
     // paralıda bile"). Plan taklit edilir, hiçbir şey kaydedilmez ("İsteğimi gönder"e basılmaz).
-    const FREE_PLAN = { plan: 'free', gift: false, daily_questions: 20, exams_week: 1, uploads: false, paper_month: 0, books_month: 0, paper_used: 0, books_used: 0, words: false, typing: false, army: false };
+    const FREE_PLAN = { plan: 'free', gift: false, daily_questions: 20, exams_week: 1, uploads: false, question_week: 10, question_used: 2, process_day: 50, paper_month: 1, books_month: 0, paper_used: 1, books_used: 0, words: false, typing: false, army: false };
     const PAID_PLAN = { plan: 'family', gift: false, daily_questions: null, exams_week: null, uploads: true, paper_month: 6, books_month: 2, paper_used: 6, books_used: 0 };
     const btnBy = (re) => [...document.querySelectorAll('#app button')].find((x) => re.test(x.textContent.trim()));
     if (role === 'student') {
@@ -1274,14 +1274,26 @@
         && !paidTabs.length && !armyOpen(state.student) && armyOn(state.student) === (state.student.hero_army ?? ((state.student.grade || 8) <= 7)),
         `satır "${line}", sunulan ${offered}${paidTabs.length ? '; sekmeler ' + paidTabs.join() : ''}`);
       go('send'); await settle();
-      const sendOff = pageText().includes('fotoğraf yükleme şu an kapalı') && btnBy(/^Soru ekle$/)?.disabled && btnBy(/^Kâğıt denemeyi yükle$/)?.disabled;
+      // Soru fotoğrafı bedavada da açık, haftada 10; kâğıt deneme ayda 1 (velinin isteği, 2026-11-25); kitap kapalı.
+      const sendOff = pageText().includes('1 kâğıt denemenin 1 tanesi') && pageText().includes('10 soru fotoğrafının 2 tanesi')
+        && pageText().includes('sıra gelince çözümünü yazarım') && !pageText().includes('bir saat içinde çözümünü')
+        && btnBy(/^Soru ekle$/) && !btnBy(/^Soru ekle$/).disabled && btnBy(/^Kâğıt denemeyi yükle$/)?.disabled;
       go('ask'); await settle();
-      const lockKid = !!document.querySelector('#app .quota-lock') && !document.querySelector('#app .quota-unlock') && !document.querySelector('#app input[type=file]');
+      const askFree = !document.querySelector('#app .quota-lock') && !!document.querySelector('#app input[type=file]') && pageText().includes('10 soru fotoğrafının 2 tanesi');
+      go('paper'); await settle();
+      const paperLock = !!document.querySelector('#app .quota-lock') && !!btnBy(/^Soru gönder$/) && !document.querySelector('#app .quota-unlock') && !document.querySelector('#app input[type=file]');
+      setPlan({ ...FREE_PLAN, question_used: 10 });
+      go('send'); await settle();
+      const sendFull = btnBy(/^Soru ekle$/)?.disabled && pageText().includes('bu haftanın soru fotoğrafları tamam');
+      go('ask'); await settle();
+      const lockKid = askFree && paperLock && !!sendFull && !!document.querySelector('#app .quota-lock') && pageText().includes('yeni hak pazartesi')
+        && !document.querySelector('#app .quota-unlock') && !document.querySelector('#app input[type=file]') && !/dolar/.test(pageText());
+      setPlan(FREE_PLAN);
       go('upload'); await settle();
       const starts = [...document.querySelectorAll('#app button')].filter((x) => /^(Başla|Yeniden çöz)$/.test(x.textContent.trim()));
       const examOk = starts.length > 0 && starts.every((x) => x.disabled === !!state.examWait) && (!state.examWait || pageText().includes('bu haftanın denemesini çözdün'));
-      check('Plan: bedavada Yükle düğmeleri kapalı ve yükleme sayfası kilitli (teklifsiz); Deneme sekmesi haftalık hakka göre',
-        !!sendOff && lockKid && examOk, [!sendOff && 'Yükle açık', !lockKid && 'soru sayfası kilitli değil', !examOk && `deneme düğmeleri (bekleme ${state.examWait})`].filter(Boolean).join('; '));
+      check('Plan: bedavada soru fotoğrafı açık (haftada 10, sayaçla), hak dolunca kilitli ve teklifsiz; ayın 1 kâğıt denemesi dolunca kilitli; Deneme sekmesi haftalık hakka göre',
+        !!sendOff && lockKid && examOk, [!sendOff && 'Yükle sayfası', !askFree && 'soru sayfası açık değil', !paperLock && 'kâğıt deneme kilidi', !sendFull && 'hak dolunca düğme', !lockKid && 'hak dolunca kilit', !examOk && `deneme düğmeleri (bekleme ${state.examWait})`].filter(Boolean).join('; '));
       setPlan(PAID_PLAN);
       go('send'); await settle();
       const paidSend = pageText().includes('6 kâğıt denemenin 6 tanesi') && btnBy(/^Kâğıt denemeyi yükle$/)?.disabled && !btnBy(/^Soru ekle$/)?.disabled;
@@ -1317,8 +1329,18 @@
       check('Plan: velide "Çocuğunuz neyle karşılaşacak?" açıklaması (beş başlık, oyunun ne olduğu); Günlük planda Oyunlar satırı çocuğun ayarıyla',
         previewOk && !!gHero && !!gRocket && gHero.checked === heroGamesOn(state.student) && gRocket.checked === typingGameOn(state.student),
         [!previewOk && 'açıklama', !(gHero && gRocket) && 'Oyunlar satırı yok'].filter(Boolean).join('; '));
+      // Veli de çocuğunun yapamadığı soruları yükler (velinin isteği, 2026-11-24): raporun Yüklemeler sekmesinde çağrı kartı.
+      go('report'); await settle();
+      btnBy(/^Yüklemeler$/)?.click(); await wait(400);
+      let askCard = null;
+      for (let i = 0; i < 20 && !((askCard = document.querySelector('#app .quota-ask'))?.querySelector('.quota-line:not([hidden])')); i++) await wait(150);
+      const askCardOk = !!askCard && /10 soru fotoğrafının 2 tanesi/.test(askCard.textContent) && !/benzer/i.test(askCard.textContent) && /sıraya girer/.test(askCard.textContent);
+      go('ask'); await settle();
+      const parentAsk = state.tab === 'ask' && !!document.querySelector('#app input[type=file]') && !document.querySelector('#app .quota-lock');
+      check('Plan: veli de soru yükler: raporun Yüklemeler sekmesinde "Yapamadığı soruları yükleyin" kartı ve haftalık sayaç; Soru gönder sayfası velide açılır',
+        askCardOk && parentAsk, [!askCardOk && 'kart', !parentAsk && 'soru sayfası'].filter(Boolean).join('; '));
       go('upload'); await settle();
-      const lockParent = !!document.querySelector('#app .quota-lock .quota-unlock') && !document.querySelector('#app input[type=file]');
+      const lockParent = !!document.querySelector('#app .quota-lock .quota-unlock') && !!btnBy(/^Yapamadığı soruları yükle$/) && !document.querySelector('#app input[type=file]');
       check('Plan: velinin Ayarlar\'ında bedava plan kartı ve "Kilidi aç" (pencere sorar, vazgeçilince kaydedilmez); velinin yükleme sayfası kilitli ve teklifli',
         freeText.includes('bedava plan') && freeText.includes('günde 20 soru') && !!unlock && dlgOk && !document.querySelector('.ask') && lockParent,
         [!freeText.includes('bedava plan') && 'kart yok', !unlock && 'düğme yok', !dlgOk && 'pencere', !lockParent && 'yükleme kilidi'].filter(Boolean).join('; '));

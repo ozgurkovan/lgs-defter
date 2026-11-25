@@ -8,13 +8,13 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(join(root, 'docs', 'plan.js'), 'utf8');
 const pure = src.slice(src.indexOf('/* Plan: saf kısım */'), src.indexOf('/* Plan: ekran */'));
-const T = new Function(pure + '\nreturn { PLAN_OPEN, planNorm, planCounted, planDailyLeft, planTrim, planExamWait, planAddDays, planPaperLeft, planBooksLeft, planAllows, heroGamesOn, typingGameOn };')();
+const T = new Function(pure + '\nreturn { PLAN_OPEN, planNorm, planCounted, planDailyLeft, planTrim, planExamWait, planAddDays, planPaperLeft, planBooksLeft, planQuestionLeft, planQueued, planAllows, heroGamesOn, typingGameOn };')();
 
 let fails = 0;
 const check = (label, cond, info) => { if (!cond) fails++; console.log(`${cond ? 'OK  ' : 'FAIL'} ${label}${info !== undefined ? '  ' + info : ''}`); };
 
-const FREE = T.planNorm({ plan: 'free', gift: false, daily_questions: 20, exams_week: 1, uploads: false, paper_month: 0, books_month: 0, paper_used: 0, books_used: 0, words: false, typing: false, army: false });
-const PAID = T.planNorm({ plan: 'family', gift: false, daily_questions: null, exams_week: null, uploads: true, paper_month: 6, books_month: 2, paper_used: 4, books_used: 2 });
+const FREE = T.planNorm({ plan: 'free', gift: false, daily_questions: 20, exams_week: 1, uploads: false, question_week: 10, question_used: 2, process_day: 50, paper_month: 1, books_month: 0, paper_used: 0, books_used: 0, words: false, typing: false, army: false });
+const PAID = T.planNorm({ plan: 'family', gift: false, daily_questions: null, exams_week: null, uploads: true, question_week: null, question_used: 40, paper_month: 6, books_month: 2, paper_used: 4, books_used: 2 });
 const GIFT = T.planNorm({ plan: 'family', gift: true, daily_questions: null, exams_week: null, uploads: true, paper_month: null, books_month: null, paper_used: 9, books_used: 5 });
 
 check('plan okunamazsa (boş, hata, eksik satır) hiçbir şey kısıtlanmaz ve "bilinmiyor" işaretlenir',
@@ -62,8 +62,17 @@ check('haftalık deneme: birden çok denemede en yenisi sayılır; ücretli ve h
   && T.planExamWait(FREE, [{ exam_date: '2026-11-28' }], '2026-11-30') === '2026-12-05' && T.planAddDays('2027-02-28', 1) === '2027-03-01');
 check('aylık haklar: ücretli 6 denemeden 4 yüklendiyse 2 kalır, 2 kitaptan 2 eklendiyse 0; hediyede Infinity; bedavada 0',
   T.planPaperLeft(PAID) === 2 && T.planBooksLeft(PAID) === 0 && T.planPaperLeft(GIFT) === Infinity && T.planBooksLeft(GIFT) === Infinity
-  && T.planPaperLeft(FREE) === 0 && T.planBooksLeft(FREE) === 0 && T.planPaperLeft({ ...PAID, paper_used: 9 }) === 0);
+  && T.planPaperLeft(FREE) === 1 && T.planPaperLeft({ ...FREE, paper_used: 1 }) === 0 && T.planBooksLeft(FREE) === 0 && T.planPaperLeft({ ...PAID, paper_used: 9 }) === 0
+  && T.planPaperLeft(T.planNorm({ plan: 'free', uploads: false, paper_month: 0 })) === 0 && T.planPaperLeft(T.planNorm({ plan: 'free', uploads: false })) === 0);
 
+check('soru fotoğrafı: bedavada haftada 10, 2 gönderildiyse 8 kalır, eksiye düşmez; ücretli, hediye ve bilinmeyen planda Infinity; alanı tanımayan eski veritabanında yükleme kapalıysa 0, açıksa sınırsız',
+  T.planQuestionLeft(FREE) === 8 && T.planQuestionLeft({ ...FREE, question_used: 19 }) === 0 && T.planQuestionLeft(PAID) === Infinity
+  && T.planQuestionLeft(GIFT) === Infinity && T.planQuestionLeft(T.planNorm(null)) === Infinity && T.planQuestionLeft(null) === Infinity
+  && T.planQuestionLeft(T.planNorm({ plan: 'free', uploads: false })) === 0 && T.planQuestionLeft(T.planNorm({ plan: 'family', uploads: true })) === Infinity
+  && T.planPaperLeft(FREE) === 1, String(T.planQuestionLeft(FREE)));
+check('sıra: bedavada yüklemeler sırada bekler (process_day dolu); ücretli, hediye, bilinmeyen plan ve alanı tanımayan eski veritabanında beklemez',
+  T.planQueued(FREE) === true && T.planQueued({ ...FREE, process_day: 0 }) === true && !T.planQueued(PAID) && !T.planQueued(GIFT)
+  && !T.planQueued(T.planNorm(null)) && !T.planQueued(null) && !T.planQueued(T.planNorm({ plan: 'free', uploads: false })));
 check('özellikler: bedavada kelime kartları, klavye ve asker kahraman kapalı; ücretli ve hediyede açık; plan bilinmiyorsa ya da alan yoksa açık',
   ['words', 'typing', 'army'].every((f) => !T.planAllows(FREE, f) && T.planAllows(PAID, f) && T.planAllows(GIFT, f) && T.planAllows(null, f) && T.planAllows(T.planNorm(null), f))
   && T.planNorm({ plan: 'free' }).words === true);
