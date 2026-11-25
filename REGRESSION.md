@@ -189,6 +189,13 @@ yüklemesi yapabilecekler ama onun da bir limiti olsun, mesela ayda 6 deneme, pa
   (`exam_question_kin`); biri için yazılan hata tekrarı soruları öbürlerine de gelir (`exam_kin`, uygulama okur) ve
   `mistake_variant_needs` onlar için yeniden soru istemez. Katalogda olmayan denemede eskisi gibi. Bekletme bozulmaz.
   [O] `test-exam-catalog.sql`; ekranda iki çocukla [E]
+- **Bize yazın** (v144; velinin isteği, 2026-11-25: "velilerden feedback alabileceğimiz bir alan olsun, veliyle diyaloğa
+  girebilelim; Haiku onları işlesin, bize aktarsın"): velinin Ayarlar'ında "Bize yazın" kartı (okunmamış cevap varsa "Yeni
+  cevap var"), yazışma sayfası; her velinin tek yazışması. Saatlik görev velinin mesajını sınıflar (öneri, sorun, soru,
+  teşekkür, şikâyet, hesap), önceliklendirir, ekip için tek cümle özet yazar ve "Telafio asistanı" adıyla kısa karşılık
+  verebilir (söz vermez, fiyat konuşmaz, isteği uygulamaz; yapay zekâ olduğu sayfada yazar). Yönetici hesabı
+  (`app_admins`) aynı sayfada gelen kutusunu görür, "Telafio ekibi" adıyla cevaplar. Veli günde en çok 10 mesaj yazar.
+  Çocuk ve öğretmen görmez. [O] `test-parent-feedback.sql`, [A] kart ve sayfa; gerçek yazışma ve gelen kutusu [E]
 - **İki görev, iki rol** (velinin kararı, 2026-11-25): saatlik görev (küçük model) soru yazmaz ve yeni denemeyi işlemez;
   katalogda olmayan denemeyi `route = 'yazim'` ile bırakır. Yazım görevi (ayrı zamanlanmış görev, güçlü model, günde 3 kez;
   deneme amaçlı, bir iki hafta sonra küçük modelle karşılaştırılacak) çalıştırma başına en çok 1 yeni deneme işler ve en çok

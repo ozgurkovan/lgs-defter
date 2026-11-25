@@ -1339,6 +1339,15 @@
       const parentAsk = state.tab === 'ask' && !!document.querySelector('#app input[type=file]') && !document.querySelector('#app .quota-lock');
       check('Plan: veli de soru yükler: raporun Yüklemeler sekmesinde "Yapamadığı soruları yükleyin" kartı ve haftalık sayaç; Soru gönder sayfası velide açılır',
         askCardOk && parentAsk, [!askCardOk && 'kart', !parentAsk && 'soru sayfası'].filter(Boolean).join('; '));
+      // Bize yazın (velinin isteği, 2026-11-25): Ayarlar'da kart, yazışma sayfası; bir şey göndermez.
+      go('settings'); await settle();
+      let fbCard = null;
+      for (let i = 0; i < 20 && !(fbCard = document.querySelector('#app .fb-card')); i++) await wait(150);
+      btnBy(/^Yazışmayı aç$/)?.click(); await settle();
+      for (let i = 0; i < 20 && !document.querySelector('#fb-text'); i++) await wait(150);
+      const fbOpen = state.tab === 'feedback' && !!document.querySelector('#fb-text') && pageText().includes('yapay zekâ') && !!btnBy(/^Gönder$/);
+      check('Bize yazın: velinin Ayarlar sayfasında kart; yazışma sayfasında mesaj kutusu, Gönder ve asistanın yapay zekâ olduğu açıklaması',
+        !!fbCard && fbOpen, [!fbCard && 'kart yok', !fbOpen && `sayfa (${state.tab})`].filter(Boolean).join('; '));
       go('upload'); await settle();
       const lockParent = !!document.querySelector('#app .quota-lock .quota-unlock') && !!btnBy(/^Yapamadığı soruları yükle$/) && !document.querySelector('#app input[type=file]');
       check('Plan: velinin Ayarlar\'ında bedava plan kartı ve "Kilidi aç" (pencere sorar, vazgeçilince kaydedilmez); velinin yükleme sayfası kilitli ve teklifli',

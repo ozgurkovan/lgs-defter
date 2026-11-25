@@ -537,7 +537,8 @@ const rootTab = () => (state.profile?.role === 'student' ? 'home' : state.studen
 // ABD'de İngilizce kelime kartları yok (yabancı dil ABD öğrencisi için ayrı bir iş).
 const allowedTabs = () => (state.profile?.role === 'student'
   ? ['home', ...(typeof isUsCurriculum === 'function' && isUsCurriculum(state.profile) ? [] : ['words']), 'shop', 'typing', 'hero', 'upload', 'send', 'paper', 'ask', 'read', 'topics', 'konu', 'settings', 'reasons', 'together', 'cikti']
-  : ['report', 'questions', 'topics', 'upload', 'ask', 'book', 'settings', 'together', 'cikti']); // ask: veli de çocuğunun yapamadığı soruları yükler
+  : ['report', 'questions', 'topics', 'upload', 'ask', 'book', 'settings', 'together', 'cikti', // ask: veli de çocuğunun yapamadığı soruları yükler
+    ...(state.profile?.role === 'parent' ? ['feedback'] : [])]); // feedback: "Bize yazın" yalnızca velide
 function goBack() {
   if (navDepth() > 0) history.back();
   else go(rootTab(), 'replace');
@@ -601,6 +602,7 @@ function go(tab, how = 'push') {
     together: viewTogether, words: viewWords, shop: viewShop, typing: viewTyping, // klavye dersleri: typing.js
     hero: viewHero, // kahramanı besleme: feed.js
     cikti: viewExport, // yapamadığı soruları yazdırma ve Excel'e aktarma: export.js
+    feedback: viewFeedback, // veli: bize yazın
   };
   Promise.resolve((views[tab] || viewHome)()).catch((e) => render(failBox(e)));
   return true;
@@ -4251,6 +4253,7 @@ function viewSettings() {
     isParent && p ? planCard() : null,
     isParent && p ? planSection(p) : null,
     isParent ? familySection() : null,
+    isParent ? feedbackCard() : null,
     showStudent && h('section', { class: 'card' },
       isParent ? h('label', { class: 'field' }, 'Sınıfı', grade) : null,
       isParent ? nextUpRow : null,
@@ -4559,6 +4562,129 @@ function heroEditor(kid) {
 
 /* Veli: çocuk ekler/siler, ikinci veliyi (eşini) ve öğretmenleri ekler; öğretmenin hangi
    çocukları göreceğini seçer. Hesap açma/silme sunucudaki "family" fonksiyonunda yapılır. */
+// ---------------------------------------------------------------- veli: bize yazın (geri bildirim)
+
+/* Veliden geri bildirim ve yazışma (velinin isteği, 2026-11-25: "velilerden feedback alabileceğimiz bir alan olsun,
+   veliyle diyaloğa girebilelim; Haiku onları işlesin, bize aktarsın"). Yalnızca velide, Ayarlar'da "Bize yazın". Her velinin
+   tek yazışması vardır (supabase/parent-feedback.sql). Saatlik görev velinin mesajını sınıflar, özetler ve "Telafio asistanı"
+   adıyla kısa bir karşılık yazabilir; ekip (yönetici hesabı) aynı sayfada gelen kutusunu görür ve "Telafio ekibi" adıyla
+   cevaplar. Çocuk ve öğretmen bu sayfayı görmez. */
+const FB_CATS = { oneri: 'Öneri', sorun: 'Sorun', soru: 'Soru', tesekkur: 'Teşekkür', sikayet: 'Şikâyet', hesap: 'Hesap' };
+const FB_ACTIONS = [['', 'Karar verilmedi'], ['yapilacak', 'Değişiklik gerekiyor'], ['yapildi', 'Yapıldı'], ['yok', 'Gerek yok']];
+const fbWhen = (iso) => new Date(iso).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+function feedbackCard() {
+  const note = h('p', { class: 'small fb-new', hidden: true }, 'Yeni cevap var.');
+  sb.rpc('feedback_unread').then(({ data }) => { if (data > 0) note.hidden = false; }, () => {});
+  const box = h('section', { class: 'card stack fb-card', style: 'gap: 8px' },
+    h('h2', {}, 'Bize yazın'),
+    h('p', { class: 'small muted' }, 'Öneriniz, bir sorununuz ya da sorunuz mu var? Yazın; okuyup cevaplıyoruz.'),
+    note,
+    h('button', { class: 'block', onclick: () => { state.fbThread = null; go('feedback'); } }, 'Yazışmayı aç'));
+  // Ekip hesabında (yönetici) aynı kart ekip panelini açar: velilerin yazdıkları ve "Kilidi aç" istekleri.
+  sb.rpc('is_admin').then(({ data }) => {
+    if (data !== true) return;
+    sb.rpc('feedback_inbox').then(({ data: rows }) => {
+      const n = (rows || []).filter((r) => r.waiting).length;
+      fill(box, h('h2', {}, 'Ekip paneli'),
+        h('p', { class: 'small muted' }, 'Velilerin yazdıkları ve "Kilidi aç" istekleri.'),
+        n ? h('p', { class: 'small fb-new' }, `${n} yazışma cevabınızı bekliyor.`) : null,
+        h('button', { class: 'primary block', onclick: () => { state.fbThread = null; go('feedback'); } }, 'Paneli aç'));
+    }, () => {});
+  }, () => {});
+  return box;
+}
+async function viewFeedback() {
+  let admin = false;
+  try { admin = (await sb.rpc('is_admin')).data === true; } catch (e) { admin = false; }
+  if (admin && !state.fbThread) return feedbackInbox();
+  const owner = admin ? state.fbThread.id : state.user.id;
+  const rows = await q(sb.from('feedback_messages').select(admin ? 'id, sender, body, created_at, category, priority, summary, action' : 'id, sender, body, created_at')
+    .eq('parent_id', owner).order('created_at'));
+  // Ekip velinin mesajını kendi sınıflar ve değişiklik gerekip gerekmediğini işaretler (velinin isteği, 2026-11-25).
+  const sortRow = (m) => {
+    const cat = h('select', { 'aria-label': 'Sınıf' }, h('option', { value: '' }, 'Sınıf seç'),
+      Object.entries(FB_CATS).map(([v, l]) => h('option', { value: v, selected: v === m.category || null }, l)));
+    const act = h('select', { 'aria-label': 'Değişiklik gerekiyor mu' },
+      FB_ACTIONS.map(([v, l]) => h('option', { value: v, selected: v === (m.action || '') || null }, l)));
+    const save = async () => {
+      try {
+        if ((await q(sb.rpc('feedback_set', { msg: m.id, cat: cat.value, act: act.value }))) !== true) throw new Error('yetki');
+        m.category = cat.value || m.category; m.action = act.value || null;
+        toast('Kaydedildi.');
+      } catch (e) { toast('Kaydedilemedi.'); }
+    };
+    cat.addEventListener('change', save); act.addEventListener('change', save);
+    return h('div', { class: 'row fb-sort' }, cat, act);
+  };
+  if (admin) sb.rpc('feedback_team_seen', { parent: owner }).then(() => {}, () => {});
+  else sb.rpc('feedback_mark_read').then(() => {}, () => {});
+  const who = (m) => (m.sender === 'veli' ? (admin ? state.fbThread.name : 'Siz') : m.sender === 'ekip' ? 'Telafio ekibi' : 'Telafio asistanı');
+  const mine = (m) => (admin ? m.sender === 'ekip' : m.sender === 'veli');
+  const input = h('textarea', { id: 'fb-text', rows: 4, maxlength: 2000, 'aria-label': 'Mesaj', placeholder: admin ? 'Veliye cevabınız' : 'Mesajınız' });
+  const send = h('button', { class: 'primary block', onclick: async () => {
+    const body = input.value.trim();
+    if (!body) return;
+    send.disabled = true;
+    try {
+      await q(sb.from('feedback_messages').insert({ parent_id: owner, sender: admin ? 'ekip' : 'veli', body }));
+      viewFeedback();
+    } catch (e) {
+      send.disabled = false;
+      toast(/feedback_limit/.test(e.message || '') ? 'Bugün çok mesaj yazdınız; yarın yine yazabilirsiniz.' : 'Gönderilemedi; internetinizi kontrol edin.');
+    }
+  } }, 'Gönder');
+  render(
+    h('header', { class: 'stack', style: 'gap: 4px' },
+      h('p', { class: 'label' }, admin ? 'Geri bildirim' : 'Bize yazın'),
+      h('h1', {}, admin ? state.fbThread.name : 'Yazışma'),
+      admin ? null : h('p', { class: 'small muted' }, 'Mesajınızı önce Telafio asistanı (yapay zekâ) okur ve kısa bir karşılık yazabilir. Bütün mesajları ekibimiz okur ve buradan cevaplar.')),
+    h('section', { class: 'stack fb-list', style: 'gap: 8px' },
+      rows.length ? rows.map((m) => h('div', { class: 'fb-msg' + (mine(m) ? ' fb-mine' : '') },
+        h('div', { class: 'spread small' }, h('b', {}, who(m)), h('span', { class: 'muted' }, fbWhen(m.created_at))),
+        h('p', { class: 'fb-body' }, m.body),
+        admin && m.sender === 'veli' && (m.summary || m.priority === 1) ? h('p', { class: 'small muted' },
+          [m.priority === 1 ? t('Acil') : null, m.summary].filter(Boolean).join(' · ')) : null,
+        admin && m.sender === 'veli' ? sortRow(m) : null))
+        : h('p', { class: 'muted' }, admin ? 'Henüz mesaj yok.' : 'Henüz mesaj yok. İlk mesajınızı yazın.')),
+    h('section', { class: 'card stack', style: 'gap: 8px' }, input, send),
+    admin ? h('button', { class: 'block', onclick: () => { state.fbThread = null; viewFeedback(); } }, 'Gelen kutusu') : null);
+}
+// Ekibin gelen kutusu: cevap bekleyenler ve acil olanlar önce.
+async function feedbackInbox() {
+  const [rows, asks, todo] = await Promise.all([
+    q(sb.rpc('feedback_inbox')).then((x) => x || []),
+    sb.rpc('admin_unlock_requests').then(({ data }) => data || [], () => []),
+    sb.rpc('feedback_todo').then(({ data }) => data || [], () => []),
+  ]);
+  render(
+    h('header', { class: 'stack', style: 'gap: 4px' },
+      h('p', { class: 'label' }, 'Ekip'),
+      h('h1', {}, 'Ekip paneli'),
+      h('p', { class: 'small muted' }, 'Velilerin yazdıkları. Basit soruları asistan cevaplar; "Cevap bekliyor" yazanlar sizi bekler. Cevabınız veliye "Telafio ekibi" adıyla gider.')),
+    asks.length ? h('section', { class: 'card stack fb-asks', style: 'gap: 6px' },
+      h('h2', {}, '"Kilidi aç" istekleri'),
+      asks.map((a) => h('div', { class: 'spread small' }, h('b', {}, a.name), h('span', { class: 'muted' }, fbWhen(a.created_at)))),
+      h('p', { class: 'small muted' }, 'Bu veliler aile planını istedi. Ödeme adımı için kendileriyle iletişime geçin.')) : null,
+    todo.length ? h('section', { class: 'card stack fb-todo', style: 'gap: 6px' },
+      h('h2', {}, 'Yapılacaklar'),
+      h('p', { class: 'small muted' }, '"Değişiklik gerekiyor" diye işaretlediğiniz mesajlar. Yapılınca yazışmada "Yapıldı" seçin.'),
+      todo.map((x) => h('button', { class: 'ghost fb-row', style: 'text-align: left', onclick: () => { state.fbThread = { id: x.parent_id, name: x.name }; viewFeedback(); } },
+        h('span', { class: 'small' }, [FB_CATS[x.category] && t(FB_CATS[x.category]), x.text].filter(Boolean).join(' · ')),
+        h('span', { class: 'small muted' }, ` · ${x.name} · ${fbWhen(x.created_at)}`)))) : null,
+    h('h2', {}, 'Geri bildirimler'),
+    rows.length ? h('section', { class: 'stack', style: 'gap: 8px' }, rows.map((r) =>
+      h('button', { class: 'card stack fb-row', style: 'gap: 4px; text-align: left', onclick: () => { state.fbThread = { id: r.parent_id, name: r.name }; viewFeedback(); } },
+        h('div', { class: 'spread' }, h('b', {}, r.name),
+          h('span', { class: 'row', style: 'gap: 6px' },
+            r.priority === 1 && r.unseen ? h('span', { class: 'tag red' }, 'Acil') : null,
+            r.waiting ? h('span', { class: 'tag amber' }, 'Cevap bekliyor')
+              : h('span', { class: 'tag green' }, r.answered_by === 'ekip' ? 'Cevaplandı' : 'Asistan cevapladı'))),
+        h('p', { class: 'small' }, [FB_CATS[r.category] && t(FB_CATS[r.category]), r.summary || r.last_text].filter(Boolean).join(' · ')),
+        h('p', { class: 'small muted' }, `${fbWhen(r.last_at)} · ${r.messages} mesaj`))))
+      : h('p', { class: 'muted' }, 'Henüz geri bildirim yok.'),
+    h('button', { class: 'block', onclick: () => { state.fbThread = { id: state.user.id, name: state.profile.display_name }; viewFeedback(); } }, 'Kendi yazışmam'));
+}
+
 function familySection() {
   const box = h('section', { class: 'stack' }, h('h2', {}, 'Aile'), h('p', { class: 'small muted' }, 'Yükleniyor…'));
   const reload = async () => {

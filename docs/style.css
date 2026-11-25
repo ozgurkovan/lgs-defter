@@ -848,3 +848,16 @@ button.battle-pill:disabled { opacity: 0.5; cursor: default; }
 .games-setting input { flex: none; margin-top: 2px; }
 .rocket-card { position: relative; }
 .quota-ask h2 { margin: 0; }
+
+/* Veli: bize yazın (geri bildirim yazışması) */
+.fb-card h2 { margin: 0; }
+.fb-new { color: var(--accent); font-weight: 600; }
+.fb-list { margin: 8px 0; }
+.fb-msg { padding: 10px 12px; border: 1px solid var(--rule); border-radius: 12px; margin-right: 12%; }
+.fb-msg.fb-mine { margin-right: 0; margin-left: 12%; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.fb-body { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-row { width: 100%; }
+.fb-asks h2 { margin: 0; }
+.fb-todo h2 { margin: 0; }
+.fb-sort { gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.fb-sort select { flex: 1; min-width: 140px; }
